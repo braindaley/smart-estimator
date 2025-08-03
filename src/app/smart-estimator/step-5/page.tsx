@@ -1,17 +1,45 @@
+"use client";
+
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { StepNavigation } from '@/components/step-navigation';
+import { Button } from '@/components/ui/button';
+import { useEstimatorStore } from '@/lib/estimator-store';
+
+const paymentStatusOptions = [
+  { label: "Current", value: "Current" },
+  { label: "Late on payments", value: "Late on payments" },
+  { label: "In collections", value: "In collections" },
+];
 
 export default function Step5() {
+  const router = useRouter();
+  const { setFormData } = useEstimatorStore();
+
+  const handleSelection = (currentPaymentStatus: string) => {
+    setFormData('step5', { currentPaymentStatus });
+    router.push('/smart-estimator/step-6');
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Step 5</CardTitle>
-        <CardDescription>This is the fifth step.</CardDescription>
+        <CardDescription>What is the current status of your payments?</CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Form fields for step 5 will go here */}
-        <p>Step 5 content goes here.</p>
-        <StepNavigation currentStep={5} totalSteps={7} />
+        <div className="flex flex-col space-y-4">
+          {paymentStatusOptions.map((option) => (
+            <Button
+              key={option.value}
+              onClick={() => handleSelection(option.value)}
+              variant="outline"
+              size="lg"
+              className="justify-start"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
