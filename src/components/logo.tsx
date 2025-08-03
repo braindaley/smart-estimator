@@ -4,10 +4,10 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 160 30"
-      width="160"
+      viewBox="0 0 200 30"
+      width="200"
       height="30"
-      aria-label="Debt Prototype logo"
+      aria-label="Smart Estimator logo"
       {...props}
     >
       <text
@@ -18,7 +18,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         fontWeight="600"
         className="fill-foreground"
       >
-        Debt Prototype
+        Smart Estimator
       </text>
     </svg>
   );

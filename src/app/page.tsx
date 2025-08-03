@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { Logo } from '@/components/logo';
 
 export default function Home() {
@@ -8,8 +10,18 @@ export default function Home() {
           <Logo />
         </div>
       </header>
-      <main className="flex-1">
-        {/* Blank canvas for future content */}
+      <main className="flex flex-1 items-center justify-center">
+        <div className="container mx-auto max-w-7xl px-4 text-center">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+            Smart Estimator
+          </h1>
+          <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
+            Get an estimate for your project in just a few steps.
+          </p>
+          <Button asChild size="lg">
+            <Link href="/smart-estimator/step-1">Start Smart Estimator</Link>
+          </Button>
+        </div>
       </main>
     </div>
   );
