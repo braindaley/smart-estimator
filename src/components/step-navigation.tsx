@@ -8,9 +8,10 @@ interface StepNavigationProps {
   currentStep: number;
   totalSteps: number;
   onNext?: () => void;
+  showNext?: boolean;
 }
 
-export function StepNavigation({ currentStep, totalSteps, onNext }: StepNavigationProps) {
+export function StepNavigation({ currentStep, totalSteps, onNext, showNext = true }: StepNavigationProps) {
   const router = useRouter();
 
   const handleNext = () => {
@@ -26,22 +27,24 @@ export function StepNavigation({ currentStep, totalSteps, onNext }: StepNavigati
 
   const handleBack = () => {
     if (currentStep > 1) {
-      router.push(`/smart-estimator/step-${currentStep - 1}`);
+      router.back();
     } else {
       router.push('/');
     }
   };
 
   return (
-    <div className="flex justify-between mt-8">
+    <div className={`flex mt-8 ${showNext ? 'justify-between' : 'justify-start'}`}>
       <Button variant="outline" onClick={handleBack}>
         <ChevronLeft className="mr-2 h-4 w-4" />
         Back
       </Button>
-      <Button onClick={handleNext}>
-        {currentStep === totalSteps ? 'Finish' : 'Next'}
-        <ChevronRight className="ml-2 h-4 w-4" />
-      </Button>
+      {showNext && (
+        <Button onClick={handleNext}>
+          {currentStep === totalSteps ? 'Finish' : 'Next'}
+          <ChevronRight className="ml-2 h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }

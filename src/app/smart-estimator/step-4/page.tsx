@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StepNavigation } from '@/components/step-navigation';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -40,9 +40,9 @@ export default function Step4() {
         <CardTitle>Step 4</CardTitle>
         <CardDescription>What is your estimated monthly expenses (not including debt payments)?</CardDescription>
       </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent>
             <FormField
               control={form.control}
               name="monthlyPaymentEstimate"
@@ -69,10 +69,12 @@ export default function Step4() {
                 </FormItem>
               )}
             />
+          </CardContent>
+          <CardFooter>
             <StepNavigation currentStep={4} totalSteps={7} />
-          </form>
-        </Form>
-      </CardContent>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 }

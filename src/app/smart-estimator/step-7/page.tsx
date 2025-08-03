@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { useEstimatorStore } from '@/lib/estimator-store';
+import { StepNavigation } from '@/components/step-navigation';
 
 const ficoScoreOptions = [
   { label: "Less than 630", value: 600 },
@@ -43,6 +44,9 @@ export default function Step7() {
           ))}
         </div>
       </CardContent>
+      <CardFooter>
+        <StepNavigation currentStep={7} totalSteps={7} showNext={false} />
+      </CardFooter>
     </Card>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { useEstimatorStore } from '@/lib/estimator-store';
+import { StepNavigation } from '@/components/step-navigation';
 
 const creditorOptions = [
   { label: "1", value: 1 },
@@ -42,6 +43,9 @@ export default function Step2() {
           ))}
         </div>
       </CardContent>
+      <CardFooter>
+        <StepNavigation currentStep={2} totalSteps={7} showNext={false} />
+      </CardFooter>
     </Card>
   );
 }
