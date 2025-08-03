@@ -42,7 +42,7 @@ export default function Results() {
 
     // Qualification Logic
     let status: QualificationStatus;
-    if (debtAmountEstimate < 15000 && debtAmountEstimate >= 10000) {
+    if (debtAmountEstimate < 15000) {
       status = "Not Qualified - Too Little Debt";
     } else if (debtAmountEstimate >= 50000) {
         status = "Needs Specialist Consultation";
@@ -105,7 +105,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!results || !qualificationStatus) {
+  if (!results || !qualificationStatus || !momentumScore) {
     return (
       <Card>
         <CardHeader>
@@ -185,6 +185,111 @@ export default function Results() {
           <div className="pt-4">{renderQualificationMessage()}</div>
         </CardHeader>
         <CardContent>
+          <div className="momentum-score-section" style={{
+            backgroundColor: '#f8f9fa',
+            padding: '24px',
+            borderRadius: '12px',
+            marginBottom: '32px',
+            textAlign: 'center'
+          }}>
+            <div className="score-header">
+              <h3 style={{margin: '0 0 16px', fontSize: '24px', color: '#2c3e50'}}>
+                Your Momentum Score
+              </h3>
+              <div className="score-display" style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '8px',
+                marginBottom: '20px'
+              }}>
+                <span className="current-score" style={{
+                  fontSize: '48px',
+                  fontWeight: 'bold',
+                  color: '#3498db'
+                }}>
+                  {momentumScore.totalScore}
+                </span>
+                <span className="max-score" style={{
+                  fontSize: '24px',
+                  color: '#7f8c8d'
+                }}>
+                  / 95
+                </span>
+              </div>
+            </div>
+            
+            <div className="score-bar" style={{
+              position: 'relative',
+              height: '12px',
+              backgroundColor: '#e9ecef',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              overflow: 'hidden'
+            }}>
+              <div 
+                className="progress-fill" 
+                style={{
+                  height: '100%',
+                  backgroundColor: '#3498db',
+                  width: `${(momentumScore.totalScore / 95) * 100}%`,
+                  transition: 'width 0.3s ease'
+                }}
+              />
+              <div className="milestone milestone-50" style={{
+                position: 'absolute',
+                top: '-25px',
+                left: '52.6%',
+                transform: 'translateX(-50%)',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: '#7f8c8d'
+              }}>
+                50
+              </div>
+              <div className="milestone milestone-75" style={{
+                position: 'absolute', 
+                top: '-25px',
+                left: '78.9%',
+                transform: 'translateX(-50%)',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: '#7f8c8d'
+              }}>
+                75
+              </div>
+            </div>
+             <div className="score-message" style={{
+              padding: '16px',
+              backgroundColor: momentumScore.totalScore >= 35 ? '#d4edda' : '#fff3cd',
+              border: `1px solid ${momentumScore.totalScore >= 35 ? '#c3e6cb' : '#ffeaa7'}`,
+              borderRadius: '8px',
+              marginTop: '16px',
+              marginBottom: '16px',
+            }}>
+              <h4 style={{margin: '0 0 8px', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
+                {momentumScore.totalScore >= 35 ? "Good Progress!" : "Let's Build Your Score"}
+              </h4>
+              <p style={{margin: '0', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
+                {momentumScore.totalScore >= 35 
+                  ? "You're on track for our debt relief program. Complete the full assessment to unlock your potential."
+                  : "Your financial situation shows potential. Complete our readiness assessment to improve your score."
+                }
+              </p>
+            </div>
+            <div className="score-breakdown" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '12px',
+              fontSize: '14px',
+              color: '#6c757d'
+            }}>
+              <div>Financial Hardship: {momentumScore.breakdown.financialHardship} pts</div>
+              <div>Mental Readiness: Not assessed yet</div>
+              <div>Financial Means: {momentumScore.breakdown.financialMeans} pts (partial)</div>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -280,3 +385,5 @@ export default function Results() {
     </div>
   );
 }
+
+    
