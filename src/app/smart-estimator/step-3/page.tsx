@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 const FormSchema = z.object({
   monthlyIncomeEstimate: z.preprocess(
     (val) => (typeof val === 'string' ? val.replace(/[$,]/g, '') : val),
-    z.coerce.number({ invalid_type_error: 'Please enter a valid number.' }).positive({ message: 'Please enter a positive number.' })
+    z.coerce.number({ required_error: 'This field is required.', invalid_type_error: 'Please enter a valid number.' }).min(1, { message: 'This field is required.' })
   )
 });
 
