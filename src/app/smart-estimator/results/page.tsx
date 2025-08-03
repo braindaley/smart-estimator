@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useEstimatorStore } from '@/lib/estimator-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   calculateMonthlyMomentumPayment,
   calculateMonthlyStandardPayment,
@@ -17,20 +18,35 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
+type QualificationStatus = "Qualified" | "Not Qualified - Too Little Debt" | "Needs Specialist Consultation" | "Not Qualified - No Income";
+
 export default function Results() {
   const { formData, reset } = useEstimatorStore();
   const [results, setResults] = React.useState<any>(null);
+  const [qualificationStatus, setQualificationStatus] = React.useState<QualificationStatus | null>(null);
 
   React.useEffect(() => {
-    // Flatten form data from all steps
     const allFormData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
     
     const { 
       debtAmountEstimate = 0, 
       userFicoScoreEstimate = 0,
+      hasSteadyIncome,
     } = allFormData;
 
-    // Perform calculations
+    // Qualification Logic
+    let status: QualificationStatus;
+    if (debtAmountEstimate < 15000 && debtAmountEstimate >= 10000) {
+      status = "Not Qualified - Too Little Debt";
+    } else if (debtAmountEstimate >= 50000) {
+        status = "Needs Specialist Consultation";
+    } else if (hasSteadyIncome === false) {
+      status = "Not Qualified - No Income";
+    } else {
+      status = "Qualified";
+    }
+    setQualificationStatus(status);
+    
     const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
     const momentumTerm = getMomentumTermLength(debtAmountEstimate);
     
@@ -58,7 +74,7 @@ export default function Results() {
         monthlyPayment: personalLoanMonthlyPayment,
         term: 36,
         apr: personalLoanApr,
-        isEligible: canGetLoan && userFicoScoreEstimate >= 620,
+        isEligible: canGetLoan && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false,
       }
     });
 
@@ -74,7 +90,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!results) {
+  if (!results || !qualificationStatus) {
     return (
       <Card>
         <CardHeader>
@@ -91,56 +107,119 @@ export default function Results() {
     reset();
   }
 
+  const renderQualificationMessage = () => {
+    switch (qualificationStatus) {
+      case "Not Qualified - Too Little Debt":
+        return (
+          <Alert variant="destructive">
+            <AlertTitle>Not Qualified - Too Little Debt</AlertTitle>
+            <AlertDescription>Your estimated debt is below the minimum required for our primary programs. Explore other options that may better suit your needs.</AlertDescription>
+          </Alert>
+        );
+      case "Needs Specialist Consultation":
+        return (
+          <Alert>
+            <AlertTitle>Needs Specialist Consultation</AlertTitle>
+            <AlertDescription>Your estimated debt amount requires a personalized review. Please schedule a consultation to discuss your options with one of our specialists.</AlertDescription>
+          </Alert>
+        );
+      case "Not Qualified - No Income":
+        return (
+          <Alert variant="destructive">
+            <AlertTitle>Not Qualified - No Income</AlertTitle>
+            <AlertDescription>A steady source of income is required for some of our options. Please see income-free options to find a suitable solution.</AlertDescription>
+          </Alert>
+        );
+      case "Qualified":
+        return (
+           <Alert>
+            <AlertTitle>Congratulations, you have options!</AlertTitle>
+            <AlertDescription>Based on the information you provided, here are some potential options.</AlertDescription>
+          </Alert>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderCtas = () => {
+    switch (qualificationStatus) {
+      case "Not Qualified - Too Little Debt":
+        return <Button>Explore Other Options</Button>;
+      case "Needs Specialist Consultation":
+        return <Button>Schedule Consultation</Button>;
+      case "Not Qualified - No Income":
+        return <Button>See Income-Free Options</Button>;
+      case "Qualified":
+        return (
+          <div className="flex gap-4">
+            <Button>Get My Personalized Plan</Button>
+            <Button variant="secondary">Apply Now</Button>
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
     <div className="space-y-8">
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Here are your smart estimator results</CardTitle>
-          <CardDescription>Based on the information you provided, here are some potential options.</CardDescription>
+          <div className="pt-4">{renderQualificationMessage()}</div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-1/3 text-center text-lg font-semibold">Momentum Plan</TableHead>
-                <TableHead className="w-1/3 text-center text-lg font-semibold border-x">Personal Loan</TableHead>
+                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableHead className="w-1/3 text-center text-lg font-semibold">Momentum Plan</TableHead>}
+                {qualificationStatus !== 'Not Qualified - No Income' && <TableHead className="w-1/3 text-center text-lg font-semibold border-x">Personal Loan</TableHead>}
                 <TableHead className="w-1/3 text-center text-lg font-semibold">Standard Plan</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell className="text-center">
-                  {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
-                </TableCell>
-                <TableCell className="text-center border-x">
-                  {results.personalLoan.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
-                </TableCell>
+                 {qualificationStatus !== 'Not Qualified - Too Little Debt' && 
+                    <TableCell className="text-center">
+                      {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
+                    </TableCell>
+                 }
+                {qualificationStatus !== 'Not Qualified - No Income' && 
+                    <TableCell className="text-center border-x">
+                      {results.personalLoan.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
+                    </TableCell>
+                }
                 <TableCell className="text-center">
                   {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>
-                <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>
+                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
+                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
                 <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>
-                <TableCell className="text-center border-x">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>
+                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
+                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
                 <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>
               </TableRow>
                <TableRow>
-                <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>
-                <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>
+                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
+                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
                 <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-center text-xs text-muted-foreground">
-                  <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
-                </TableCell>
-                <TableCell className="text-center text-xs text-muted-foreground border-x">
-                   <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
-                </TableCell>
+                {qualificationStatus !== 'Not Qualified - Too Little Debt' && 
+                    <TableCell className="text-center text-xs text-muted-foreground">
+                    <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
+                    </TableCell>
+                }
+                {qualificationStatus !== 'Not Qualified - No Income' && 
+                    <TableCell className="text-center text-xs text-muted-foreground border-x">
+                    <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
+                    </TableCell>
+                }
                 <TableCell className="text-center text-xs text-muted-foreground">
                    <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
                 </TableCell>
@@ -149,6 +228,13 @@ export default function Results() {
           </Table>
         </CardContent>
       </Card>
+      
+       <div className="text-center mt-8 space-y-4">
+            {renderCtas()}
+            <Button asChild onClick={handleRestart} variant="link">
+              <Link href="/smart-estimator/step-1">Start Over</Link>
+            </Button>
+        </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -176,12 +262,8 @@ export default function Results() {
           </CardContent>
         </Card>
       </div>
-
-       <div className="text-center mt-8">
-            <Button asChild onClick={handleRestart}>
-              <Link href="/smart-estimator/step-1">Start Over</Link>
-            </Button>
-        </div>
     </div>
   );
 }
+
+    
