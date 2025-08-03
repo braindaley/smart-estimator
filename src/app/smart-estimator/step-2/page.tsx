@@ -1,17 +1,46 @@
+"use client";
+
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { StepNavigation } from '@/components/step-navigation';
+import { Button } from '@/components/ui/button';
+import { useEstimatorStore } from '@/lib/estimator-store';
+
+const creditorOptions = [
+  { label: "1", value: 1 },
+  { label: "2-5", value: 3 },
+  { label: "6-10", value: 8 },
+  { label: "10+", value: 15 },
+];
 
 export default function Step2() {
+  const router = useRouter();
+  const { setFormData } = useEstimatorStore();
+
+  const handleSelection = (creditorCountEstimate: number) => {
+    setFormData('step2', { creditorCountEstimate });
+    router.push('/smart-estimator/step-3');
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Step 2</CardTitle>
-        <CardDescription>This is the second step.</CardDescription>
+        <CardDescription>Estimated number of creditors?</CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Form fields for step 2 will go here */}
-        <p>Step 2 content goes here.</p>
-        <StepNavigation currentStep={2} totalSteps={7} />
+        <div className="flex flex-col space-y-4">
+          {creditorOptions.map((option) => (
+            <Button
+              key={option.value}
+              onClick={() => handleSelection(option.value)}
+              variant="outline"
+              size="lg"
+              className="justify-start"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
