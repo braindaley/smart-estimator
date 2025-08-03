@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -12,7 +13,8 @@ import {
   getMomentumTermLength,
   getStandardTermLength,
   getPersonalLoanApr,
-  getMaximumPersonalLoanAmount
+  getMaximumPersonalLoanAmount,
+  calculateMomentumScore
 } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +26,7 @@ export default function Results() {
   const { formData, reset } = useEstimatorStore();
   const [results, setResults] = React.useState<any>(null);
   const [qualificationStatus, setQualificationStatus] = React.useState<QualificationStatus | null>(null);
+  const [momentumScore, setMomentumScore] = React.useState<any>(null);
 
   React.useEffect(() => {
     const allFormData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
@@ -32,6 +35,9 @@ export default function Results() {
       debtAmountEstimate = 0, 
       userFicoScoreEstimate = 0,
       hasSteadyIncome,
+      monthlyIncomeEstimate = 0,
+      monthlyPaymentEstimate = 0,
+      creditorCountEstimate = 0,
     } = allFormData;
 
     // Qualification Logic
@@ -77,6 +83,15 @@ export default function Results() {
         isEligible: canGetLoan && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false,
       }
     });
+
+    const momentumScoreData = calculateMomentumScore({
+        debtAmountEstimate,
+        monthlyIncomeEstimate,
+        monthlyPaymentEstimate,
+        creditorCountEstimate
+    });
+    setMomentumScore(momentumScoreData);
+
 
   }, [formData]);
 
@@ -265,5 +280,3 @@ export default function Results() {
     </div>
   );
 }
-
-    
