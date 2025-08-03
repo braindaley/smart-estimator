@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 const FormSchema = z.object({
   monthlyIncomeEstimate: z.preprocess(
     (val) => (typeof val === 'string' ? val.replace(/[$,]/g, '') : val),
-    z.coerce.number({ required_error: 'This field is required.', invalid_type_error: 'Please enter a valid number.' }).min(1, { message: 'This field is required.' })
+    z.coerce.number({ required_error: 'This field is required.', invalid_type_error: 'Please enter a valid number.' }).min(0, { message: 'Please enter a positive number.' })
   )
 });
 
@@ -60,7 +60,7 @@ export default function Step3() {
                           const value = e.target.value;
                           const numericValue = value.replace(/[^0-9]/g, '');
                           const formattedValue = new Intl.NumberFormat('en-US').format(Number(numericValue));
-                          field.onChange(formattedValue === '0' ? '' : formattedValue);
+                          field.onChange(formattedValue === '0' ? '0' : formattedValue);
                         }}
                       />
                     </div>
