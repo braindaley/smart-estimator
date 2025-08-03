@@ -20,12 +20,80 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-type QualificationStatus = "Qualified" | "Not Qualified - Too Little Debt" | "Needs Specialist Consultation" | "Not Qualified - No Income";
+type Qualification = {
+  status: string;
+  hideColumns: string[];
+  primaryCTA: string;
+  secondaryCTA?: string;
+  message: string;
+  showScore: boolean;
+  scoreMessage: string;
+};
+
+function getQualificationStatus(formData: any, momentumScore: any): Qualification {
+  const { debtAmountEstimate, hasSteadyIncome } = formData;
+
+  if (debtAmountEstimate < 15000) {
+    return {
+      status: "Not Qualified - Too Little Debt",
+      hideColumns: ["momentum"],
+      primaryCTA: "Explore Other Options",
+      message: "Momentum programs start at $15,000. Here are other solutions:",
+      showScore: true,
+      scoreMessage: "Your score shows potential, but debt amount is below our minimum."
+    };
+  }
+  
+  if (debtAmountEstimate >= 50000) {
+    return {
+      status: "Needs Specialist Consultation", 
+      hideColumns: [],
+      primaryCTA: "Schedule Consultation",
+      message: "For debt over $50,000, let's discuss your custom options.",
+      showScore: true,
+      scoreMessage: "High debt amounts require personalized consultation."
+    };
+  }
+  
+  if (hasSteadyIncome === false) {
+    return {
+      status: "Not Qualified - No Income",
+      hideColumns: ["personalLoan"], 
+      primaryCTA: "See Income-Free Options",
+      message: "We understand income challenges. Here are alternative resources:",
+      showScore: true,
+      scoreMessage: "Steady income is required for most debt relief programs."
+    };
+  }
+  
+  if (momentumScore.totalScore >= 35) {
+    return {
+      status: "Qualified - Good Progress",
+      hideColumns: [],
+      primaryCTA: "Get My Personalized Plan", 
+      secondaryCTA: "Continue Full Assessment",
+      message: "You're showing strong potential for debt relief success.",
+      showScore: true,
+      scoreMessage: "Complete our full assessment to potentially reach 75+ points and qualify for VIP enrollment."
+    };
+  }
+  
+  return {
+    status: "Needs Assessment", 
+    hideColumns: [],
+    primaryCTA: "Build My Score",
+    secondaryCTA: "Learn About Debt Relief",
+    message: "Complete our readiness assessment to determine your best options.",
+    showScore: true,
+    scoreMessage: "Your score shows room for improvement. Our assessment will help identify the best path forward."
+  };
+}
+
 
 export default function Results() {
   const { formData, reset } = useEstimatorStore();
   const [results, setResults] = React.useState<any>(null);
-  const [qualificationStatus, setQualificationStatus] = React.useState<QualificationStatus | null>(null);
+  const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -40,18 +108,16 @@ export default function Results() {
       creditorCountEstimate = 0,
     } = allFormData;
 
-    // Qualification Logic
-    let status: QualificationStatus;
-    if (debtAmountEstimate < 15000) {
-      status = "Not Qualified - Too Little Debt";
-    } else if (debtAmountEstimate >= 50000) {
-        status = "Needs Specialist Consultation";
-    } else if (hasSteadyIncome === false) {
-      status = "Not Qualified - No Income";
-    } else {
-      status = "Qualified";
-    }
-    setQualificationStatus(status);
+    const momentumScoreData = calculateMomentumScore({
+        debtAmountEstimate,
+        monthlyIncomeEstimate,
+        monthlyPaymentEstimate,
+        creditorCountEstimate
+    });
+    setMomentumScore(momentumScoreData);
+
+    const qualificationStatus = getQualificationStatus(allFormData, momentumScoreData);
+    setQualification(qualificationStatus);
     
     const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
     const momentumTerm = getMomentumTermLength(debtAmountEstimate);
@@ -84,15 +150,6 @@ export default function Results() {
       }
     });
 
-    const momentumScoreData = calculateMomentumScore({
-        debtAmountEstimate,
-        monthlyIncomeEstimate,
-        monthlyPaymentEstimate,
-        creditorCountEstimate
-    });
-    setMomentumScore(momentumScoreData);
-
-
   }, [formData]);
 
   const formatCurrency = (value: number) => {
@@ -105,7 +162,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!results || !qualificationStatus || !momentumScore) {
+  if (!results || !qualification || !momentumScore) {
     return (
       <Card>
         <CardHeader>
@@ -122,227 +179,201 @@ export default function Results() {
     reset();
   }
 
-  const renderQualificationMessage = () => {
-    switch (qualificationStatus) {
-      case "Not Qualified - Too Little Debt":
-        return (
-          <Alert variant="destructive">
-            <AlertTitle>Not Qualified - Too Little Debt</AlertTitle>
-            <AlertDescription>Your estimated debt is below the minimum required for our primary programs. Explore other options that may better suit your needs.</AlertDescription>
-          </Alert>
-        );
-      case "Needs Specialist Consultation":
-        return (
-          <Alert>
-            <AlertTitle>Needs Specialist Consultation</AlertTitle>
-            <AlertDescription>Your estimated debt amount requires a personalized review. Please schedule a consultation to discuss your options with one of our specialists.</AlertDescription>
-          </Alert>
-        );
-      case "Not Qualified - No Income":
-        return (
-          <Alert variant="destructive">
-            <AlertTitle>Not Qualified - No Income</AlertTitle>
-            <AlertDescription>A steady source of income is required for some of our options. Please see income-free options to find a suitable solution.</AlertDescription>
-          </Alert>
-        );
-      case "Qualified":
-        return (
-           <Alert>
-            <AlertTitle>Congratulations, you have options!</AlertTitle>
-            <AlertDescription>Based on the information you provided, here are some potential options.</AlertDescription>
-          </Alert>
-        );
-      default:
-        return null;
-    }
+  const handleCTAClick = (cta: string) => {
+    // Placeholder for CTA handling
+    console.log(`${cta} button clicked`);
   };
 
   const renderCtas = () => {
-    switch (qualificationStatus) {
-      case "Not Qualified - Too Little Debt":
-        return <Button>Explore Other Options</Button>;
-      case "Needs Specialist Consultation":
-        return <Button>Schedule Consultation</Button>;
-      case "Not Qualified - No Income":
-        return <Button>See Income-Free Options</Button>;
-      case "Qualified":
-        return (
-          <div className="flex gap-4">
-            <Button>Get My Personalized Plan</Button>
-            <Button variant="secondary">Apply Now</Button>
-          </div>
-        );
-      default:
-        return null;
-    }
-  }
+    if (!qualification) return null;
+    return (
+      <div className="cta-buttons flex flex-col items-center gap-4">
+        <Button onClick={() => handleCTAClick(qualification.primaryCTA)} size="lg">
+          {qualification.primaryCTA}
+        </Button>
+        {qualification.secondaryCTA && (
+          <Button onClick={() => handleCTAClick(qualification.secondaryCTA)} variant="secondary">
+            {qualification.secondaryCTA}
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8">
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Here are your smart estimator results</CardTitle>
-          <div className="pt-4">{renderQualificationMessage()}</div>
+          <div className="pt-4">
+             <Alert>
+                <AlertTitle>{qualification.status}</AlertTitle>
+                <AlertDescription>{qualification.message}</AlertDescription>
+            </Alert>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="momentum-score-section" style={{
-            backgroundColor: '#f8f9fa',
-            padding: '24px',
-            borderRadius: '12px',
-            marginBottom: '32px',
-            textAlign: 'center'
-          }}>
-            <div className="score-header">
-              <h3 style={{margin: '0 0 16px', fontSize: '24px', color: '#2c3e50'}}>
-                Your Momentum Score
-              </h3>
-              <div className="score-display" style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'center',
-                gap: '8px',
-                marginBottom: '20px'
-              }}>
-                <span className="current-score" style={{
-                  fontSize: '48px',
-                  fontWeight: 'bold',
-                  color: '#3498db'
+          {qualification.showScore && (
+            <div className="momentum-score-section" style={{
+              backgroundColor: '#f8f9fa',
+              padding: '24px',
+              borderRadius: '12px',
+              marginBottom: '32px',
+              textAlign: 'center'
+            }}>
+              <div className="score-header">
+                <h3 style={{margin: '0 0 16px', fontSize: '24px', color: '#2c3e50'}}>
+                  Your Momentum Score
+                </h3>
+                <div className="score-display" style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginBottom: '20px'
                 }}>
-                  {momentumScore.totalScore}
-                </span>
-                <span className="max-score" style={{
-                  fontSize: '24px',
+                  <span className="current-score" style={{
+                    fontSize: '48px',
+                    fontWeight: 'bold',
+                    color: '#3498db'
+                  }}>
+                    {momentumScore.totalScore}
+                  </span>
+                  <span className="max-score" style={{
+                    fontSize: '24px',
+                    color: '#7f8c8d'
+                  }}>
+                    / 95
+                  </span>
+                </div>
+              </div>
+              
+              <div className="score-bar" style={{
+                position: 'relative',
+                height: '12px',
+                backgroundColor: '#e9ecef',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                overflow: 'hidden'
+              }}>
+                <div 
+                  className="progress-fill" 
+                  style={{
+                    height: '100%',
+                    backgroundColor: '#3498db',
+                    width: `${(momentumScore.totalScore / 95) * 100}%`,
+                    transition: 'width 0.3s ease'
+                  }}
+                />
+                <div className="milestone milestone-50" style={{
+                  position: 'absolute',
+                  top: '-25px',
+                  left: '52.6%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
                   color: '#7f8c8d'
                 }}>
-                  / 95
-                </span>
+                  50
+                </div>
+                <div className="milestone milestone-75" style={{
+                  position: 'absolute', 
+                  top: '-25px',
+                  left: '78.9%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: '#7f8c8d'
+                }}>
+                  75
+                </div>
               </div>
-            </div>
-            
-            <div className="score-bar" style={{
-              position: 'relative',
-              height: '12px',
-              backgroundColor: '#e9ecef',
-              borderRadius: '6px',
-              marginBottom: '16px',
-              overflow: 'hidden'
-            }}>
-              <div 
-                className="progress-fill" 
-                style={{
-                  height: '100%',
-                  backgroundColor: '#3498db',
-                  width: `${(momentumScore.totalScore / 95) * 100}%`,
-                  transition: 'width 0.3s ease'
-                }}
-              />
-              <div className="milestone milestone-50" style={{
-                position: 'absolute',
-                top: '-25px',
-                left: '52.6%',
-                transform: 'translateX(-50%)',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#7f8c8d'
+               <div className="score-message" style={{
+                padding: '16px',
+                backgroundColor: momentumScore.totalScore >= 35 ? '#d4edda' : '#fff3cd',
+                border: `1px solid ${momentumScore.totalScore >= 35 ? '#c3e6cb' : '#ffeaa7'}`,
+                borderRadius: '8px',
+                marginTop: '16px',
+                marginBottom: '16px',
               }}>
-                50
+                <h4 style={{margin: '0 0 8px', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
+                  {momentumScore.totalScore >= 35 ? "Good Progress!" : "Let's Build Your Score"}
+                </h4>
+                <p style={{margin: '0', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
+                  {qualification.scoreMessage}
+                </p>
               </div>
-              <div className="milestone milestone-75" style={{
-                position: 'absolute', 
-                top: '-25px',
-                left: '78.9%',
-                transform: 'translateX(-50%)',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#7f8c8d'
+              <div className="score-breakdown" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '12px',
+                fontSize: '14px',
+                color: '#6c757d'
               }}>
-                75
+                <div>Financial Hardship: {momentumScore.breakdown.financialHardship} pts</div>
+                <div>Mental Readiness: Not assessed yet</div>
+                <div>Financial Means: {momentumScore.breakdown.financialMeans} pts (partial)</div>
               </div>
             </div>
-             <div className="score-message" style={{
-              padding: '16px',
-              backgroundColor: momentumScore.totalScore >= 35 ? '#d4edda' : '#fff3cd',
-              border: `1px solid ${momentumScore.totalScore >= 35 ? '#c3e6cb' : '#ffeaa7'}`,
-              borderRadius: '8px',
-              marginTop: '16px',
-              marginBottom: '16px',
-            }}>
-              <h4 style={{margin: '0 0 8px', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
-                {momentumScore.totalScore >= 35 ? "Good Progress!" : "Let's Build Your Score"}
-              </h4>
-              <p style={{margin: '0', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
-                {momentumScore.totalScore >= 35 
-                  ? "You're on track for our debt relief program. Complete the full assessment to unlock your potential."
-                  : "Your financial situation shows potential. Complete our readiness assessment to improve your score."
-                }
-              </p>
-            </div>
-            <div className="score-breakdown" style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px',
-              fontSize: '14px',
-              color: '#6c757d'
-            }}>
-              <div>Financial Hardship: {momentumScore.breakdown.financialHardship} pts</div>
-              <div>Mental Readiness: Not assessed yet</div>
-              <div>Financial Means: {momentumScore.breakdown.financialMeans} pts (partial)</div>
-            </div>
-          </div>
+          )}
 
           <Table>
             <TableHeader>
               <TableRow>
-                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableHead className="w-1/3 text-center text-lg font-semibold">Momentum Plan</TableHead>}
-                {qualificationStatus !== 'Not Qualified - No Income' && <TableHead className="w-1/3 text-center text-lg font-semibold border-x">Personal Loan</TableHead>}
-                <TableHead className="w-1/3 text-center text-lg font-semibold">Standard Plan</TableHead>
+                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center text-lg font-semibold">Momentum Plan</TableHead>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center text-lg font-semibold border-x">Personal Loan</TableHead>}
+                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center text-lg font-semibold">Standard Plan</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
-                 {qualificationStatus !== 'Not Qualified - Too Little Debt' && 
+                 {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center">
                       {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                     </TableCell>
                  }
-                {qualificationStatus !== 'Not Qualified - No Income' && 
+                {!qualification.hideColumns.includes('personalLoan') && 
                     <TableCell className="text-center border-x">
                       {results.personalLoan.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                     </TableCell>
                 }
-                <TableCell className="text-center">
-                  {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
-                </TableCell>
+                {!qualification.hideColumns.includes('standard') && 
+                    <TableCell className="text-center">
+                    {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
+                    </TableCell>
+                }
               </TableRow>
               <TableRow>
-                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
-                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
-                <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>
+                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
               </TableRow>
               <TableRow>
-                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
-                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
-                <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>
+                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{formatCurrency(results.debtAmountEstimate)} Debt Covered</TableCell>}
               </TableRow>
                <TableRow>
-                {qualificationStatus !== 'Not Qualified - Too Little Debt' && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
-                {qualificationStatus !== 'Not Qualified - No Income' && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
-                <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>
+                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>}
               </TableRow>
               <TableRow>
-                {qualificationStatus !== 'Not Qualified - Too Little Debt' && 
+                {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center text-xs text-muted-foreground">
                     <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
                     </TableCell>
                 }
-                {qualificationStatus !== 'Not Qualified - No Income' && 
+                {!qualification.hideColumns.includes('personalLoan') && 
                     <TableCell className="text-center text-xs text-muted-foreground border-x">
                     <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
                     </TableCell>
                 }
-                <TableCell className="text-center text-xs text-muted-foreground">
-                   <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
-                </TableCell>
+                {!qualification.hideColumns.includes('standard') && 
+                    <TableCell className="text-center text-xs text-muted-foreground">
+                    <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
+                    </TableCell>
+                }
               </TableRow>
             </TableBody>
           </Table>
@@ -351,6 +382,16 @@ export default function Results() {
       
        <div className="text-center mt-8 space-y-4">
             {renderCtas()}
+             {qualification.showScore && qualification.scoreMessage && (
+                <div className="score-context" style={{
+                    fontSize: '14px',
+                    color: '#6c757d',
+                    marginTop: '12px',
+                    fontStyle: 'italic'
+                }}>
+                    {qualification.scoreMessage}
+                </div>
+            )}
             <Button asChild onClick={handleRestart} variant="link">
               <Link href="/smart-estimator/step-1">Start Over</Link>
             </Button>
