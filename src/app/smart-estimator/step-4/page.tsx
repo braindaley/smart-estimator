@@ -37,8 +37,8 @@ export default function Step4() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 4</CardTitle>
-        <CardDescription>What is your estimated monthly expenses (not including debt payments)?</CardDescription>
+        <CardTitle>Roughly how much do you spend each month on essentials?</CardTitle>
+        <CardDescription>Don't include credit card or loan payments-- just the basics.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -48,7 +48,7 @@ export default function Step4() {
               name="monthlyPaymentEstimate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monthly Expenses</FormLabel>
+                  <FormLabel>Monthly essentials</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
