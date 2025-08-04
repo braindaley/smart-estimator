@@ -19,7 +19,7 @@ export default function Home() {
               </p>
               <div className="flex w-full flex-col items-start gap-4">
                 <p className="text-sm text-muted-foreground">
-                  Explore plans to resolve your debt
+                  Takes 2 minutes. No credit score impact.
                 </p>
                 <Button asChild size="lg">
                   <Link href="/smart-estimator/step-1">Explore plans</Link>
