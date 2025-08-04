@@ -413,7 +413,7 @@ export default function Results() {
                 <ProgressCircle
                   score={momentumScore.breakdown.financialHardship}
                   maxScore={40}
-                  label="Assessment"
+                  label="Financial"
                   color="text-blue-500"
                 />
                 <ProgressCircle
