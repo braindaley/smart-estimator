@@ -11,7 +11,7 @@ const ficoScoreOptions = [
   { label: "Yes, it's between 630-660", value: 645 },
   { label: "Yes, it's between 660-720", value: 690 },
   { label: "Yes, it's above 720", value: 750 },
-  { label: "I don't know", value: 645 },
+  { label: "No, I'm not sure", value: 645 },
 ];
 
 export default function Step6() {
