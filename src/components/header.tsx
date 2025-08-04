@@ -17,12 +17,6 @@ export function Header() {
         <Logo />
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           <Link
-            href="/how-it-works"
-            className="transition-colors hover:text-foreground/80 text-foreground/60"
-          >
-            How it works
-          </Link>
-          <Link
             href="/apply"
             className="transition-colors hover:text-foreground/80 text-foreground/60"
           >
