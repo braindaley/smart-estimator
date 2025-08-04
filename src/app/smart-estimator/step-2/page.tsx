@@ -10,7 +10,7 @@ const creditorOptions = [
   { label: "Just 1", value: 1 },
   { label: "2-5", value: 3 },
   { label: "6-10", value: 8 },
-  { label: "10+", value: 15 },
+  { label: "More than 10", value: 15 },
 ];
 
 export default function Step2() {
