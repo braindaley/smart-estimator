@@ -26,8 +26,8 @@ export default function Step6() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 6</CardTitle>
-        <CardDescription>Do you know your FICO score?</CardDescription>
+        <CardTitle>Do you happen to know your credit score?</CardTitle>
+        <CardDescription>Even a rough range helps us better understand your options.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">

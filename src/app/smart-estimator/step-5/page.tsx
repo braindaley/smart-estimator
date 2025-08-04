@@ -9,7 +9,7 @@ import { StepNavigation } from '@/components/step-navigation';
 const paymentStatusOptions = [
   { label: "I'm current and making payments", value: "Current" },
   { label: "I'm late on most", value: "Late on payments" },
-  { label: "In collections", value: "In collections" },
+  { label: "I'm in collections", value: "In collections" },
 ];
 
 export default function Step5() {
