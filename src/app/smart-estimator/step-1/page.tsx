@@ -26,8 +26,8 @@ export default function Step1() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Estimated total amount of debt</CardTitle>
-        <CardDescription>Step 1</CardDescription>
+        <CardTitle>About how much debt are you carrying right now? (credit cards, loans, etc)</CardTitle>
+        <CardDescription>Just a ballpark is fine - no need to be exact.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
