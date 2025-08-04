@@ -26,7 +26,7 @@ export default function Step1() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>About how much debt are you carrying right now? (credit cards, loans, etc)</CardTitle>
+        <CardTitle>About how much debt are you carrying right now?</CardTitle>
         <CardDescription>Just a ballpark is fine - no need to be exact.</CardDescription>
       </CardHeader>
       <CardContent>
