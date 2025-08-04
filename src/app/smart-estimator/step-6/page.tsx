@@ -27,7 +27,7 @@ export default function Step6() {
     <Card>
       <CardHeader>
         <CardTitle>Do you happen to know your credit score?</CardTitle>
-        <CardDescription>Even a rough range helps us better understand your options.</CardDescription>
+        <CardDescription>If you are not sure, we can run your credit for free if you would like.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
