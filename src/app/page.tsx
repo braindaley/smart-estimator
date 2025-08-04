@@ -17,7 +17,7 @@ export default function Home() {
               <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
                 Answer a few questions. See your best path to financial freedom.
               </p>
-              <div className="flex w-full flex-col items-start gap-4">
+              <div className="flex w-full flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                 <p className="text-sm text-muted-foreground">
                   Takes 2 minutes. No credit score impact.
                 </p>
