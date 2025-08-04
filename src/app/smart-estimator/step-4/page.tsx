@@ -70,7 +70,7 @@ export default function Step4() {
               )}
             />
           </CardContent>
-          <CardFooter>
+          <CardFooter className="w-full">
             <StepNavigation currentStep={4} totalSteps={6} />
           </CardFooter>
         </form>

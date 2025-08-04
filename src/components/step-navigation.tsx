@@ -34,7 +34,7 @@ export function StepNavigation({ currentStep, totalSteps, onNext, showNext = tru
   };
 
   return (
-    <div className={`flex mt-8 ${showNext ? 'justify-between' : 'justify-start'}`}>
+    <div className={`flex w-full mt-8 ${showNext ? 'justify-between' : 'justify-start'}`}>
       <Button variant="outline" onClick={handleBack}>
         <ChevronLeft className="mr-2 h-4 w-4" />
         Back

@@ -43,7 +43,7 @@ export default function Step1() {
           ))}
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="w-full">
         <StepNavigation currentStep={1} totalSteps={7} showNext={false} />
       </CardFooter>
     </Card>
