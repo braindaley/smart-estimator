@@ -144,6 +144,7 @@ const ProgressCircle = ({ score, maxScore, label, color, status }: { score: numb
   const radius = 25;
   const circumference = 2 * Math.PI * radius;
   const offset = status === "Not Started" ? circumference : circumference - (score / maxScore) * circumference;
+  const percentage = Math.round((score / maxScore) * 100);
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -178,7 +179,7 @@ const ProgressCircle = ({ score, maxScore, label, color, status }: { score: numb
           className="transform rotate-90 origin-center fill-current text-foreground font-bold"
           style={{ fontSize: status ? '8px' : '12px' }}
         >
-          {status ? status : score}
+          {status ? status : `${percentage}%`}
         </text>
       </svg>
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
