@@ -15,7 +15,7 @@ export default function Home() {
                 Momentum changes everything
               </h1>
               <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
-                Get in. Get out. Get on with life.
+                Answer a few questions. See your best path to financial freedom.
               </p>
               <div className="flex w-full flex-col items-start gap-4">
                 <p className="text-sm text-muted-foreground">
