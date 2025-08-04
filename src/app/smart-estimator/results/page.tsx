@@ -32,22 +32,24 @@ type Qualification = {
 function getQualificationStatus(formData: any, momentumScore: any): Qualification {
   const { debtAmountEstimate, hasSteadyIncome, userFicoScoreEstimate } = formData;
 
-  // Priority 1: Debt amount checks
-  if (debtAmountEstimate < 15000) {
-    return {
-      status: "Not Qualified - Too Little Debt",
-      hideColumns: ["momentum"],
-      primaryCTA: "Explore Other Options",
-      message: "Momentum programs start at $15,000. Here are other solutions:",
-      showScore: true,
-      scoreMessage: "Your score shows potential, but debt amount is below our minimum."
-    };
-  }
+  // NEW APPROACH: Check all disqualifying factors first
+  const hideColumns: string[] = [];
   
-  if (debtAmountEstimate >= 50000) {
+  // Check all disqualifying factors
+  const tooLittleDebt = debtAmountEstimate < 15000;
+  const tooMuchDebt = debtAmountEstimate >= 50000;
+  const noIncome = hasSteadyIncome === false;
+  const poorCredit = userFicoScoreEstimate < 620;
+  
+  // Apply column hiding rules
+  if (tooLittleDebt) hideColumns.push("momentum");
+  if (noIncome || poorCredit) hideColumns.push("personalLoan");
+  
+  // Determine primary status based on most restrictive condition
+  if (tooMuchDebt) {
     return {
-      status: "Needs Specialist Consultation", 
-      hideColumns: [],
+      status: "Needs Specialist Consultation",
+      hideColumns: hideColumns,
       primaryCTA: "Schedule Consultation",
       message: "For debt over $50,000, let's discuss your custom options.",
       showScore: true,
@@ -55,11 +57,45 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
   
-  // Priority 2: Income check
-  if (hasSteadyIncome === false) {
+  // Handle multiple qualification issues
+  if (tooLittleDebt && noIncome) {
+    return {
+      status: "Multiple Qualification Issues",
+      hideColumns: hideColumns, // Both momentum and personalLoan hidden
+      primaryCTA: "Explore Other Options",
+      message: "Debt below $15,000 and income requirements limit most program options.",
+      showScore: true,
+      scoreMessage: "Standard debt management may be your best current option."
+    };
+  }
+  
+  if (tooLittleDebt && poorCredit) {
+    return {
+      status: "Multiple Qualification Issues",
+      hideColumns: hideColumns, // Both momentum and personalLoan hidden  
+      primaryCTA: "Explore Other Options",
+      message: "Debt below $15,000 and credit requirements limit most program options.",
+      showScore: true,
+      scoreMessage: "Focus on building credit and consider debt consolidation alternatives."
+    };
+  }
+  
+  // Single disqualifying factors
+  if (tooLittleDebt) {
+    return {
+      status: "Not Qualified - Too Little Debt",
+      hideColumns: hideColumns,
+      primaryCTA: "Explore Other Options",
+      message: "Momentum programs start at $15,000. Here are other solutions:",
+      showScore: true,
+      scoreMessage: "Your score shows potential, but debt amount is below our minimum."
+    };
+  }
+  
+  if (noIncome) {
     return {
       status: "Not Qualified - No Income",
-      hideColumns: ["personalLoan"], 
+      hideColumns: hideColumns,
       primaryCTA: "See Income-Free Options",
       message: "We understand income challenges. Here are alternative resources:",
       showScore: true,
@@ -67,11 +103,10 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
   
-  // Priority 3: Credit score check (NEW FIX)
-  if (userFicoScoreEstimate < 620) {
+  if (poorCredit) {
     return {
       status: "Poor Credit - Limited Options",
-      hideColumns: ["personalLoan"],
+      hideColumns: hideColumns,
       primaryCTA: "Build My Score",
       secondaryCTA: "Learn About Debt Relief",
       message: "Credit score below 620 limits personal loan options. Focus on debt settlement programs.",
@@ -80,12 +115,12 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
   
-  // Priority 4: Score-based qualification
+  // Score-based qualification for fully qualified users
   if (momentumScore.totalScore >= 35) {
     return {
       status: "Qualified - Good Progress",
-      hideColumns: [],
-      primaryCTA: "Get My Personalized Plan", 
+      hideColumns: hideColumns,
+      primaryCTA: "Get My Personalized Plan",
       secondaryCTA: "Continue Full Assessment",
       message: "You're showing strong potential for debt relief success.",
       showScore: true,
@@ -94,8 +129,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
   }
   
   return {
-    status: "Needs Assessment", 
-    hideColumns: [],
+    status: "Needs Assessment",
+    hideColumns: hideColumns,
     primaryCTA: "Build My Score",
     secondaryCTA: "Learn About Debt Relief",
     message: "Complete our readiness assessment to determine your best options.",
