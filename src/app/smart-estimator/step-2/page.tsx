@@ -25,8 +25,8 @@ export default function Step2() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 2</CardTitle>
-        <CardDescription>Estimated number of creditors?</CardDescription>
+        <CardTitle>How many different companies do you owe money to?</CardTitle>
+        <CardDescription>Think credit cards, lenders, or finance companies.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
