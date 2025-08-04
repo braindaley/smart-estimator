@@ -7,8 +7,7 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { StepNavigation } from '@/components/step-navigation';
 
 const debtOptions = [
-  { label: "$5K–$10K", value: 7500 },
-  { label: "$10K–$14.9K", value: 12500 },
+  { label: "Less than $15,000", value: 12500 },
   { label: "$15K–$24.9K", value: 20000 },
   { label: "$25K–$49.9K", value: 37500 },
   { label: "$50K+", value: 60000 },
@@ -33,7 +32,7 @@ export default function Step1() {
         <div className="flex flex-col space-y-4">
           {debtOptions.map((option) => (
             <Button
-              key={option.value}
+              key={option.label}
               onClick={() => handleSelection(option.value)}
               variant="outline"
               size="lg"
