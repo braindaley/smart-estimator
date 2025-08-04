@@ -8,9 +8,9 @@ import { StepNavigation } from '@/components/step-navigation';
 
 const debtOptions = [
   { label: "Less than $15,000", value: 12500 },
-  { label: "$15K–$24.9K", value: 20000 },
-  { label: "$25K–$49.9K", value: 37500 },
-  { label: "$50K+", value: 60000 },
+  { label: "$15,000-$25,000", value: 20000 },
+  { label: "$25,000-$50,000", value: 37500 },
+  { label: "Over $50,000", value: 60000 },
 ];
 
 export default function Step1() {
