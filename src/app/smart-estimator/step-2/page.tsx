@@ -7,7 +7,7 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { StepNavigation } from '@/components/step-navigation';
 
 const creditorOptions = [
-  { label: "1", value: 1 },
+  { label: "Just 1", value: 1 },
   { label: "2-5", value: 3 },
   { label: "6-10", value: 8 },
   { label: "10+", value: 15 },
