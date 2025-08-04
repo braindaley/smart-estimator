@@ -69,7 +69,7 @@ export function Header() {
                   href="/smart-estimator/step-1"
                   className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
                 >
-                  Smart Estimator
+                  Estimator
                 </Link>
                 <Link
                   href="/login"

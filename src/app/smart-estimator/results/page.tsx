@@ -227,7 +227,7 @@ export default function Results() {
           <CardTitle>Calculating Results...</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Please wait while we calculate your smart estimator results.</p>
+          <p>Please wait while we calculate your results.</p>
         </CardContent>
       </Card>
     );
@@ -262,7 +262,7 @@ export default function Results() {
     <div className="space-y-8">
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl">Here are your smart estimator results</CardTitle>
+          <CardTitle className="text-3xl">Here are your results</CardTitle>
           <div className="pt-4">
              <Alert>
                 <AlertTitle>{qualification.status}</AlertTitle>

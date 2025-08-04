@@ -5,9 +5,9 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 200 30"
-      width="200"
-      height="30"
-      aria-label="Smart Estimator logo"
+      width="140"
+      height="24"
+      aria-label="Momentum logo"
       {...props}
     >
       <text
@@ -18,7 +18,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         fontWeight="600"
         className="fill-foreground"
       >
-        Smart Estimator
+        Momentum
       </text>
     </svg>
   );

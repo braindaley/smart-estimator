@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Smart Estimator',
-  description: 'A multi-step form application to provide smart estimates.',
+  title: 'Momentum',
+  description: 'A multi-step form application to get you on the path to financial momentum.',
 };
 
 export default function RootLayout({
