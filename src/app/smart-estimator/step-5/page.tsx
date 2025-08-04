@@ -24,8 +24,8 @@ export default function Step5() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 5</CardTitle>
-        <CardDescription>What is the current status of your payments?</CardDescription>
+        <CardTitle>How are you doing with your payments right now?</CardTitle>
+        <CardDescription>This helps us understand how urgent your situation might be.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
