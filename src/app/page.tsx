@@ -1,15 +1,11 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Logo } from '@/components/logo';
+import { Header } from '@/components/header';
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur-sm">
-        <div className="container mx-auto flex h-16 max-w-7xl items-center px-4">
-          <Logo />
-        </div>
-      </header>
+      <Header />
       <main className="flex flex-1 items-center justify-center">
         <div className="container mx-auto max-w-7xl px-4 text-center">
           <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
