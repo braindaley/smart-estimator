@@ -7,10 +7,10 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { StepNavigation } from '@/components/step-navigation';
 
 const debtOptions = [
-  { label: "Less than $15,000", value: 12500 },
+  { label: "Less than $15,000", value: 14999 },
   { label: "$15,000-$25,000", value: 20000 },
   { label: "$25,000-$50,000", value: 37500 },
-  { label: "Over $50,000", value: 60000 },
+  { label: "Over $50,000", value: 50001 },
 ];
 
 export default function Step1() {
