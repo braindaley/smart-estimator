@@ -438,17 +438,21 @@ export default function Results() {
           <Table>
             <TableHeader>
               <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center text-lg font-semibold">Momentum Plan</TableHead>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center text-lg font-semibold border-x">Personal Loan</TableHead>}
-                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center text-lg font-semibold">Standard Plan</TableHead>}
+                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center">
+                    <p className="text-lg font-semibold">Momentum Plan</p>
+                    <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
+                </TableHead>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x">
+                    <p className="text-lg font-semibold">Personal Loan</p>
+                    <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
+                </TableHead>}
+                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center">
+                    <p className="text-lg font-semibold">Standard Plan</p>
+                    <p className="text-xs text-muted-foreground">A longer program term that might be easier to manage.</p>
+                </TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>}
-              </TableRow>
               <TableRow>
                  {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center">
@@ -601,3 +605,5 @@ export default function Results() {
     </div>
   );
 }
+
+    
