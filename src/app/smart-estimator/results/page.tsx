@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -138,6 +139,53 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     scoreMessage: "Your score shows room for improvement. Our assessment will help identify the best path forward."
   };
 }
+
+const ProgressCircle = ({ score, maxScore, label, color, status }: { score: number, maxScore: number, label: string, color: string, status?: string }) => {
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const offset = status === "Not Started" ? circumference : circumference - (score / maxScore) * circumference;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg width="120" height="120" viewBox="0 0 120 120" className="transform -rotate-90">
+        <circle
+          cx="60"
+          cy="60"
+          r={radius}
+          strokeWidth="10"
+          className="text-gray-200"
+          fill="transparent"
+          stroke="currentColor"
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r={radius}
+          strokeWidth="10"
+          className={status === "Not Started" ? "text-gray-200" : color}
+          fill="transparent"
+          stroke="currentColor"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
+        />
+        <text
+          x="60"
+          y="60"
+          textAnchor="middle"
+          dy=".3em"
+          className="transform rotate-90 origin-center fill-current text-foreground font-bold"
+          style={{ fontSize: status ? '14px' : '24px' }}
+        >
+          {status ? status : score}
+        </text>
+      </svg>
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+    </div>
+  );
+};
+
 
 export default function Results() {
   const { formData, reset } = useEstimatorStore();
@@ -361,16 +409,27 @@ export default function Results() {
                   {qualification.scoreMessage}
                 </p>
               </div>
-              <div className="score-breakdown" style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '12px',
-                fontSize: '14px',
-                color: '#6c757d'
-              }}>
-                <div>Financial Hardship: {momentumScore.breakdown.financialHardship} pts</div>
-                <div>Mental Readiness: Not assessed yet</div>
-                <div>Financial Means: {momentumScore.breakdown.financialMeans} pts (partial)</div>
+              <div className="flex justify-around items-center p-4">
+                <ProgressCircle
+                  score={momentumScore.breakdown.financialHardship}
+                  maxScore={40}
+                  label="Assessment"
+                  color="text-blue-500"
+                />
+                <ProgressCircle
+                  score={0}
+                  maxScore={30}
+                  label="Readiness"
+                  color="text-green-500"
+                  status="Not Started"
+                />
+                <ProgressCircle
+                  score={0}
+                  maxScore={30}
+                  label="Means"
+                  color="text-purple-500"
+                  status="Not Started"
+                />
               </div>
             </div>
           )}
