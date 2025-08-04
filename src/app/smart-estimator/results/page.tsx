@@ -444,6 +444,11 @@ export default function Results() {
             </TableHeader>
             <TableBody>
               <TableRow>
+                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
+                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>}
+              </TableRow>
+              <TableRow>
                  {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center">
                       {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
@@ -495,11 +500,6 @@ export default function Results() {
                 }
               </TableRow>
                <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">Pay off debt faster with a lower monthly payment.</TableCell>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">Consolidate into one payment, but with high interest.</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">A longer program term that might be easier to manage.</TableCell>}
-              </TableRow>
-              <TableRow>
                 {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center text-xs text-muted-foreground">
                     <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
