@@ -106,12 +106,14 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 
 export default function Results() {
   const { formData, reset } = useEstimatorStore();
+  const [allFormData, setAllFormData] = React.useState<any>(null);
   const [results, setResults] = React.useState<any>(null);
   const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
 
   React.useEffect(() => {
-    const allFormData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    const collectedData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    setAllFormData(collectedData);
     
     const { 
       debtAmountEstimate = 0, 
@@ -120,7 +122,7 @@ export default function Results() {
       monthlyIncomeEstimate = 0,
       monthlyPaymentEstimate = 0,
       creditorCountEstimate = 0,
-    } = allFormData;
+    } = collectedData;
 
     // Calculate Momentum Score
     const momentumScoreData = calculateMomentumScore({
@@ -132,7 +134,7 @@ export default function Results() {
     setMomentumScore(momentumScoreData);
 
     // Get qualification status
-    const qualificationStatus = getQualificationStatus(allFormData, momentumScoreData);
+    const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
     setQualification(qualificationStatus);
     
     // Calculate Momentum and Standard payments
@@ -183,7 +185,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!results || !qualification || !momentumScore) {
+  if (!results || !qualification || !momentumScore || !allFormData) {
     return (
       <Card>
         <CardHeader>
@@ -468,6 +470,39 @@ export default function Results() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Testing &amp; Debugging Information</CardTitle>
+          <CardDescription>This section is for testing purposes only.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-semibold">Collected Form Data</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(allFormData, null, 2)}</code>
+            </pre>
+          </div>
+          <div>
+            <h4 className="font-semibold">Calculation Results</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(results, null, 2)}</code>
+            </pre>
+          </div>
+          <div>
+            <h4 className="font-semibold">Qualification Rules Applied</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(qualification, null, 2)}</code>
+            </pre>
+          </div>
+           <div>
+            <h4 className="font-semibold">Momentum Score Details</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(momentumScore, null, 2)}</code>
+            </pre>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
