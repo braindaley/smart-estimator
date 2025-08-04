@@ -141,27 +141,27 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 }
 
 const ProgressCircle = ({ score, maxScore, label, color, status }: { score: number, maxScore: number, label: string, color: string, status?: string }) => {
-  const radius = 50;
+  const radius = 25;
   const circumference = 2 * Math.PI * radius;
   const offset = status === "Not Started" ? circumference : circumference - (score / maxScore) * circumference;
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width="120" height="120" viewBox="0 0 120 120" className="transform -rotate-90">
+    <div className="flex flex-col items-center gap-1">
+      <svg width="60" height="60" viewBox="0 0 60 60" className="transform -rotate-90">
         <circle
-          cx="60"
-          cy="60"
+          cx="30"
+          cy="30"
           r={radius}
-          strokeWidth="10"
+          strokeWidth="5"
           className="text-gray-200"
           fill="transparent"
           stroke="currentColor"
         />
         <circle
-          cx="60"
-          cy="60"
+          cx="30"
+          cy="30"
           r={radius}
-          strokeWidth="10"
+          strokeWidth="5"
           className={status === "Not Started" ? "text-gray-200" : color}
           fill="transparent"
           stroke="currentColor"
@@ -171,17 +171,17 @@ const ProgressCircle = ({ score, maxScore, label, color, status }: { score: numb
           style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
         />
         <text
-          x="60"
-          y="60"
+          x="30"
+          y="30"
           textAnchor="middle"
           dy=".3em"
           className="transform rotate-90 origin-center fill-current text-foreground font-bold"
-          style={{ fontSize: status ? '14px' : '24px' }}
+          style={{ fontSize: status ? '8px' : '12px' }}
         >
           {status ? status : score}
         </text>
       </svg>
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
     </div>
   );
 };
