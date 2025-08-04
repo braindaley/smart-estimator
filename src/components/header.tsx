@@ -41,7 +41,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur-sm">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Logo />
+        <Link href="/">
+          <Logo />
+        </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           <Link
             href={plansLink}
@@ -70,7 +72,9 @@ export function Header() {
             <SheetContent>
               <SheetHeader className="mb-8">
                 <SheetTitle>
+                  <Link href="/">
                     <Logo />
+                  </Link>
                 </SheetTitle>
               </SheetHeader>
               <nav className="grid gap-6 text-lg font-medium">
