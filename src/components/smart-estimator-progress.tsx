@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { Progress } from '@/components/ui/progress';
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 export function SmartEstimatorProgress() {
   const pathname = usePathname();

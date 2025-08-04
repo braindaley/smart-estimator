@@ -43,7 +43,7 @@ export default function Step5() {
         </div>
       </CardContent>
       <CardFooter>
-        <StepNavigation currentStep={5} totalSteps={7} showNext={false} />
+        <StepNavigation currentStep={5} totalSteps={6} showNext={false} />
       </CardFooter>
     </Card>
   );

@@ -31,6 +31,9 @@ export default function Step3() {
 
   const onSubmit = (data: FormData) => {
     setFormData('step3', data);
+    // Also set hasSteadyIncome based on this input
+    const hasSteadyIncome = data.monthlyIncomeEstimate > 0;
+    setFormData('step6', { hasSteadyIncome });
     router.push('/smart-estimator/step-4');
   };
 
@@ -71,7 +74,7 @@ export default function Step3() {
             />
           </CardContent>
           <CardFooter>
-            <StepNavigation currentStep={3} totalSteps={7} />
+            <StepNavigation currentStep={3} totalSteps={6} />
           </CardFooter>
         </form>
       </Form>

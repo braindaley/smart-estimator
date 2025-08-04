@@ -6,29 +6,32 @@ import { Button } from '@/components/ui/button';
 import { useEstimatorStore } from '@/lib/estimator-store';
 import { StepNavigation } from '@/components/step-navigation';
 
-const incomeStatusOptions = [
-  { label: "Yes", value: true },
-  { label: "No", value: false },
+const ficoScoreOptions = [
+  { label: "Less than 630", value: 600 },
+  { label: "630-659", value: 645 },
+  { label: "660-719", value: 690 },
+  { label: "Greater than 720", value: 750 },
+  { label: "I don't know", value: 645 },
 ];
 
 export default function Step6() {
   const router = useRouter();
   const { setFormData } = useEstimatorStore();
 
-  const handleSelection = (hasSteadyIncome: boolean) => {
-    setFormData('step6', { hasSteadyIncome });
-    router.push('/smart-estimator/step-7');
+  const handleSelection = (userFicoScoreEstimate: number) => {
+    setFormData('step7', { userFicoScoreEstimate });
+    router.push('/smart-estimator/results');
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Step 6</CardTitle>
-        <CardDescription>Do you currently have a steady source of income?</CardDescription>
+        <CardDescription>Do you know your FICO score?</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
-          {incomeStatusOptions.map((option) => (
+          {ficoScoreOptions.map((option) => (
             <Button
               key={option.label}
               onClick={() => handleSelection(option.value)}
@@ -42,7 +45,7 @@ export default function Step6() {
         </div>
       </CardContent>
       <CardFooter>
-        <StepNavigation currentStep={6} totalSteps={7} showNext={false} />
+        <StepNavigation currentStep={6} totalSteps={6} showNext={false} />
       </CardFooter>
     </Card>
   );
