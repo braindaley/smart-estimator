@@ -40,7 +40,7 @@ export default function Step3() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>What’s your best guess at your monthly income (before taxes)?</CardTitle>
+        <CardTitle>What’s your monthly income before taxes?</CardTitle>
         <CardDescription>This helps us understand what kind of plan might fit your budget.</CardDescription>
       </CardHeader>
       <Form {...form}>
