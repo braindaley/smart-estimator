@@ -26,8 +26,8 @@ export default function Step1() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 1</CardTitle>
-        <CardDescription>Estimated total amount of debt</CardDescription>
+        <CardTitle>Estimated total amount of debt</CardTitle>
+        <CardDescription>Step 1</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4">
