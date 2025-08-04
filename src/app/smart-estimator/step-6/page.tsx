@@ -9,7 +9,7 @@ import { StepNavigation } from '@/components/step-navigation';
 const ficoScoreOptions = [
   { label: "Yes, it's under 630", value: 600 },
   { label: "Yes, it's between 630-660", value: 645 },
-  { label: "660-719", value: 690 },
+  { label: "Yes, it's between 660-720", value: 690 },
   { label: "Greater than 720", value: 750 },
   { label: "I don't know", value: 645 },
 ];
