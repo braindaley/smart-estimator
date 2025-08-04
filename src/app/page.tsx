@@ -12,7 +12,7 @@ export default function Home() {
           <div className="grid grid-cols-1 items-center gap-12 py-12 md:grid-cols-2 md:py-24">
             <div className="flex flex-col items-start text-left">
               <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                Freedom from debt starts with Momentum
+                Freedom starts with Momentum
               </h1>
               <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
                 Get in. Get out. Get on with life.
