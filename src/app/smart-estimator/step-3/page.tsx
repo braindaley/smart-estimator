@@ -40,8 +40,8 @@ export default function Step3() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 3</CardTitle>
-        <CardDescription>What is your estimated monthly income?</CardDescription>
+        <CardTitle>What’s your best guess at your monthly income (before taxes)?</CardTitle>
+        <CardDescription>This helps us understand what kind of plan might fit your budget.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
