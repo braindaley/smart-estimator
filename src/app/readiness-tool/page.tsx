@@ -42,6 +42,21 @@ const whatToExpectItems = [
     }
 ]
 
+const toolBenefits = [
+    {
+        text: "Personalized feedback based on your situation",
+        icon: CheckCircle2,
+    },
+    {
+        text: "Tips to improve readiness if you’re not quite there yet",
+        icon: CheckCircle2,
+    },
+    {
+        text: "Free educational videos to earn Momentum Points and boost your score",
+        icon: CheckCircle2,
+    }
+]
+
 export default function ReadinessToolPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -69,6 +84,22 @@ export default function ReadinessToolPage() {
                 className="rounded-lg"
                 data-ai-hint="abstract dots"
               />
+            </div>
+          </div>
+          
+          <div className="py-12 md:py-24 bg-muted rounded-lg">
+            <div className="container mx-auto px-4">
+                <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">How This Tool Helps You Prepare</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                    {toolBenefits.map((item) => (
+                        <div key={item.text} className="flex items-start gap-4">
+                            <item.icon className="h-6 w-6 flex-shrink-0 text-primary mt-1" />
+                            <p className="text-lg text-foreground">{item.text}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
           </div>
 
