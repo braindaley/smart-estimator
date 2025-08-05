@@ -226,12 +226,11 @@ export default function Results() {
       'userFicoScoreEstimate',
     ];
 
-    const hasAllData = requiredKeys.every(key => key in collectedData && collectedData[key] !== undefined);
-    
-    // The "hasSteadyIncome" can be false, so it must be checked for undefined only.
-    const hasIncomeData = 'hasSteadyIncome' in collectedData && collectedData['hasSteadyIncome'] !== undefined;
+    const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key));
+    const hasIncomeData = collectedData.hasOwnProperty('hasSteadyIncome');
 
-    if (!hasAllData || !hasIncomeData) {
+
+    if (!hasAllRequiredData || !hasIncomeData) {
       // Don't redirect immediately, just wait for data.
       // A loading state is already shown.
       // If data is truly missing, the user can use navigation to go back.
@@ -656,5 +655,3 @@ export default function Results() {
     </div>
   );
 }
-
-    
