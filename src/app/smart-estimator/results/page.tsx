@@ -453,56 +453,6 @@ export default function Results() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Time to Freedom</CardTitle>
-            <CardDescription>See how long each plan takes and what it will cost you.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[250px] w-full">
-              <BarChart
-                accessibilityLayer
-                data={chartData}
-                layout="vertical"
-                margin={{ left: 10, right: 10 }}
-              >
-                <CartesianGrid horizontal={false} />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  
-                />
-                <XAxis dataKey="term" type="number" hide />
-                <Tooltip
-                  cursor={{ fill: "hsl(var(--muted))" }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name, props) => (
-                        <div className="flex flex-col gap-1">
-                            <div className="font-bold">{props.payload.name}</div>
-                            <div>
-                                <span className="text-muted-foreground">Term: </span>
-                                {props.payload.term} months
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">Total Cost: </span>
-                                {formatCurrency(props.payload.totalCost)}
-                            </div>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                 <Bar dataKey="term" name="Term" layout="vertical" radius={5}>
-                 </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
         <div className="text-center mt-8 space-y-4">
               {renderCtas()}
               {qualification.showScore && qualification.scoreMessage && (
