@@ -404,6 +404,11 @@ export default function Results() {
                   {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x pb-4">
                       <p className="text-lg font-semibold">Personal Loan</p>
                       <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
+                      {results.personalLoan.isEligible && results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
+                        <div className="text-amber-600 mt-1 text-xs font-normal">
+                          ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
+                        </div>
+                      )}
                   </TableHead>}
                   {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center pb-4">
                       <p className="text-lg font-semibold">Standard Plan</p>
@@ -423,11 +428,6 @@ export default function Results() {
                         {results.personalLoan.isEligible ? (
                           <>
                             <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p>
-                            {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
-                              <div className="text-amber-600 mt-1 text-xs">
-                                ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
-                              </div>
-                            )}
                           </>
                           ) : (
                             <p className="text-muted-foreground">Not Eligible</p>
