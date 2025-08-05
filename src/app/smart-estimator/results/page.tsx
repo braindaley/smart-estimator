@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from 'react';
@@ -453,7 +454,7 @@ export default function Results() {
                 <TableRow>
                     {!qualification.hideColumns.includes('momentum') && (
                       <TableCell className="text-center text-xs text-muted-foreground align-top">
-                        <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
+                        <p className="font-bold">Why it matters:</p>Shorter term = Faster freedom + Less total cost (lower direct & 3rd-party fees).
                       </TableCell>
                     )}
                     {!qualification.hideColumns.includes('personalLoan') && (
