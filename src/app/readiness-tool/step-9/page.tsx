@@ -24,7 +24,7 @@ export default function Step9() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Is any of the debt you plan to enroll held jointly with a spouse or significant other?</CardTitle>
+        <CardTitle>Is any of the debt shared with your spouse or partner?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

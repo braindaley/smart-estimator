@@ -24,7 +24,7 @@ export default function Step1() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Are you actively looking for a way to reduce or eliminate your debt right now?</CardTitle>
+        <CardTitle>Are you currently trying to find a way to lower or get rid of your debt?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

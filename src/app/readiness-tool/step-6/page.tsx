@@ -25,7 +25,7 @@ export default function Step6() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Which of the following best describes your current situation?</CardTitle>
+        <CardTitle>Which of these sounds most like your current situation?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

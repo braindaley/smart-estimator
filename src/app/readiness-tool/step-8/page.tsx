@@ -23,7 +23,7 @@ export default function Step8() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Have you discussed a debt settlement solution with family or friends?</CardTitle>
+        <CardTitle>Have you talked with anyone close to you about trying debt settlement?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

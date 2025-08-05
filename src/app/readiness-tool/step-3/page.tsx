@@ -24,7 +24,7 @@ export default function Step3() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Do you expect to make any large purchases (home, car, student loan co-sign) soon?</CardTitle>
+        <CardTitle>Are you planning any big purchases soon—like a car, home, or co-signing a loan?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

@@ -25,7 +25,7 @@ export default function Step2() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>How important is keeping your credit score high in the next 12–24 months?</CardTitle>
+        <CardTitle>How important is it to you to keep your credit score high in the next year or two?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

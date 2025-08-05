@@ -24,7 +24,7 @@ export default function Step4() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Are you willing to follow a strutured plan to become debt-free?</CardTitle>
+        <CardTitle>Would you be open to following a clear step-by-step plan to become debt-free?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">

@@ -25,7 +25,7 @@ export default function Step7() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Which of these options have you explored and ruled out?</CardTitle>
+        <CardTitle>Have you already tried any of these and decided they won’t work?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">
