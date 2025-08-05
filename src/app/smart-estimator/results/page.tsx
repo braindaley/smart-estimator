@@ -241,11 +241,13 @@ export default function Results() {
         monthlyPayment: momentumMonthlyPayment,
         term: momentumTerm,
         isEligible: debtAmountEstimate >= 15000,
+        totalCost: momentumMonthlyPayment * momentumTerm,
       },
       standard: {
         monthlyPayment: standardMonthlyPayment,
         term: standardTerm,
         isEligible: debtAmountEstimate >= 10000,
+        totalCost: standardMonthlyPayment * standardTerm,
       },
       personalLoan: {
         monthlyPayment: personalLoanMonthlyPayment,
@@ -254,6 +256,7 @@ export default function Results() {
         actualLoanAmount: actualLoanAmount, // FIX: Add actual loan amount
         maxAvailable: maxLoanAmount,        // FIX: Add max available
         isEligible: canGetLoan,
+        totalCost: personalLoanMonthlyPayment * 36,
       }
     });
 
@@ -430,6 +433,11 @@ export default function Results() {
                   {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
                   {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
                   {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
+                </TableRow>
+                <TableRow>
+                  {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{results.momentum.isEligible ? `Total Cost: ${formatCurrency(results.momentum.totalCost)}` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `Total Cost: ${formatCurrency(results.personalLoan.totalCost)}` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
                 </TableRow>
                 <TableRow>
                     {!qualification.hideColumns.includes('momentum') && (
