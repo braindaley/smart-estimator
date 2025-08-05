@@ -309,7 +309,7 @@ export default function Results() {
 
   return (
     <div className="space-y-8">
-      <Card>
+      <Card className="border-0 shadow-none">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Here are your results</CardTitle>
           <div className="pt-4">
@@ -605,5 +605,3 @@ export default function Results() {
     </div>
   );
 }
-
-    
