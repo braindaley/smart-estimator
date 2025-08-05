@@ -221,16 +221,20 @@ export default function Results() {
       'debtAmountEstimate',
       'creditorCountEstimate',
       'monthlyIncomeEstimate',
-      'hasSteadyIncome',
       'monthlyPaymentEstimate',
       'currentPaymentStatus',
       'userFicoScoreEstimate',
     ];
 
     const hasAllData = requiredKeys.every(key => key in collectedData && collectedData[key] !== undefined);
+    
+    // The "hasSteadyIncome" can be false, so it must be checked for undefined only.
+    const hasIncomeData = 'hasSteadyIncome' in collectedData && collectedData['hasSteadyIncome'] !== undefined;
 
-    if (!hasAllData) {
-      router.push('/smart-estimator/step-1');
+    if (!hasAllData || !hasIncomeData) {
+      // Don't redirect immediately, just wait for data.
+      // A loading state is already shown.
+      // If data is truly missing, the user can use navigation to go back.
       return;
     }
 
@@ -652,3 +656,5 @@ export default function Results() {
     </div>
   );
 }
+
+    
