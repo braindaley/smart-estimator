@@ -427,7 +427,7 @@ export default function Results() {
                 </div>
               </div>
               <div
-                className="milestones relative mb-8 text-xs text-muted-foreground"
+                className="milestones relative mt-2 mb-8 text-xs text-muted-foreground"
                 style={{ maxWidth: '384px', width: '100%' }}
               >
                 {[50, 70, 75].map((milestone) => (
