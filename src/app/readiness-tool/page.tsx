@@ -155,6 +155,16 @@ export default function ReadinessToolPage() {
             </div>
           </div>
         </div>
+        <div className="bg-muted py-12 mt-12">
+          <div className="container mx-auto max-w-7xl px-4 text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Ready to see where you stand?
+            </h2>
+            <Button asChild size="lg" className="mt-6">
+              <Link href="#">Start the Readiness Tool</Link>
+            </Button>
+          </div>
+        </div>
       </main>
     </div>
   );
