@@ -158,12 +158,16 @@ export function Header() {
 
   const NavPlaceholder = () => (
     <div className="flex items-center gap-4">
-      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
-      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
-      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
-      <div className="hidden h-10 w-24 rounded-md bg-muted animate-pulse md:block" />
-      <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse md:block" />
-      <div className="h-10 w-10 rounded-md bg-muted animate-pulse md:hidden" />
+      <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+        <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
+        <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
+        <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
+      </nav>
+      <div className="flex items-center gap-4">
+        <div className="hidden h-10 w-24 rounded-md bg-muted animate-pulse md:block" />
+        <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse md:block" />
+        <div className="h-10 w-10 rounded-md bg-muted animate-pulse md:hidden" />
+      </div>
     </div>
     );
 
