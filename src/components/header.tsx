@@ -22,12 +22,12 @@ export function Header() {
   useEffect(() => {
     // Since the store is persisted, we need to check it on the client side.
     const hasData = Object.keys(formData).length > 0;
-    const hasResultsData = Object.keys(formData).length >= 6;
+    const hasResultsData = Object.keys(formData).length >= 5;
     if (hasResultsData) {
       setPlansLink('/smart-estimator/results');
     } else if (hasData) {
         const lastStep = Math.max(0, ...Object.keys(formData).map(k => parseInt(k.replace('step', '') || '0', 10)));
-        if(lastStep > 0 && lastStep < 7) {
+        if(lastStep > 0 && lastStep < 6) {
             setPlansLink(`/smart-estimator/step-${lastStep}`);
         } else {
             setPlansLink('/smart-estimator/step-1');
@@ -65,6 +65,9 @@ export function Header() {
           </Link>
         </nav>
         <div className="flex items-center gap-4">
+          <Button asChild className="hidden md:flex">
+            <Link href="/contact-us">Contact Us</Link>
+          </Button>
           <Button variant="ghost" asChild className="hidden md:flex">
             <Link href="/login">Sign in</Link>
           </Button>
@@ -113,6 +116,12 @@ export function Header() {
                   className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
                 >
                   Readiness Tool
+                </Link>
+                <Link
+                  href="/contact-us"
+                  className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Contact Us
                 </Link>
                 <Link
                   href="/login"
