@@ -1,7 +1,7 @@
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, CalendarClock, TrendingUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -23,6 +23,24 @@ const readinessFactors = [
     description: "Beyond the finances, you need the mental and emotional strength to stick with the plan, even when it gets challenging.",
   },
 ];
+
+const whatToExpectItems = [
+    {
+        icon: CalendarClock,
+        title: "Monthly Commitment",
+        description: "You’ll make a monthly payment into a dedicated account.",
+    },
+    {
+        icon: AlertTriangle,
+        title: "Hard Choices Ahead",
+        description: "Some accounts may go into collections temporarily.",
+    },
+    {
+        icon: TrendingUp,
+        title: "Long-Term Impact",
+        description: "Debt-free in 2–4 years if you stay the course.",
+    }
+]
 
 export default function ReadinessToolPage() {
   return (
@@ -81,6 +99,28 @@ export default function ReadinessToolPage() {
                     </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div className="py-12 md:py-24">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">What to Expect on the Journey</h2>
+              <p className="mt-4 text-lg text-muted-foreground">The path has challenges, but the destination is worth it.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                {whatToExpectItems.map((item) => (
+                    <Card key={item.title}>
+                        <CardHeader className="items-center text-center">
+                            <div className="rounded-full bg-primary/10 p-3">
+                                <item.icon className="h-8 w-8 text-primary" />
+                            </div>
+                            <CardTitle>{item.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-center">
+                            <p className="text-muted-foreground">{item.description}</p>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
           </div>
         </div>
