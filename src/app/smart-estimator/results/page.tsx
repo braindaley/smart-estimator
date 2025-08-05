@@ -64,7 +64,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     hideColumns.push("personalLoan"); // Disable loan offer
     
     return {
-      status: "No Income - Limited Options",
+      status: "With no income you may have limited options",
       hideColumns: hideColumns,
       primaryCTA: "See Non-Payment Based Solutions",
       secondaryCTA: "Schedule Call",
