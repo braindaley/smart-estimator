@@ -52,6 +52,12 @@ export function Header() {
             Smart Estimator
           </Link>
           <Link
+            href="/readiness-tool"
+            className="transition-colors hover:text-foreground/80 text-foreground/60"
+          >
+            Readiness Tool
+          </Link>
+          <Link
             href="/apply"
             className="transition-colors hover:text-foreground/80 text-foreground/60"
           >
@@ -101,6 +107,12 @@ export function Header() {
                   className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
                 >
                   Smart Estimator
+                </Link>
+                 <Link
+                  href="/readiness-tool"
+                  className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Readiness Tool
                 </Link>
                 <Link
                   href="/login"
