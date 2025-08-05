@@ -16,26 +16,51 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { useEffect, useState } from 'react';
 
 export function Header() {
-  const { formData } = useEstimatorStore();
+  const { formData, _hasHydrated } = useEstimatorStore();
   const [plansLink, setPlansLink] = useState('/smart-estimator/step-1');
 
   useEffect(() => {
-    // Since the store is persisted, we need to check it on the client side.
+    if (!_hasHydrated) return;
+
     const hasData = Object.keys(formData).length > 0;
-    const hasResultsData = Object.keys(formData).length >= 5;
+    const hasResultsData = Object.keys(formData).filter(k => k.startsWith('step')).length >= 5;
+
     if (hasResultsData) {
       setPlansLink('/smart-estimator/results');
     } else if (hasData) {
-        const lastStep = Math.max(0, ...Object.keys(formData).map(k => parseInt(k.replace('step', '') || '0', 10)));
-        if(lastStep > 0 && lastStep < 6) {
-            setPlansLink(`/smart-estimator/step-${lastStep}`);
-        } else {
-            setPlansLink('/smart-estimator/step-1');
-        }
-    } else {
+      const steps = Object.keys(formData)
+        .filter(k => k.startsWith('step'))
+        .map(k => parseInt(k.replace('step', ''), 10))
+        .filter(n => !isNaN(n) && n > 0);
+      
+      const lastStep = steps.length > 0 ? Math.max(...steps) : 0;
+
+      if (lastStep > 0) {
+        setPlansLink(`/smart-estimator/step-${lastStep}`);
+      } else {
         setPlansLink('/smart-estimator/step-1');
+      }
+    } else {
+      setPlansLink('/smart-estimator/step-1');
     }
-  }, [formData]);
+  }, [formData, _hasHydrated]);
+
+  if (!_hasHydrated) {
+    // Render a placeholder or skeleton while rehydrating
+    return (
+      <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur-sm">
+        <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+          <Link href="/">
+            <Logo />
+          </Link>
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-24 rounded-md bg-muted animate-pulse" />
+            <div className="h-10 w-20 rounded-md bg-muted animate-pulse" />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
 
   return (

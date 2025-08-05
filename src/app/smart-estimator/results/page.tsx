@@ -192,8 +192,6 @@ export default function Results() {
   const store = useEstimatorStore();
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isReady, setIsReady] = React.useState(false);
-
 
   const [allFormData, setAllFormData] = React.useState<any>(null);
   const [results, setResults] = React.useState<any>(null);
@@ -201,14 +199,8 @@ export default function Results() {
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
 
   React.useEffect(() => {
-      if (store._hasHydrated) {
-          setIsReady(true);
-      }
-  }, [store._hasHydrated]);
-
-  React.useEffect(() => {
     // Wait for the store to be hydrated before doing anything.
-    if (!isReady) {
+    if (!store._hasHydrated) {
       return;
     }
 
@@ -320,7 +312,7 @@ export default function Results() {
     } finally {
       setIsLoading(false);
     }
-  }, [isReady, store.formData, router]);
+  }, [store._hasHydrated, store.formData, router]);
 
   const formatCurrency = (value: number) => {
     if (typeof value !== 'number' || isNaN(value)) return '$0';

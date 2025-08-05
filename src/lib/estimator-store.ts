@@ -11,13 +11,13 @@ interface EstimatorState {
 
 const initialState = {
   formData: {},
-  _hasHydrated: false,
 };
 
 export const useEstimatorStore = create<EstimatorState>()(
   persist(
     (set) => ({
-      ...initialState,
+      formData: {},
+      _hasHydrated: false,
       setFormData: (step, data) =>
         set((state) => ({
           formData: {
@@ -25,7 +25,7 @@ export const useEstimatorStore = create<EstimatorState>()(
             [step]: data,
           },
         })),
-      reset: () => set(initialState),
+      reset: () => set({ ...initialState, _hasHydrated: true }),
        setHasHydrated: (hydrated) => {
         set({
           _hasHydrated: hydrated,
