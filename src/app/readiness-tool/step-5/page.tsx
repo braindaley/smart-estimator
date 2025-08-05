@@ -24,7 +24,7 @@ export default function Step5() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Are they in agreement with a debt settlement plan solution?</CardTitle>
+        <CardTitle>Is your spouse in agreement with a debt settlement plan solution?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">
