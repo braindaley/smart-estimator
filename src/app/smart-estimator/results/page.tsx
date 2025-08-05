@@ -390,15 +390,15 @@ export default function Results() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center">
+                  {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center pb-4">
                       <p className="text-lg font-semibold">Momentum Plan</p>
                       <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
                   </TableHead>}
-                  {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x">
+                  {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x pb-4">
                       <p className="text-lg font-semibold">Personal Loan</p>
                       <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
                   </TableHead>}
-                  {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center">
+                  {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center pb-4">
                       <p className="text-lg font-semibold">Standard Plan</p>
                       <p className="text-xs text-muted-foreground">A longer program term that might be easier to manage.</p>
                   </TableHead>}
