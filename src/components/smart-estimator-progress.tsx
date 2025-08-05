@@ -9,11 +9,13 @@ export function SmartEstimatorProgress() {
   const pathname = usePathname();
   const stepMatch = pathname.match(/step-(\d+)/);
   const currentStep = stepMatch ? parseInt(stepMatch[1], 10) : 0;
-  const progress = (currentStep / TOTAL_STEPS) * 100;
+  const progress = currentStep > 0 ? (currentStep / TOTAL_STEPS) * 100 : 0;
+
+  if (currentStep === 0) return null;
 
   return (
     <div className="w-full">
-      <p className="text-center text-sm text-muted-foreground mb-2">
+      <p className="mb-2 text-center text-sm text-muted-foreground">
         Step {currentStep} of {TOTAL_STEPS}
       </p>
       <Progress value={progress} className="w-full" />

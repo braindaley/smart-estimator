@@ -30,7 +30,7 @@ export default function Step6() {
         <CardDescription>If you are not sure, we can run your credit for free if you would like.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4 max-w-md mx-auto">
+        <div className="mx-auto flex max-w-md flex-col space-y-4">
           {ficoScoreOptions.map((option) => (
             <Button
               key={option.label}
