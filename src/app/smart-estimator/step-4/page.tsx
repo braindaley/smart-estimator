@@ -73,7 +73,7 @@ export default function Step4() {
             </div>
           </CardContent>
           <CardFooter className="w-full">
-            <StepNavigation currentStep={4} totalSteps={6} />
+            <StepNavigation currentStep={4} totalSteps={5} />
           </CardFooter>
         </form>
       </Form>

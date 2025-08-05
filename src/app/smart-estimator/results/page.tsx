@@ -222,7 +222,6 @@ export default function Results() {
       'creditorCountEstimate',
       'monthlyIncomeEstimate',
       'monthlyPaymentEstimate',
-      'currentPaymentStatus',
       'userFicoScoreEstimate',
     ];
 
