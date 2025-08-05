@@ -190,78 +190,90 @@ const ProgressCircle = ({ score, maxScore, label, color, status }: { score: numb
 
 
 export default function Results() {
-  const { formData, reset } = useEstimatorStore();
+  const store = useEstimatorStore();
+  const [isInitialized, setIsInitialized] = React.useState(false);
+
   const [allFormData, setAllFormData] = React.useState<any>(null);
   const [results, setResults] = React.useState<any>(null);
   const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
 
   React.useEffect(() => {
-    const collectedData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
-    setAllFormData(collectedData);
-    
-    const { 
-      debtAmountEstimate = 0, 
-      userFicoScoreEstimate = 0,
-      hasSteadyIncome,
-      monthlyIncomeEstimate = 0,
-      monthlyPaymentEstimate = 0,
-      creditorCountEstimate = 0,
-    } = collectedData;
-
-    // Calculate Momentum Score
-    const momentumScoreData = calculateMomentumScore({
-        debtAmountEstimate,
-        monthlyIncomeEstimate,
-        monthlyPaymentEstimate,
-        creditorCountEstimate
-    });
-    setMomentumScore(momentumScoreData);
-
-    // Get qualification status
-    const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
-    setQualification(qualificationStatus);
-    
-    // Calculate Momentum and Standard payments
-    const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
-    const momentumTerm = getMomentumTermLength(debtAmountEstimate);
-    
-    const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
-    const standardTerm = getStandardTermLength(debtAmountEstimate);
-
-    // Calculate Personal Loan with FIXED LOGIC
-    const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
-    const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
-    const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount); // FIX: Use actual available amount
-    const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
-    const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0; // FIX: Use actual amount
-    
-    setResults({
-      debtAmountEstimate,
-      momentum: {
-        monthlyPayment: momentumMonthlyPayment,
-        term: momentumTerm,
-        isEligible: debtAmountEstimate >= 15000,
-        totalCost: momentumMonthlyPayment * momentumTerm,
-      },
-      standard: {
-        monthlyPayment: standardMonthlyPayment,
-        term: standardTerm,
-        isEligible: debtAmountEstimate >= 10000,
-        totalCost: standardMonthlyPayment * standardTerm,
-      },
-      personalLoan: {
-        monthlyPayment: personalLoanMonthlyPayment,
-        term: 36,
-        apr: personalLoanApr,
-        actualLoanAmount: actualLoanAmount, // FIX: Add actual loan amount
-        maxAvailable: maxLoanAmount,        // FIX: Add max available
-        isEligible: canGetLoan,
-        totalCost: personalLoanMonthlyPayment * 36,
+    if (store && !isInitialized) {
+      const { formData } = store;
+      const collectedData = Object.keys(formData).length > 0
+        ? Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {})
+        : {};
+      
+      if (Object.keys(collectedData).length === 0) {
+        return;
       }
-    });
+      
+      setAllFormData(collectedData);
+      
+      const { 
+        debtAmountEstimate = 0, 
+        userFicoScoreEstimate = 0,
+        hasSteadyIncome,
+        monthlyIncomeEstimate = 0,
+        monthlyPaymentEstimate = 0,
+        creditorCountEstimate = 0,
+      } = collectedData;
 
-  }, [formData]);
+      // Calculate Momentum Score
+      const momentumScoreData = calculateMomentumScore({
+          debtAmountEstimate,
+          monthlyIncomeEstimate,
+          monthlyPaymentEstimate,
+          creditorCountEstimate
+      });
+      setMomentumScore(momentumScoreData);
+
+      // Get qualification status
+      const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
+      setQualification(qualificationStatus);
+      
+      // Calculate Momentum and Standard payments
+      const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
+      const momentumTerm = getMomentumTermLength(debtAmountEstimate);
+      
+      const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
+      const standardTerm = getStandardTermLength(debtAmountEstimate);
+
+      // Calculate Personal Loan with FIXED LOGIC
+      const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
+      const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
+      const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount); // FIX: Use actual available amount
+      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
+      const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0; // FIX: Use actual amount
+      
+      setResults({
+        debtAmountEstimate,
+        momentum: {
+          monthlyPayment: momentumMonthlyPayment,
+          term: momentumTerm,
+          isEligible: debtAmountEstimate >= 15000,
+          totalCost: momentumMonthlyPayment * momentumTerm,
+        },
+        standard: {
+          monthlyPayment: standardMonthlyPayment,
+          term: standardTerm,
+          isEligible: debtAmountEstimate >= 10000,
+          totalCost: standardMonthlyPayment * standardTerm,
+        },
+        personalLoan: {
+          monthlyPayment: personalLoanMonthlyPayment,
+          term: 36,
+          apr: personalLoanApr,
+          actualLoanAmount: actualLoanAmount, // FIX: Add actual loan amount
+          maxAvailable: maxLoanAmount,        // FIX: Add max available
+          isEligible: canGetLoan,
+          totalCost: personalLoanMonthlyPayment * 36,
+        }
+      });
+      setIsInitialized(true);
+    }
+  }, [store, isInitialized]);
 
   const formatCurrency = (value: number) => {
     if (typeof value !== 'number' || isNaN(value)) return '$0';
@@ -287,7 +299,7 @@ export default function Results() {
   }
 
   const handleRestart = () => {
-    reset();
+    store.reset();
   }
 
   const handleCTAClick = (cta: string) => {

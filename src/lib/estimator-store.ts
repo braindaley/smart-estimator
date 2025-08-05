@@ -5,10 +5,13 @@ interface EstimatorState {
   formData: Record<string, any>;
   setFormData: (step: string, data: any) => void;
   reset: () => void;
+  _hasHydrated: boolean;
+  setHasHydrated: (hydrated: boolean) => void;
 }
 
 const initialState = {
   formData: {},
+  _hasHydrated: false,
 };
 
 export const useEstimatorStore = create<EstimatorState>()(
@@ -23,10 +26,20 @@ export const useEstimatorStore = create<EstimatorState>()(
           },
         })),
       reset: () => set(initialState),
+       setHasHydrated: (hydrated) => {
+        set({
+          _hasHydrated: hydrated,
+        });
+      },
     }),
     {
       name: 'estimator-storage', // name of the item in the storage (must be unique)
       storage: createJSONStorage(() => sessionStorage), // (optional) by default, 'localStorage' is used
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHasHydrated(true);
+        }
+      },
     }
   )
 );
