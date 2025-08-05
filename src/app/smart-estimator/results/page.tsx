@@ -397,11 +397,11 @@ export default function Results() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center pb-4">
+                  {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center pb-4 align-top">
                       <p className="text-lg font-semibold">Momentum Plan</p>
                       <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
                   </TableHead>}
-                  {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x pb-4">
+                  {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x pb-4 align-top">
                       <p className="text-lg font-semibold">Personal Loan</p>
                       <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
                       {results.personalLoan.isEligible && results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
@@ -410,7 +410,7 @@ export default function Results() {
                         </div>
                       )}
                   </TableHead>}
-                  {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center pb-4">
+                  {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center pb-4 align-top">
                       <p className="text-lg font-semibold">Standard Plan</p>
                       <p className="text-xs text-muted-foreground">A longer program term that might be easier to manage.</p>
                   </TableHead>}
@@ -419,12 +419,12 @@ export default function Results() {
               <TableBody>
                 <TableRow>
                   {!qualification.hideColumns.includes('momentum') && 
-                      <TableCell className="text-center">
+                      <TableCell className="text-center align-top">
                         {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                       </TableCell>
                   }
                   {!qualification.hideColumns.includes('personalLoan') && 
-                      <TableCell className="text-center border-x">
+                      <TableCell className="text-center border-x align-top">
                         {results.personalLoan.isEligible ? (
                           <>
                             <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p>
@@ -435,29 +435,29 @@ export default function Results() {
                       </TableCell>
                   }
                   {!qualification.hideColumns.includes('standard') && 
-                      <TableCell className="text-center">
+                      <TableCell className="text-center align-top">
                       {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                       </TableCell>
                   }
                 </TableRow>
                 <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
-                  {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
-                  {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x align-top">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('standard') && <TableCell className="text-center align-top">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
                 </TableRow>
                 <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center">{results.momentum.isEligible ? `Total Cost: ${formatCurrency(results.momentum.totalCost)}` : '-'}</TableCell>}
-                  {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `Total Cost: ${formatCurrency(results.personalLoan.totalCost)}` : '-'}</TableCell>}
-                  {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `Total Cost: ${formatCurrency(results.momentum.totalCost)}` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x align-top">{results.personalLoan.isEligible ? `Total Cost: ${formatCurrency(results.personalLoan.totalCost)}` : '-'}</TableCell>}
+                  {!qualification.hideColumns.includes('standard') && <TableCell className="text-center align-top">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
                 </TableRow>
                 <TableRow>
                     {!qualification.hideColumns.includes('momentum') && (
-                      <TableCell className="text-center text-xs text-muted-foreground">
+                      <TableCell className="text-center text-xs text-muted-foreground align-top">
                         <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
                       </TableCell>
                     )}
                     {!qualification.hideColumns.includes('personalLoan') && (
-                      <TableCell className="text-center text-xs text-muted-foreground border-x">
+                      <TableCell className="text-center text-xs text-muted-foreground border-x align-top">
                         {results.personalLoan.isEligible ? (
                           <>
                             <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
@@ -468,7 +468,7 @@ export default function Results() {
                       </TableCell>
                     )}
                     {!qualification.hideColumns.includes('standard') && (
-                      <TableCell className="text-center text-xs text-muted-foreground">
+                      <TableCell className="text-center text-xs text-muted-foreground align-top">
                         <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
                       </TableCell>
                     )}
