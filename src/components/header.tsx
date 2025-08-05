@@ -42,7 +42,12 @@ export function Header() {
       const lastStep = steps.length > 0 ? Math.max(...steps) : 0;
 
       if (lastStep > 0) {
-        setPlansLink(`/smart-estimator/step-${lastStep + 1 > 5 ? 'results' : lastStep}`);
+        const nextStep = lastStep + 1;
+        if (nextStep > 5) {
+            setPlansLink('/smart-estimator/results');
+        } else {
+            setPlansLink(`/smart-estimator/step-${lastStep}`);
+        }
       } else {
         setPlansLink('/smart-estimator/step-1');
       }
@@ -116,7 +121,7 @@ export function Header() {
   );
 
   const DesktopNav = () => (
-    <>
+    <div className="flex items-center gap-4">
       <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
         <Link
           href={plansLink}
@@ -144,10 +149,24 @@ export function Header() {
         <Button variant="ghost" asChild className="hidden md:flex">
           <Link href="/login">Sign in</Link>
         </Button>
-        <MobileNav />
+        <div className='md:hidden'>
+            <MobileNav />
+        </div>
       </div>
-    </>
+    </div>
   );
+
+  const NavPlaceholder = () => (
+    <div className="flex items-center gap-4">
+      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
+      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
+      <div className="hidden h-6 w-24 rounded-md bg-muted animate-pulse md:block" />
+      <div className="hidden h-10 w-24 rounded-md bg-muted animate-pulse md:block" />
+      <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse md:block" />
+      <div className="h-10 w-10 rounded-md bg-muted animate-pulse md:hidden" />
+    </div>
+    );
+
 
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur-sm">
@@ -155,12 +174,7 @@ export function Header() {
         <Link href="/">
           <Logo />
         </Link>
-        {isClient ? <DesktopNav /> : (
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-24 rounded-md bg-muted animate-pulse" />
-              <div className="h-10 w-20 rounded-md bg-muted animate-pulse" />
-            </div>
-        )}
+        {isClient ? <DesktopNav /> : <NavPlaceholder />}
       </div>
     </header>
   );
