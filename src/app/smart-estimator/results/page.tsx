@@ -397,7 +397,8 @@ export default function Results() {
       {qualification.showScore && (
         <Card>
           <CardHeader>
-            <CardTitle>You've added {momentumScore.totalScore} points to your Momentum score</CardTitle>
+            <CardTitle>Momentum Score</CardTitle>
+            <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="momentum-score-section flex flex-col items-center text-center">
