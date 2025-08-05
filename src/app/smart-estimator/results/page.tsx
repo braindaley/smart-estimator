@@ -426,6 +426,20 @@ export default function Results() {
                   {momentumScore.totalScore}
                 </div>
               </div>
+              <div
+                className="milestones relative mb-8 text-xs text-muted-foreground"
+                style={{ maxWidth: '384px', width: '100%' }}
+              >
+                {[50, 70, 75].map((milestone) => (
+                  <div
+                    key={milestone}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${(milestone / 95) * 100}%` }}
+                  >
+                    {milestone}
+                  </div>
+                ))}
+              </div>
               <div className="mt-4 text-center">
                 <p className="text-sm text-muted-foreground">Earn more Momentum points</p>
                 <div className="mt-2 flex justify-center gap-4">
