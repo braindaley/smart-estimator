@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from 'react';
@@ -143,8 +144,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 const ProgressCircle = ({ score, maxScore, label, color, status }: { score: number, maxScore: number, label: string, color: string, status?: string }) => {
   const radius = 25;
   const circumference = 2 * Math.PI * radius;
-  const offset = status === "Not Started" ? circumference : circumference - (score / maxScore) * circumference;
-  const percentage = Math.round((score / maxScore) * 100);
+  const offset = status === "Not Started" || maxScore === 0 ? circumference : circumference - (score / maxScore) * circumference;
+  const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -309,108 +310,52 @@ export default function Results() {
 
   return (
     <div className="space-y-8">
-      <Card className="border-0 shadow-none">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl">Here are your results</CardTitle>
-          <div className="pt-4">
-             <Alert>
-                <AlertTitle>{qualification.status}</AlertTitle>
-                <AlertDescription>{qualification.message}</AlertDescription>
-            </Alert>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {qualification.showScore && (
-            <div className="momentum-score-section" style={{
-              backgroundColor: '#f8f9fa',
-              padding: '24px',
-              borderRadius: '12px',
-              marginBottom: '32px',
-              textAlign: 'center'
-            }}>
-              <div className="score-header">
-                <h3 style={{margin: '0 0 16px', fontSize: '24px', color: '#2c3e50'}}>
-                  Your Momentum Score
-                </h3>
-                <div className="score-display" style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginBottom: '20px'
-                }}>
-                  <span className="current-score" style={{
-                    fontSize: '48px',
-                    fontWeight: 'bold',
-                    color: '#3498db'
-                  }}>
-                    {momentumScore.totalScore}
-                  </span>
-                  <span className="max-score" style={{
-                    fontSize: '24px',
-                    color: '#7f8c8d'
-                  }}>
-                    / 95
-                  </span>
-                </div>
+      <div className="text-center space-y-4">
+        <h1 className="text-3xl font-bold">Here are your results</h1>
+        <Alert>
+          <AlertTitle>{qualification.status}</AlertTitle>
+          <AlertDescription>{qualification.message}</AlertDescription>
+        </Alert>
+      </div>
+
+      {qualification.showScore && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Momentum Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="momentum-score-section text-center">
+              <div className="score-display mb-5 flex items-baseline justify-center gap-2">
+                <span className="text-5xl font-bold text-primary">
+                  {momentumScore.totalScore}
+                </span>
+                <span className="text-2xl text-muted-foreground">/ 95</span>
               </div>
-              
-              <div className="score-bar" style={{
-                position: 'relative',
-                height: '12px',
-                backgroundColor: '#e9ecef',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                overflow: 'hidden'
-              }}>
-                <div 
-                  className="progress-fill" 
+
+              <div className="score-bar relative mb-4 h-3 rounded-full bg-gray-200">
+                <div
+                  className="progress-fill h-full rounded-full bg-primary transition-all"
                   style={{
-                    height: '100%',
-                    backgroundColor: '#3498db',
                     width: `${(momentumScore.totalScore / 95) * 100}%`,
-                    transition: 'width 0.3s ease'
                   }}
                 />
-                <div className="milestone milestone-50" style={{
-                  position: 'absolute',
-                  top: '-25px',
-                  left: '52.6%',
-                  transform: 'translateX(-50%)',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#7f8c8d'
-                }}>
+                <div className="milestone absolute top-[-25px] left-[52.6%] -translate-x-1/2 text-xs font-bold text-muted-foreground">
                   50
                 </div>
-                <div className="milestone milestone-75" style={{
-                  position: 'absolute', 
-                  top: '-25px',
-                  left: '78.9%',
-                  transform: 'translateX(-50%)',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#7f8c8d'
-                }}>
+                <div className="milestone absolute top-[-25px] left-[78.9%] -translate-x-1/2 text-xs font-bold text-muted-foreground">
                   75
                 </div>
               </div>
-               <div className="score-message" style={{
-                padding: '16px',
-                backgroundColor: momentumScore.totalScore >= 35 ? '#d4edda' : '#fff3cd',
-                border: `1px solid ${momentumScore.totalScore >= 35 ? '#c3e6cb' : '#ffeaa7'}`,
-                borderRadius: '8px',
-                marginTop: '16px',
-                marginBottom: '16px',
-              }}>
-                <h4 style={{margin: '0 0 8px', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
-                  {momentumScore.totalScore >= 35 ? "Good Progress!" : "Let's Build Your Score"}
-                </h4>
-                <p style={{margin: '0', color: momentumScore.totalScore >= 35 ? '#155724' : '#856404'}}>
-                  {qualification.scoreMessage}
-                </p>
+              <div className="score-message rounded-lg border p-4 my-4 bg-secondary">
+                  <h4 className="font-semibold mb-2 text-secondary-foreground">
+                    {momentumScore.totalScore >= 35 ? "Good Progress!" : "Let's Build Your Score"}
+                  </h4>
+                  <p className="text-sm text-secondary-foreground">
+                    {qualification.scoreMessage}
+                  </p>
               </div>
-              <div className="flex justify-around items-center p-4">
+
+              <div className="flex items-center justify-around p-4">
                 <ProgressCircle
                   score={momentumScore.breakdown.financialHardship}
                   maxScore={40}
@@ -433,8 +378,15 @@ export default function Results() {
                 />
               </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Plans that fit your situation</CardTitle>
+        </CardHeader>
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
