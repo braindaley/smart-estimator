@@ -501,7 +501,7 @@ export default function Results() {
             <CardTitle>Why Momentum May Be Better</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">The Momentum Plan is designed to get you out of debt as quickly as possible. By negotiating with your creditors, we can often reduce the total amount you owe, leading to significant savings and a faster path to financial freedom.</p>
+            <p className="text-sm text-muted-foreground">Low monthly cost, shorter term = less stress + faster recovery.</p>
           </CardContent>
         </Card>
         <Card>
