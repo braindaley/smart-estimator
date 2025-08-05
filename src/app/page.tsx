@@ -22,7 +22,7 @@ export default function Home() {
                   Takes 2 minutes. No credit score impact.
                 </p>
                 <Button asChild size="lg">
-                  <Link href="/smart-estimator/step-1">Explore plans</Link>
+                  <Link href="/smart-estimator/step-1">Smart Estimator</Link>
                 </Button>
               </div>
             </div>
