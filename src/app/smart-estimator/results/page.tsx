@@ -401,7 +401,7 @@ export default function Results() {
 
       {qualification.showScore && (
         <Card>
-          <CardHeader className="text-center">
+          <CardHeader className="pb-4 text-center">
             <CardTitle>Momentum Score</CardTitle>
             <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
           </CardHeader>
