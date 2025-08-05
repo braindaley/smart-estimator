@@ -191,7 +191,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 export default function Results() {
   const store = useEstimatorStore();
   const router = useRouter();
-  const [isInitialized, setIsInitialized] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   const [allFormData, setAllFormData] = React.useState<any>(null);
   const [results, setResults] = React.useState<any>(null);
@@ -203,113 +203,111 @@ export default function Results() {
     if (!store._hasHydrated) {
       return;
     }
-  
-    // Use a timeout to allow the store to fully hydrate.
-    const timer = setTimeout(() => {
-      const hasFormData = store.formData && Object.keys(store.formData).length > 0;
-      
-      // Redirect if there's no data.
-      if (!hasFormData) {
-          console.log("Redirecting to step-1 because no form data found after hydration.");
-          router.push('/smart-estimator/step-1');
-          return;
-      }
-      
-      // If we have data, run the calculations.
-      try {
-        const { formData } = store;
-        const collectedData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
+
+    const { formData } = store;
+    const collectedData = Object.values(formData).reduce(
+      (acc, curr) => ({ ...acc, ...curr }),
+      {}
+    );
+
+    const requiredKeys = [
+      'debtAmountEstimate',
+      'creditorCountEstimate',
+      'monthlyIncomeEstimate',
+      'hasSteadyIncome',
+      'monthlyPaymentEstimate',
+      'currentPaymentStatus',
+      'userFicoScoreEstimate',
+    ];
+
+    const hasAllData = requiredKeys.every(key => key in collectedData);
+
+    if (!hasAllData) {
+      router.push('/smart-estimator/step-1');
+      return;
+    }
+
+    try {
+      setAllFormData(collectedData);
         
-        // Another check in case the reduced data is empty
-        if (Object.keys(collectedData).length === 0) {
-          router.push('/smart-estimator/step-1');
-          return;
-        }
-  
-        setAllFormData(collectedData);
-        
-        const { 
-          debtAmountEstimate = 0, 
-          userFicoScoreEstimate = 0,
-          hasSteadyIncome,
-          monthlyIncomeEstimate = 0,
-          monthlyPaymentEstimate = 0,
-          creditorCountEstimate = 0,
-        } = collectedData;
-  
-        // Calculate Momentum Score
-        const momentumScoreData = calculateMomentumScore({
-            debtAmountEstimate,
-            monthlyIncomeEstimate,
-            monthlyPaymentEstimate,
-            creditorCountEstimate
-        });
-        setMomentumScore(momentumScoreData);
-  
-        // Get qualification status
-        const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
-        setQualification(qualificationStatus);
-        
-        // Calculate Momentum and Standard payments
-        const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
-        const momentumTerm = getMomentumTermLength(debtAmountEstimate);
-        
-        const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
-        const standardTerm = getStandardTermLength(debtAmountEstimate);
-  
-        // Calculate Personal Loan with FIXED LOGIC
-        const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
-        const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
-        const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount);
-        const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
-        const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0;
-        
-        // Calculate Current Path (doing nothing)
-        const currentPathData = calculateCurrentPath(debtAmountEstimate);
-        
-        const resultsData = {
+      const { 
+        debtAmountEstimate, 
+        userFicoScoreEstimate,
+        hasSteadyIncome,
+        monthlyIncomeEstimate,
+        monthlyPaymentEstimate,
+        creditorCountEstimate,
+      } = collectedData;
+
+      // Calculate Momentum Score
+      const momentumScoreData = calculateMomentumScore({
           debtAmountEstimate,
-          momentum: {
-            monthlyPayment: momentumMonthlyPayment,
-            term: momentumTerm,
-            isEligible: debtAmountEstimate >= 15000,
-            totalCost: momentumMonthlyPayment * momentumTerm,
-          },
-          standard: {
-            monthlyPayment: standardMonthlyPayment,
-            term: standardTerm,
-            isEligible: debtAmountEstimate >= 10000,
-            totalCost: standardMonthlyPayment * standardTerm,
-          },
-          personalLoan: {
-            monthlyPayment: personalLoanMonthlyPayment,
-            term: 36,
-            apr: personalLoanApr,
-            actualLoanAmount: actualLoanAmount,
-            maxAvailable: maxLoanAmount,
-            isEligible: canGetLoan,
-            totalCost: personalLoanMonthlyPayment * 36,
-          },
-          currentPath: {
-            monthlyPayment: currentPathData.monthlyPayment,
-            term: currentPathData.term,
-            totalCost: currentPathData.totalCost,
-            isEligible: true,
-          }
-        };
-        
-        setResults(resultsData);
-        
-      } catch (error) {
-        console.error('Error in Results calculation:', error);
-        // If there's an error, maybe redirect or show an error message.
-        // For now, just log it. To prevent infinite loops, we mark as initialized.
-      } finally {
-        setIsInitialized(true);
-      }
-    }, 0);
-  
-    return () => clearTimeout(timer);
+          monthlyIncomeEstimate,
+          monthlyPaymentEstimate,
+          creditorCountEstimate
+      });
+      setMomentumScore(momentumScoreData);
+
+      // Get qualification status
+      const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
+      setQualification(qualificationStatus);
+      
+      // Calculate Momentum and Standard payments
+      const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
+      const momentumTerm = getMomentumTermLength(debtAmountEstimate);
+      
+      const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
+      const standardTerm = getStandardTermLength(debtAmountEstimate);
+
+      // Calculate Personal Loan with FIXED LOGIC
+      const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
+      const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
+      const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount);
+      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
+      const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0;
+      
+      // Calculate Current Path (doing nothing)
+      const currentPathData = calculateCurrentPath(debtAmountEstimate);
+      
+      const resultsData = {
+        debtAmountEstimate,
+        momentum: {
+          monthlyPayment: momentumMonthlyPayment,
+          term: momentumTerm,
+          isEligible: debtAmountEstimate >= 15000,
+          totalCost: momentumMonthlyPayment * momentumTerm,
+        },
+        standard: {
+          monthlyPayment: standardMonthlyPayment,
+          term: standardTerm,
+          isEligible: debtAmountEstimate >= 10000,
+          totalCost: standardMonthlyPayment * standardTerm,
+        },
+        personalLoan: {
+          monthlyPayment: personalLoanMonthlyPayment,
+          term: 36,
+          apr: personalLoanApr,
+          actualLoanAmount: actualLoanAmount,
+          maxAvailable: maxLoanAmount,
+          isEligible: canGetLoan,
+          totalCost: personalLoanMonthlyPayment * 36,
+        },
+        currentPath: {
+          monthlyPayment: currentPathData.monthlyPayment,
+          term: currentPathData.term,
+          totalCost: currentPathData.totalCost,
+          isEligible: true,
+        }
+      };
+      
+      setResults(resultsData);
+    } catch (error) {
+      console.error('Error in Results calculation:', error);
+      // Redirect or show an error message if calculations fail.
+      router.push('/smart-estimator/step-1');
+    } finally {
+      setIsLoading(false);
+    }
   }, [store._hasHydrated, store.formData, router]);
 
   const formatCurrency = (value: number) => {
@@ -322,7 +320,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!isInitialized || !results || !qualification || !momentumScore) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
