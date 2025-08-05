@@ -421,6 +421,17 @@ export default function Results() {
                   {momentumScore.totalScore}
                 </div>
               </div>
+              <div className="mt-4 text-center">
+                <p className="text-sm text-muted-foreground">Earn more Momentum points</p>
+                <div className="flex justify-center gap-4 mt-2">
+                  <Button asChild variant="link">
+                    <Link href="/readiness-tool">Readiness Tool</Link>
+                  </Button>
+                  <Button asChild variant="link">
+                    <Link href="/customize-plan">Customize Plan</Link>
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
