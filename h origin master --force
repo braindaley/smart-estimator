@@ -1,0 +1,82 @@
+* [33ma3ad71e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m Make the following changes:
+* [33m8805053[m for this scenario: "status": "Not Qualified - No Income" Add a secondary
+* [33m5e1d65e[m Make the following changes:
+* [33mb5f0bd9[m Make the following changes:
+* [33me283299[m under the table and above the "get my personal plan" add a "Time to Free
+* [33mb2719a0[m I see this error with the app, reported by NextJS, please fix it. The er
+* [33m471bfe4[m Make the following changes:
+* [33m702c87f[m Make the following changes:
+* [33m4639eea[m Make the following changes:
+* [33m852f981[m Make the following changes:
+* [33mb3c9a42[m Make the following changes:
+* [33m003bdcd[m Make the following changes:
+* [33mb07328d[m Make the following changes:
+* [33mca90ce3[m Make the following changes:
+* [33m8335427[m Make the following changes:
+* [33me5f7cb5[m I see this error with the app, reported by NextJS, please fix it. The er
+* [33mcb12dfe[m Make the following changes:
+* [33me79d0cb[m Make the following changes:
+* [33m62f2070[m I see this error with the app, reported by NextJS, please fix it. The er
+* [33m879bfec[m Make the following changes:
+* [33ma66a698[m Make the following changes:
+* [33mfe7c899[m Make the following changes:
+* [33m4a1ecb9[m Make the following changes:
+* [33mead001a[m Make the following changes:
+* [33mfa499d6[m Make the following changes:
+* [33macf9e3e[m Make the following changes:
+* [33m4639b9b[m Make the following changes:
+* [33meeadae6[m Make the following changes:
+* [33me394b57[m on the page: /smart-estimator/results
+* [33m4293486[m Make the following changes:
+* [33m76ef3b6[m Make the following changes:
+* [33m15015d8[m Make the following changes:
+* [33m6026358[m Make the following changes:
+* [33m8511c87[m Make the following changes:
+* [33m952b3b3[m Make the following changes:
+* [33m007950c[m Make the following changes:
+* [33md71884f[m Make the following changes:
+* [33m436a17f[m Make the following changes:
+* [33m558feaa[m Make the following changes:
+* [33mb103046[m Make the following changes:
+* [33mce05735[m Make the following changes:
+* [33m9360ea9[m Make the following changes:
+* [33m8ca684f[m Make the following changes:
+* [33m11739f4[m Make the following changes:
+* [33ma0dce7b[m Make the following changes:
+* [33me1c66cc[m Make the following changes:
+* [33mc92134a[m Make the following changes:
+* [33m84e0478[m Make the following changes:
+* [33m494ded8[m did you update all of the logic that uses these button as input?
+* [33m2d6f936[m Make the following changes:
+* [33ma6b6895[m Make the following changes:
+* [33m8001898[m Make the following changes:
+* [33m17f4f5c[m Make the following changes:
+* [33md0042e8[m Make the following changes:
+* [33m9dd6b1e[m Make the following changes:
+* [33me0b7b90[m Make the following changes:
+* [33m4d6c936[m Make the following changes:
+* [33m1efbec4[m Make the following changes:
+* [33m7d3ece0[m Make the following changes:
+* [33m5cbf87c[m Make the following changes:
+* [33meeae0c8[m i would like to combine the logic in /smart-estimator/step-3 and /smart-
+* [33m5728f56[m in the banner, make the H1: "Momentum changes everything"  and the secon
+* [33m0aa1893[m update the name to Momentum
+* [33m1665729[m in the center add links to pages: How it works and Apply
+* [33m173740b[m To the navigation add a hamburger menu and login link like this
+* [33mba1b1ff[m accounted for two disqualifications on results
+* [33ma310241[m for testing puposes can you add the fields that were collected in the fo
+* [33m74f37f1[m updated logic on the results page
+* [33md9f8de9[m Make the following changes:
+* [33m3db22c6[m Make the following changes:
+* [33m1b3ce3d[m add back buttons to all form steps but not the results
+* [33mb995e5a[m Update Qualification Logic with Score Update your existing qualification
+* [33m07f558c[m Add Momentum Score Display UI Add a Momentum Score display section to yo
+* [33m5d6fade[m Add Momentum Score Calculations Add Momentum Score calculation functions
+* [33m0d8872f[m Qualification Logic & Conditional Display Implement the qualification sy
+* [33m0761012[m Results Page Layout & Basic Display Create the results page with this st
+* [33mcc88a4b[m Calculation Functions Create a calculations module with these specific f
+* [33ma92316e[m Form Steps 4-7 (Expenses, Payment Status, Income Status, FICO) Build the
+* [33me757c59[m Form Steps 1-3 (Debt Amount, Creditors, Income) Build the first three fo
+* [33m899e5d2[m Project Setup & Routing Structure Create a multi-step form application c
+* [33m1ce1bdb[m Initial prototype
+* [33mcd1e7bf[m initial scaffold
