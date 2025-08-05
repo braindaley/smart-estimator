@@ -1,0 +1,49 @@
+"use client";
+
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { useReadinessStore } from '@/lib/readiness-store';
+import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
+
+const options = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Not applicable", value: "na" },
+];
+
+export default function Step9() {
+  const router = useRouter();
+  const { setFormData } = useReadinessStore();
+
+  const handleSelection = (value: string) => {
+    setFormData('step9', { joint_debt: value });
+    router.push('/readiness-tool/step-10');
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Is any of the debt you plan to enroll held jointly with a spouse or significant other?</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
+          {options.map((option) => (
+            <Button
+              key={option.value}
+              onClick={() => handleSelection(option.value)}
+              variant="outline"
+              size="lg"
+              className="justify-start"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter className="w-full">
+        <ReadinessStepNavigation currentStep={9} totalSteps={10} showNext={false} />
+      </CardFooter>
+    </Card>
+  );
+}

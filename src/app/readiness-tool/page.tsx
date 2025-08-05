@@ -72,7 +72,7 @@ export default function ReadinessToolPage() {
                 Debt settlement takes commitment—but if you’re ready, this tool will help you find out.
               </p>
               <Button asChild size="lg">
-                <Link href="#">Start the Readiness Check</Link>
+                <Link href="/readiness-tool/step-1">Start the Readiness Check</Link>
               </Button>
             </div>
             <div className="flex items-center justify-center">
@@ -161,7 +161,7 @@ export default function ReadinessToolPage() {
               Ready to see where you stand?
             </h2>
             <Button asChild size="lg" className="mt-6">
-              <Link href="#">Start the Readiness Tool</Link>
+              <Link href="/readiness-tool/step-1">Start the Readiness Tool</Link>
             </Button>
           </div>
         </div>
