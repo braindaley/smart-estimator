@@ -17,8 +17,8 @@ export default function Home() {
               <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
                 Get in. Get out. Get on with life.
               </p>
-              <div className="flex w-full flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
-                <p className="text-sm text-muted-foreground">
+              <div className="flex w-full flex-col items-start gap-4 md:flex-row md:items-center">
+                <p className="text-sm text-muted-foreground md:mr-4">
                   Takes 2 minutes. No credit score impact.
                 </p>
                 <Button asChild size="lg">

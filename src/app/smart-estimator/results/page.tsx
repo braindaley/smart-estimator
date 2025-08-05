@@ -400,66 +400,66 @@ export default function Results() {
       </div>
 
       {qualification.showScore && (
-  <Card>
-    <CardHeader className="pb-4 text-center">
-      <CardTitle>Momentum Score</CardTitle>
-      <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div className="momentum-score-section flex flex-col items-center text-center">
-        {/* Score Bar */}
-        <div
-          className="score-bar relative mt-6 mb-2 h-3 rounded-full bg-gray-200"
-          style={{ maxWidth: '384px', width: '100%' }}
-        >
-          <div
-            className="progress-fill h-full rounded-full bg-primary transition-all"
-            style={{
-              width: `${(momentumScore.totalScore / 95) * 100}%`,
-            }}
-          />
-          <div
-            className="absolute -top-10 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground"
-            style={{
-              left: `${(momentumScore.totalScore / 95) * 100}%`,
-            }}
-          >
-            {momentumScore.totalScore}
-          </div>
-        </div>
-        
-        {/* Milestones */}
-        <div
-          className="milestones relative mb-6 text-xs text-muted-foreground"
-          style={{ maxWidth: '384px', width: '100%' }}
-        >
-          {[50, 70, 75].map((milestone) => (
-            <div
-              key={milestone}
-              className="absolute -translate-x-1/2"
-              style={{ left: `${(milestone / 95) * 100}%`, top: '4px' }}
-            >
-              {milestone}
+        <Card>
+          <CardHeader className="pb-4 text-center">
+            <CardTitle>Momentum Score</CardTitle>
+            <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="momentum-score-section flex flex-col items-center text-center">
+              {/* Score Bar */}
+              <div
+                className="score-bar relative mt-8 mb-2 h-3 rounded-full bg-gray-200"
+                style={{ maxWidth: '384px', width: '100%' }}
+              >
+                <div
+                  className="progress-fill h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: `${(momentumScore.totalScore / 95) * 100}%`,
+                  }}
+                />
+                <div
+                  className="absolute -top-10 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground"
+                  style={{
+                    left: `${(momentumScore.totalScore / 95) * 100}%`,
+                  }}
+                >
+                  {momentumScore.totalScore}
+                </div>
+              </div>
+              
+              {/* Milestones */}
+              <div
+                className="milestones relative mb-6 text-xs text-muted-foreground"
+                style={{ maxWidth: '384px', width: '100%' }}
+              >
+                {[50, 70, 75].map((milestone) => (
+                  <div
+                    key={milestone}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${(milestone / 95) * 100}%`, top: '4px' }}
+                  >
+                    {milestone}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Bottom Actions - Text and Buttons on Same Line */}
+              <div className="flex items-center justify-center gap-4">
+                <p className="text-sm text-muted-foreground">Earn more Momentum points:</p>
+                <div className="flex gap-4">
+                  <Button asChild variant="link">
+                    <Link href="/readiness-tool">Readiness Tool</Link>
+                  </Button>
+                  <Button asChild variant="link">
+                    <Link href="/customize-plan">Customize Plan</Link>
+                  </Button>
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-        
-        {/* Bottom Actions - Text and Buttons on Same Line */}
-        <div className="flex items-center justify-center gap-4">
-          <p className="text-sm text-muted-foreground">Earn more Momentum points:</p>
-          <div className="flex gap-4">
-            <Button asChild variant="link">
-              <Link href="/readiness-tool">Readiness Tool</Link>
-            </Button>
-            <Button asChild variant="link">
-              <Link href="/customize-plan">Customize Plan</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-)}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="text-center">
