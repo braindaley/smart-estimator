@@ -7,11 +7,11 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { StepNavigation } from '@/components/step-navigation';
 
 const ficoOptions = [
-  { label: "Excellent (720+)", value: 750 },
-  { label: "Good (660-719)", value: 690 },
-  { label: "Fair (620-659)", value: 640 },
-  { label: "Needs Work (Below 620)", value: 580 },
-  { label: "I'm not sure", value: 640 }, // Default to 'Fair' if unsure
+  { label: "Yes, it's above 720", value: 720 },
+  { label: "Yes, it's between 660-719", value: 680 },
+  { label: "Yes, it's between 630-659", value: 645 },
+  { label: "Yes, it's below 630", value: 610 },
+  { label: "No, I'm not sure", value: 640 }, // Default to 'Fair' if unsure
 ];
 
 export default function Step5() {

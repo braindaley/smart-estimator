@@ -66,7 +66,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     return {
       status: "With no income you may have limited options",
       hideColumns: hideColumns,
-      primaryCTA: "See Non-Payment Based Solutions",
+      primaryCTA: "See Non-Payment Solutions",
       secondaryCTA: "Schedule Call",
       message: "We understand income challenges and have non-payment based relief options available through our legal aid partners.",
       showScore: true,
@@ -83,8 +83,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     return {
       status: "Settlement Recommended",
       hideColumns: hideColumns,
-      primaryCTA: "Review Settlement Options",
-      secondaryCTA: "Review How It Works",
+      primaryCTA: "Customize Plan",
+      secondaryCTA: "Take Readiness Quiz",
       message: "Most clients in this range succeed through settlement. Based on your credit profile, debt settlement is typically the most effective path forward.",
       showScore: true,
       scoreMessage: "Settlement programs are designed for your credit range."
@@ -95,24 +95,24 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
   if (userFicoScoreEstimate >= 630 && userFicoScoreEstimate <= 659 && debtAmountEstimate > 15000) {
     // Highlight Settlement (show all columns but emphasize settlement)
     return {
-      status: "Compare Options - Loan Approval Low",
+      status: "Settlement is A good option",
       hideColumns: hideColumns,
-      primaryCTA: "Compare Your Options",
-      secondaryCTA: "Estimate Your Savings",
-      message: "Compare plan options — loans may not help. Your credit may qualify for loans, but settlement often provides better savings for your situation.",
+      primaryCTA: "Customize Plan",
+      secondaryCTA: "Schedule a Call",
+      message: "Your credit may qualify for loans, but settlement often provides better savings for your situation.",
       showScore: true,
       scoreMessage: "Loan approval rates are lower in this credit range - settlement may save more."
     };
   }
 
-  // FICO 660-719 AND debt > $10K
+  // FICO 660-719 AND debt > $15K
   if (userFicoScoreEstimate >= 660 && userFicoScoreEstimate <= 719 && debtAmountEstimate > 10000) {
     // Show All 3 Columns
     return {
       status: "Multiple Options Available",
       hideColumns: hideColumns,
-      primaryCTA: "Explore Both Paths",
-      secondaryCTA: "Use Smart Estimator",
+      primaryCTA: "Customize Plan",
+      secondaryCTA: "Schedule a Call",
       message: "You're eligible for loan or settlement — see what saves you more. You qualify for both loan consolidation and settlement programs.",
       showScore: true,
       scoreMessage: "Your credit score opens up multiple debt relief options."
@@ -125,9 +125,9 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     return {
       status: "Excellent Credit - Best Options",
       hideColumns: hideColumns,
-      primaryCTA: "Choose Your Best-Fit Plan",
-      secondaryCTA: "Apply Now or Speak With Us",
-      message: "Loan + settlement comparison — choose what fits best. Your excellent credit qualifies you for the best rates and terms across all programs.",
+      primaryCTA: "Customize Plan",
+      secondaryCTA: "Schedule a Call",
+      message: "Compare loans vs settlement and choose what fits best. Your excellent credit qualifies you for the best rates and terms across all programs.",
       showScore: true,
       scoreMessage: "Premium loan rates and priority settlement terms available."
     };
