@@ -461,7 +461,7 @@ export default function Results() {
                       <TableCell className="text-center text-xs text-muted-foreground border-x align-top">
                         {results.personalLoan.isEligible ? (
                           <>
-                            <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
+                            <p className="font-bold">Why it matters:</p> Requires strong credit; total payback can exceed current balances.
                           </>
                         ) : (
                           '-'
