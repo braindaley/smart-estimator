@@ -49,7 +49,7 @@ export function Header() {
             href={plansLink}
             className="transition-colors hover:text-foreground/80 text-foreground/60"
           >
-            Plans
+            Smart Estimator
           </Link>
           <Link
             href="/apply"
@@ -100,7 +100,7 @@ export function Header() {
                   href={plansLink}
                   className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
                 >
-                  Estimator
+                  Smart Estimator
                 </Link>
                 <Link
                   href="/login"
