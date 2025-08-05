@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import * as React from 'react';
@@ -20,6 +18,30 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+// Calculate current path (doing nothing - minimum payments)
+function calculateCurrentPath(debtAmount: number) {
+  // Based on real credit card data: $2K at 22% APR = $4.3K total over 11 years
+  // Scaling proportionally for any debt amount at 24% APR
+  
+  const scalingFactor = debtAmount / 2000; // Scale from the $2K example
+  const aprAdjustment = 24 / 22; // Adjust for 24% vs 22% APR
+  
+  // Base calculation from real data, adjusted for higher APR
+  const baseYears = 11 * aprAdjustment; // ~12 years at 24% APR
+  const baseTotalCost = 4300 * scalingFactor * aprAdjustment; // ~2.3x debt amount
+  
+  // Monthly payment starts around 2.5% of balance, decreasing over time
+  const initialMonthlyPayment = Math.round(debtAmount * 0.025);
+  
+  return {
+    monthlyPayment: initialMonthlyPayment,
+    term: Math.round(baseYears * 12), // Convert to months
+    totalCost: Math.round(baseTotalCost),
+    neverPaysOff: false // Will eventually pay off, just takes forever
+  };
+}
 
 type Qualification = {
   status: string;
@@ -34,21 +56,115 @@ type Qualification = {
 function getQualificationStatus(formData: any, momentumScore: any): Qualification {
   const { debtAmountEstimate, hasSteadyIncome, userFicoScoreEstimate } = formData;
 
-  // NEW APPROACH: Check all disqualifying factors first
+  // Initialize column hiding array
   const hideColumns: string[] = [];
   
-  // Check all disqualifying factors
-  const tooLittleDebt = debtAmountEstimate < 15000;
-  const tooMuchDebt = debtAmountEstimate >= 50000;
-  const noIncome = hasSteadyIncome === false;
-  const poorCredit = userFicoScoreEstimate < 620;
+  // STEP 1: Check income first
+  if (hasSteadyIncome === false) {
+    hideColumns.push("personalLoan"); // Disable loan offer
+    
+    return {
+      status: "No Income - Limited Options",
+      hideColumns: hideColumns,
+      primaryCTA: "See Non-Payment Based Solutions",
+      secondaryCTA: "Schedule Call",
+      message: "We understand income challenges and have non-payment based relief options available through our legal aid partners.",
+      showScore: true,
+      scoreMessage: "Income-free debt relief options are available."
+    };
+  }
+
+  // STEP 2: Check credit score ranges with debt thresholds
   
-  // Apply column hiding rules
-  if (tooLittleDebt) hideColumns.push("momentum");
-  if (noIncome || poorCredit) hideColumns.push("personalLoan");
+  // FICO < 630
+  if (userFicoScoreEstimate < 630) {
+    hideColumns.push("personalLoan"); // Disable Loan Offer Column
+    
+    return {
+      status: "Settlement Recommended",
+      hideColumns: hideColumns,
+      primaryCTA: "Review Settlement Options",
+      secondaryCTA: "Review How It Works",
+      message: "Most clients in this range succeed through settlement. Based on your credit profile, debt settlement is typically the most effective path forward.",
+      showScore: true,
+      scoreMessage: "Settlement programs are designed for your credit range."
+    };
+  }
+
+  // FICO 630-659 AND debt > $15K
+  if (userFicoScoreEstimate >= 630 && userFicoScoreEstimate <= 659 && debtAmountEstimate > 15000) {
+    // Highlight Settlement (show all columns but emphasize settlement)
+    return {
+      status: "Compare Options - Loan Approval Low",
+      hideColumns: hideColumns,
+      primaryCTA: "Compare Your Options",
+      secondaryCTA: "Estimate Your Savings",
+      message: "Compare plan options — loans may not help. Your credit may qualify for loans, but settlement often provides better savings for your situation.",
+      showScore: true,
+      scoreMessage: "Loan approval rates are lower in this credit range - settlement may save more."
+    };
+  }
+
+  // FICO 660-719 AND debt > $10K
+  if (userFicoScoreEstimate >= 660 && userFicoScoreEstimate <= 719 && debtAmountEstimate > 10000) {
+    // Show All 3 Columns
+    return {
+      status: "Multiple Options Available",
+      hideColumns: hideColumns,
+      primaryCTA: "Explore Both Paths",
+      secondaryCTA: "Use Smart Estimator",
+      message: "You're eligible for loan or settlement — see what saves you more. You qualify for both loan consolidation and settlement programs.",
+      showScore: true,
+      scoreMessage: "Your credit score opens up multiple debt relief options."
+    };
+  }
+
+  // FICO 720+
+  if (userFicoScoreEstimate >= 720) {
+    // Highlight Both (loan + settlement)
+    return {
+      status: "Excellent Credit - Best Options",
+      hideColumns: hideColumns,
+      primaryCTA: "Choose Your Best-Fit Plan",
+      secondaryCTA: "Apply Now or Speak With Us",
+      message: "Loan + settlement comparison — choose what fits best. Your excellent credit qualifies you for the best rates and terms across all programs.",
+      showScore: true,
+      scoreMessage: "Premium loan rates and priority settlement terms available."
+    };
+  }
+
+  // Handle cases where debt thresholds aren't met for the credit ranges
   
-  // Determine primary status based on most restrictive condition
-  if (tooMuchDebt) {
+  // FICO 630-659 but debt <= $15K
+  if (userFicoScoreEstimate >= 630 && userFicoScoreEstimate <= 659 && debtAmountEstimate <= 15000) {
+    hideColumns.push("momentum"); // Hide momentum since debt is too low
+    return {
+      status: "Limited Options - Debt Below Threshold",
+      hideColumns: hideColumns,
+      primaryCTA: "Compare Your Options",
+      secondaryCTA: "Estimate Your Savings",
+      message: "Compare plan options — loans may not help. For debt amounts under $15K, focus on available consolidation options.",
+      showScore: true,
+      scoreMessage: "Consider direct creditor negotiations or smaller consolidation loans."
+    };
+  }
+
+  // FICO 660-719 but debt <= $10K
+  if (userFicoScoreEstimate >= 660 && userFicoScoreEstimate <= 719 && debtAmountEstimate <= 10000) {
+    hideColumns.push("momentum"); // Hide momentum since debt is too low
+    return {
+      status: "Personal Loan Recommended",
+      hideColumns: hideColumns,
+      primaryCTA: "Explore Both Paths",
+      secondaryCTA: "Use Smart Estimator",
+      message: "Explore both paths available to you. Your good credit makes personal loans a viable option for smaller debt amounts.",
+      showScore: true,
+      scoreMessage: "Good credit qualifies you for competitive loan rates."
+    };
+  }
+
+  // Edge case: High debt requiring specialist consultation
+  if (debtAmountEstimate >= 50000) {
     return {
       status: "Needs Specialist Consultation",
       hideColumns: hideColumns,
@@ -58,176 +174,136 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
       scoreMessage: "High debt amounts require personalized consultation."
     };
   }
-  
-  // Handle multiple qualification issues
-  if (tooLittleDebt && noIncome) {
-    return {
-      status: "Multiple Qualification Issues",
-      hideColumns: hideColumns, // Both momentum and personalLoan hidden
-      primaryCTA: "Explore Other Options",
-      message: "Debt below $15,000 and income requirements limit most program options.",
-      showScore: true,
-      scoreMessage: "Standard debt management may be your best current option."
-    };
-  }
-  
-  if (tooLittleDebt && poorCredit) {
-    return {
-      status: "Multiple Qualification Issues",
-      hideColumns: hideColumns, // Both momentum and personalLoan hidden  
-      primaryCTA: "Explore Other Options",
-      message: "Debt below $15,000 and credit requirements limit most program options.",
-      showScore: true,
-      scoreMessage: "Focus on building credit and consider debt consolidation alternatives."
-    };
-  }
-  
-  // Single disqualifying factors
-  if (tooLittleDebt) {
-    return {
-      status: "Not Qualified - Too Little Debt",
-      hideColumns: hideColumns,
-      primaryCTA: "Explore Other Options",
-      message: "Momentum programs start at $15,000. Here are other solutions:",
-      showScore: true,
-      scoreMessage: "Your score shows potential, but debt amount is below our minimum."
-    };
-  }
-  
-  if (noIncome) {
-    return {
-      status: "Not Qualified - No Income",
-      hideColumns: hideColumns,
-      primaryCTA: "See Income-Free Options",
-      secondaryCTA: "Schedule a call",
-      message: "We understand income challenges. Here are alternative resources:",
-      showScore: true,
-      scoreMessage: "Steady income is required for most debt relief programs."
-    };
-  }
-  
-  if (poorCredit) {
-    return {
-      status: "Poor Credit - Limited Options",
-      hideColumns: hideColumns,
-      primaryCTA: "Build My Score",
-      secondaryCTA: "Learn About Debt Relief",
-      message: "Credit score below 620 limits personal loan options. Focus on debt settlement programs.",
-      showScore: true,
-      scoreMessage: "Improve your credit and complete our assessment for more options."
-    };
-  }
-  
-  // Score-based qualification for fully qualified users
-  if (momentumScore.totalScore >= 35) {
-    return {
-      status: "Qualified - Good Progress",
-      hideColumns: hideColumns,
-      primaryCTA: "Get My Personalized Plan",
-      secondaryCTA: "Continue Full Assessment",
-      message: "You're showing strong potential for debt relief success.",
-      showScore: true,
-      scoreMessage: "Complete our full assessment to potentially reach 75+ points and qualify for VIP enrollment."
-    };
-  }
-  
+
+  // Default fallback
   return {
-    status: "Needs Assessment",
+    status: "Assessment Needed",
     hideColumns: hideColumns,
-    primaryCTA: "Build My Score",
-    secondaryCTA: "Learn About Debt Relief",
-    message: "Complete our readiness assessment to determine your best options.",
+    primaryCTA: "Complete Assessment",
+    secondaryCTA: "Get Help Now",
+    message: "Complete our assessment to determine your best options.",
     showScore: true,
-    scoreMessage: "Your score shows room for improvement. Our assessment will help identify the best path forward."
+    scoreMessage: "We need more information to provide personalized recommendations."
   };
 }
 
 export default function Results() {
   const store = useEstimatorStore();
+  const router = useRouter();
   const [isInitialized, setIsInitialized] = React.useState(false);
 
   const [allFormData, setAllFormData] = React.useState<any>(null);
   const [results, setResults] = React.useState<any>(null);
   const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
+  const [hasCalculated, setHasCalculated] = React.useState(false);
 
   React.useEffect(() => {
-    if (store && !isInitialized && store._hasHydrated) {
-      const { formData } = store;
-      const collectedData = Object.keys(formData).length > 0
-        ? Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {})
-        : {};
-      
-      if (Object.keys(collectedData).length === 0) {
+    // This effect should only run once on mount to initialize, or when the store's hydration status changes.
+    const hasFormData = store.formData && Object.keys(store.formData).length > 0;
+    
+    // Redirect if there's no data and the store has hydrated.
+    if (store._hasHydrated && !hasFormData) {
+        console.log("Redirecting to step-1 because no form data found after hydration.");
+        router.push('/smart-estimator/step-1');
         return;
-      }
-      
-      setAllFormData(collectedData);
-      
-      const { 
-        debtAmountEstimate = 0, 
-        userFicoScoreEstimate = 0,
-        hasSteadyIncome,
-        monthlyIncomeEstimate = 0,
-        monthlyPaymentEstimate = 0,
-        creditorCountEstimate = 0,
-      } = collectedData;
-
-      // Calculate Momentum Score
-      const momentumScoreData = calculateMomentumScore({
-          debtAmountEstimate,
-          monthlyIncomeEstimate,
-          monthlyPaymentEstimate,
-          creditorCountEstimate
-      });
-      setMomentumScore(momentumScoreData);
-
-      // Get qualification status
-      const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
-      setQualification(qualificationStatus);
-      
-      // Calculate Momentum and Standard payments
-      const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
-      const momentumTerm = getMomentumTermLength(debtAmountEstimate);
-      
-      const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
-      const standardTerm = getStandardTermLength(debtAmountEstimate);
-
-      // Calculate Personal Loan with FIXED LOGIC
-      const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
-      const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
-      const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount); // FIX: Use actual available amount
-      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
-      const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0; // FIX: Use actual amount
-      
-      const resultsData = {
-        debtAmountEstimate,
-        momentum: {
-          monthlyPayment: momentumMonthlyPayment,
-          term: momentumTerm,
-          isEligible: debtAmountEstimate >= 15000,
-          totalCost: momentumMonthlyPayment * momentumTerm,
-        },
-        standard: {
-          monthlyPayment: standardMonthlyPayment,
-          term: standardTerm,
-          isEligible: debtAmountEstimate >= 10000,
-          totalCost: standardMonthlyPayment * standardTerm,
-        },
-        personalLoan: {
-          monthlyPayment: personalLoanMonthlyPayment,
-          term: 36,
-          apr: personalLoanApr,
-          actualLoanAmount: actualLoanAmount, // FIX: Add actual loan amount
-          maxAvailable: maxLoanAmount,        // FIX: Add max available
-          isEligible: canGetLoan,
-          totalCost: personalLoanMonthlyPayment * 36,
-        }
-      };
-      setResults(resultsData);
-      setIsInitialized(true);
     }
-  }, [store, isInitialized]);
+
+    if (store._hasHydrated && hasFormData && !hasCalculated) {
+      try {
+        const { formData } = store;
+        const collectedData = Object.values(formData).reduce((acc, curr) => ({ ...acc, ...curr }), {});
+        
+        // Final check if somehow data is empty after reduction
+        if (Object.keys(collectedData).length === 0) {
+          router.push('/smart-estimator/step-1');
+          return;
+        }
+
+        setAllFormData(collectedData);
+        
+        const { 
+          debtAmountEstimate = 0, 
+          userFicoScoreEstimate = 0,
+          hasSteadyIncome,
+          monthlyIncomeEstimate = 0,
+          monthlyPaymentEstimate = 0,
+          creditorCountEstimate = 0,
+        } = collectedData;
+
+        // Calculate Momentum Score
+        const momentumScoreData = calculateMomentumScore({
+            debtAmountEstimate,
+            monthlyIncomeEstimate,
+            monthlyPaymentEstimate,
+            creditorCountEstimate
+        });
+        setMomentumScore(momentumScoreData);
+
+        // Get qualification status
+        const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
+        setQualification(qualificationStatus);
+        
+        // Calculate Momentum and Standard payments
+        const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
+        const momentumTerm = getMomentumTermLength(debtAmountEstimate);
+        
+        const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
+        const standardTerm = getStandardTermLength(debtAmountEstimate);
+
+        // Calculate Personal Loan with FIXED LOGIC
+        const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
+        const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
+        const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount);
+        const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
+        const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0;
+        
+        // Calculate Current Path (doing nothing)
+        const currentPathData = calculateCurrentPath(debtAmountEstimate);
+        
+        const resultsData = {
+          debtAmountEstimate,
+          momentum: {
+            monthlyPayment: momentumMonthlyPayment,
+            term: momentumTerm,
+            isEligible: debtAmountEstimate >= 15000,
+            totalCost: momentumMonthlyPayment * momentumTerm,
+          },
+          standard: {
+            monthlyPayment: standardMonthlyPayment,
+            term: standardTerm,
+            isEligible: debtAmountEstimate >= 10000,
+            totalCost: standardMonthlyPayment * standardTerm,
+          },
+          personalLoan: {
+            monthlyPayment: personalLoanMonthlyPayment,
+            term: 36,
+            apr: personalLoanApr,
+            actualLoanAmount: actualLoanAmount,
+            maxAvailable: maxLoanAmount,
+            isEligible: canGetLoan,
+            totalCost: personalLoanMonthlyPayment * 36,
+          },
+          currentPath: {
+            monthlyPayment: currentPathData.monthlyPayment,
+            term: currentPathData.term,
+            totalCost: currentPathData.totalCost,
+            isEligible: true,
+          }
+        };
+        
+        setResults(resultsData);
+        setHasCalculated(true);
+        
+      } catch (error) {
+        console.error('Error in Results calculation:', error);
+        // Set some fallback state so user doesn't get stuck, and prevent infinite loops.
+        setHasCalculated(true); 
+      } finally {
+        setIsInitialized(true);
+      }
+    }
+  }, [store._hasHydrated, store.formData, router, hasCalculated]);
 
   const formatCurrency = (value: number) => {
     if (typeof value !== 'number' || isNaN(value)) return '$0';
@@ -239,7 +315,7 @@ export default function Results() {
     }).format(value);
   };
   
-  if (!results || !qualification || !momentumScore || !allFormData) {
+  if (!isInitialized || !results || !qualification || !momentumScore) {
     return (
       <Card>
         <CardHeader>
@@ -254,6 +330,7 @@ export default function Results() {
 
   const handleRestart = () => {
     store.reset();
+    router.push('/smart-estimator/step-1');
   }
 
   const handleCTAClick = (cta: string) => {
@@ -265,7 +342,7 @@ export default function Results() {
     if (!qualification) return null;
 
     const primaryCTAComponent = () => {
-      if (qualification.primaryCTA === "See Income-Free Options") {
+      if (qualification.primaryCTA === "See Non-Payment Based Solutions") {
         return (
           <Button asChild size="lg">
             <Link href="/resources/income-free-debt-options">{qualification.primaryCTA}</Link>
@@ -281,36 +358,33 @@ export default function Results() {
 
     const secondaryCTAComponent = () => {
         if (!qualification.secondaryCTA) return null;
-        if (qualification.secondaryCTA === "Schedule a call") {
+        if (qualification.secondaryCTA === "Schedule Call") {
           return (
-            <Button asChild variant="secondary">
+            <Button asChild variant="secondary" size="lg">
               <Link href="/contact-us">{qualification.secondaryCTA}</Link>
             </Button>
           );
         }
         return (
-          <Button onClick={() => handleCTAClick(qualification.secondaryCTA!)} variant="secondary">
+          <Button onClick={() => handleCTAClick(qualification.secondaryCTA!)} variant="secondary" size="lg">
             {qualification.secondaryCTA}
           </Button>
         );
       };
 
     return (
-      <div className="cta-buttons flex flex-col items-center gap-4">
+      <>
         {primaryCTAComponent()}
         {secondaryCTAComponent()}
-      </div>
+      </>
     );
   };
 
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4">
-        <h1 className="text-3xl font-bold">Here are your results</h1>
-        <Alert>
-          <AlertTitle>{qualification.status}</AlertTitle>
-          <AlertDescription>{qualification.message}</AlertDescription>
-        </Alert>
+        <h1 className="text-3xl font-bold">You are building momentum!</h1>
+        <p className="text-muted-foreground">Here are your results</p>
       </div>
 
       {qualification.showScore && (
@@ -367,11 +441,11 @@ export default function Results() {
           <Table>
             <TableHeader>
               <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 text-center pb-4 align-top">
+                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/4 text-center pb-4 align-top">
                     <p className="text-lg font-semibold">Momentum Plan</p>
                     <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
                 </TableHead>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 text-center border-x pb-4 align-top">
+                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/4 text-center border-x pb-4 align-top">
                     <p className="text-lg font-semibold">Personal Loan</p>
                     <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
                     {results.personalLoan.isEligible && results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
@@ -380,10 +454,14 @@ export default function Results() {
                       </div>
                     )}
                 </TableHead>}
-                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/3 text-center pb-4 align-top">
+                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/4 text-center border-x pb-4 align-top">
                     <p className="text-lg font-semibold">Standard Plan</p>
                     <p className="text-xs text-muted-foreground">A longer program term that might be easier to manage.</p>
                 </TableHead>}
+                <TableHead className="w-1/4 text-center pb-4 align-top bg-red-50">
+                    <p className="text-lg font-semibold text-red-700">Current Path</p>
+                    <p className="text-xs text-red-600">Keep making minimum payments at 24% APR.</p>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -405,20 +483,32 @@ export default function Results() {
                     </TableCell>
                 }
                 {!qualification.hideColumns.includes('standard') && 
-                    <TableCell className="text-center align-top">
+                    <TableCell className="text-center border-x align-top">
                     {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
                     </TableCell>
                 }
+                <TableCell className="text-center align-top bg-red-50">
+                  <p className="text-3xl font-bold text-red-700">{formatCurrency(results.currentPath.monthlyPayment)}/mo</p>
+                  <p className="text-xs text-red-600 mt-1">Then decreasing</p>
+                </TableCell>
               </TableRow>
               <TableRow>
                 {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
                 {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x align-top">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center align-top">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center border-x align-top">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
+                <TableCell className="text-center align-top bg-red-50">
+                  <span className="text-red-700">{results.currentPath.term} Months</span>
+                  <p className="text-xs text-red-600 mt-1">({Math.round(results.currentPath.term / 12)} years)</p>
+                </TableCell>
               </TableRow>
               <TableRow>
                 {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `Total Cost: ${formatCurrency(results.momentum.totalCost)}` : '-'}</TableCell>}
                 {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x align-top">{results.personalLoan.isEligible ? `Total Cost: ${formatCurrency(results.personalLoan.totalCost)}` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center align-top">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
+                {!qualification.hideColumns.includes('standard') && <TableCell className="text-center border-x align-top">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
+                <TableCell className="text-center align-top bg-red-50">
+                  <span className="text-red-700 font-semibold">Total Cost: {formatCurrency(results.currentPath.totalCost)}</span>
+                  <p className="text-xs text-red-600 mt-1">({Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your debt!)</p>
+                </TableCell>
               </TableRow>
               <TableRow>
                   {!qualification.hideColumns.includes('momentum') && (
@@ -438,28 +528,29 @@ export default function Results() {
                     </TableCell>
                   )}
                   {!qualification.hideColumns.includes('standard') && (
-                    <TableCell className="text-center text-xs text-muted-foreground align-top">
+                    <TableCell className="text-center text-xs text-muted-foreground border-x align-top">
                       <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
                     </TableCell>
                   )}
+                  <TableCell className="text-center text-xs text-red-600 align-top bg-red-50">
+                    <p className="font-bold">Why it's dangerous:</p>
+                    You'll pay {Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your original debt over {Math.round(results.currentPath.term / 12)} years - that's {formatCurrency(results.currentPath.totalCost - results.debtAmountEstimate)} in interest alone!
+                  </TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       
+      <Alert>
+        <AlertTitle>{qualification.status}</AlertTitle>
+        <AlertDescription>{qualification.message}</AlertDescription>
+      </Alert>
+      
       <div className="text-center mt-8 space-y-4">
-            {renderCtas()}
-            {qualification.showScore && qualification.scoreMessage && (
-                <div className="score-context" style={{
-                    fontSize: '14px',
-                    color: '#6c757d',
-                    marginTop: '12px',
-                    fontStyle: 'italic'
-                }}>
-                    {qualification.scoreMessage}
-                </div>
-            )}
+            <div className="cta-buttons flex flex-row items-center justify-center gap-4">
+              {renderCtas()}
+            </div>
             <Button asChild onClick={handleRestart} variant="link">
               <Link href="/smart-estimator/step-1">Start Over</Link>
             </Button>
@@ -484,10 +575,12 @@ export default function Results() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Why Standard Plans Lag</CardTitle>
+            <CardTitle>Why Current Path is Dangerous</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Low payment, but longer payoff. You wait months longer at increased cost and risk for financial freedom.</p>
+            <p className="text-sm text-muted-foreground">
+              At 24% APR with minimum payments, you'll pay {Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your original debt and stay trapped for {Math.round(results.currentPath.term / 12)} years - wasting {formatCurrency(results.currentPath.totalCost - results.debtAmountEstimate)} on interest.
+            </p>
           </CardContent>
         </Card>
       </div>
