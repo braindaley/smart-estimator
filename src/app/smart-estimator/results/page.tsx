@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -226,10 +227,9 @@ export default function Results() {
     ];
 
     const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key));
-    const hasIncomeData = collectedData.hasOwnProperty('hasSteadyIncome');
 
 
-    if (!hasAllRequiredData || !hasIncomeData) {
+    if (!hasAllRequiredData) {
       // Don't redirect immediately, just wait for data.
       // A loading state is already shown.
       // If data is truly missing, the user can use navigation to go back.
@@ -237,6 +237,10 @@ export default function Results() {
     }
 
     try {
+      // Also set hasSteadyIncome based on income. This is for the getQualificationStatus function.
+      if (!collectedData.hasOwnProperty('hasSteadyIncome')) {
+          collectedData.hasSteadyIncome = collectedData.monthlyIncomeEstimate > 0;
+      }
       setAllFormData(collectedData);
         
       const { 
@@ -356,10 +360,17 @@ export default function Results() {
     if (!qualification) return null;
 
     const primaryCTAComponent = () => {
-      if (qualification.primaryCTA === "See Non-Payment Based Solutions") {
+      if (qualification.primaryCTA === "See Non-Payment Solutions") {
         return (
           <Button asChild size="lg">
             <Link href="/resources/income-free-debt-options">{qualification.primaryCTA}</Link>
+          </Button>
+        );
+      }
+      if (qualification.primaryCTA === "Customize Plan") {
+        return (
+          <Button asChild size="lg">
+            <Link href="/customize-plan">{qualification.primaryCTA}</Link>
           </Button>
         );
       }
@@ -654,3 +665,5 @@ export default function Results() {
     </div>
   );
 }
+
+    
