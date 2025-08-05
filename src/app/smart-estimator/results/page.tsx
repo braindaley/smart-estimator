@@ -396,7 +396,7 @@ export default function Results() {
 
       {qualification.showScore && (
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Momentum Score</CardTitle>
             <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
           </CardHeader>
@@ -438,7 +438,7 @@ export default function Results() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="text-center">
           <CardTitle>Plans that fit your situation</CardTitle>
             <CardDescription>
               These plans are designed to help with an estimated debt of{' '}
@@ -521,7 +521,7 @@ export default function Results() {
               <TableRow>
                   {!qualification.hideColumns.includes('momentum') && (
                     <TableCell className="text-center text-xs text-muted-foreground align-top">
-                      <p className="font-bold">Why it matters:</p>Shorter term = Faster freedom + Less total cost (lower direct & 3rd-party fees).
+                      <p className="font-bold">Why it matters:</p>Shorter term = Faster freedom + Less total cost (lower direct &amp; 3rd-party fees).
                     </TableCell>
                   )}
                   {!qualification.hideColumns.includes('personalLoan') && (
