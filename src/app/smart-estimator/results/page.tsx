@@ -359,28 +359,6 @@ export default function Results() {
                     </p>
                 </div>
 
-                <div className="flex items-center justify-around p-4">
-                  <ProgressCircle
-                    score={momentumScore.breakdown.financialHardship}
-                    maxScore={40}
-                    label="Financial"
-                    color="text-blue-500"
-                  />
-                  <ProgressCircle
-                    score={0}
-                    maxScore={30}
-                    label="Readiness"
-                    color="text-green-500"
-                    status="Not Started"
-                  />
-                  <ProgressCircle
-                    score={0}
-                    maxScore={30}
-                    label="Means"
-                    color="text-purple-500"
-                    status="Not Started"
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>
