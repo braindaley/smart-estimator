@@ -11,7 +11,7 @@ export function Footer() {
               <Logo />
             </Link>
             <p className="mt-4 text-sm">
-              Your partner in financial momentum.
+              Get in. Get out. Get on with life.
             </p>
           </div>
           <div>
