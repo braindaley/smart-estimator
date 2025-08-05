@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -104,12 +103,6 @@ export function Header() {
             Readiness Tool
           </Link>
           <Link
-            href="/contact-us"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
-          >
-            Contact Us
-          </Link>
-          <Link
             href="/login"
             className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
           >
@@ -121,8 +114,8 @@ export function Header() {
   );
 
   const DesktopNav = () => (
-    <div className="flex items-center gap-4">
-      <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+    <>
+      <nav className="hidden absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-6 text-sm font-medium md:flex">
         <Link
           href={plansLink}
           className="transition-colors hover:text-foreground/80 text-foreground/60"
@@ -143,42 +136,38 @@ export function Header() {
         </Link>
       </nav>
       <div className="flex items-center gap-4">
-        <Button asChild className="hidden md:flex">
-          <Link href="/contact-us">Contact Us</Link>
-        </Button>
         <Button variant="ghost" asChild className="hidden md:flex">
           <Link href="/login">Sign in</Link>
         </Button>
-        <div className='md:hidden'>
-            <MobileNav />
-        </div>
+        <MobileNav />
       </div>
-    </div>
+    </>
   );
 
   const NavPlaceholder = () => (
-    <div className="flex items-center gap-4">
-      <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+    <>
+      <nav className="hidden absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-6 text-sm font-medium md:flex">
         <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
         <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
         <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
       </nav>
       <div className="flex items-center gap-4">
-        <div className="hidden h-10 w-24 rounded-md bg-muted animate-pulse md:block" />
         <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse md:block" />
         <div className="h-10 w-10 rounded-md bg-muted animate-pulse md:hidden" />
       </div>
-    </div>
-    );
-
+    </>
+  );
 
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur-sm">
-      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 relative">
         <Link href="/">
           <Logo />
         </Link>
-        {isClient ? <DesktopNav /> : <NavPlaceholder />}
+        {/* Add suppressHydrationWarning to prevent hydration mismatch error */}
+        <div suppressHydrationWarning={true}>
+          {isClient ? <DesktopNav /> : <NavPlaceholder />}
+        </div>
       </div>
     </header>
   );
