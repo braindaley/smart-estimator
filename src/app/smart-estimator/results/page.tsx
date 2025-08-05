@@ -420,7 +420,18 @@ export default function Results() {
                   }
                   {!qualification.hideColumns.includes('personalLoan') && 
                       <TableCell className="text-center border-x">
-                        {results.personalLoan.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
+                        {results.personalLoan.isEligible ? (
+                          <>
+                            <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p>
+                            {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
+                              <div className="text-amber-600 mt-1 text-xs">
+                                ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
+                              </div>
+                            )}
+                          </>
+                          ) : (
+                            <p className="text-muted-foreground">Not Eligible</p>
+                          )}
                       </TableCell>
                   }
                   {!qualification.hideColumns.includes('standard') && 
@@ -450,11 +461,6 @@ export default function Results() {
                         {results.personalLoan.isEligible ? (
                           <>
                             <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
-                            {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
-                              <div className="text-amber-600 mt-1">
-                                ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
-                              </div>
-                            )}
                           </>
                         ) : (
                           '-'
