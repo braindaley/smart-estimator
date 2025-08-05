@@ -58,10 +58,10 @@ export function Header() {
             Readiness Tool
           </Link>
           <Link
-            href="/apply"
+            href="/customize-plan"
             className="transition-colors hover:text-foreground/80 text-foreground/60"
           >
-            Apply
+            Customize Plan
           </Link>
         </nav>
         <div className="flex items-center gap-4">
@@ -97,10 +97,10 @@ export function Header() {
                   How it works
                 </Link>
                 <Link
-                  href="/apply"
+                  href="/customize-plan"
                   className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
                 >
-                  Apply
+                  Customize Plan
                 </Link>
                 <Link
                   href={plansLink}
