@@ -517,7 +517,7 @@ export default function Results() {
               <CardTitle>Why Standard Plans Lag</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Standard debt management plans offer lower monthly payments but extend the repayment period. While this can provide temporary relief, it often means paying more over time and staying in debt for longer than necessary.</p>
+              <p className="text-sm text-muted-foreground">Low payment, but longer payoff. You wait months longer at increased cost and risk for financial freedom.</p>
             </CardContent>
           </Card>
         </div>
