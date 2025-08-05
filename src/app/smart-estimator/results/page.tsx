@@ -225,9 +225,8 @@ export default function Results() {
       'monthlyPaymentEstimate',
       'userFicoScoreEstimate',
     ];
-
-    const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key));
-
+    
+    const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key) && collectedData[key] !== undefined);
 
     if (!hasAllRequiredData) {
       // Don't redirect immediately, just wait for data.
@@ -383,7 +382,7 @@ export default function Results() {
 
     const secondaryCTAComponent = () => {
         if (!qualification.secondaryCTA) return null;
-        if (qualification.secondaryCTA === "Schedule Call") {
+        if (qualification.secondaryCTA === "Schedule Call" || qualification.secondaryCTA === "Schedule a Call") {
           return (
             <Button asChild variant="secondary" size="lg">
               <Link href="/contact-us">{qualification.secondaryCTA}</Link>
@@ -665,5 +664,3 @@ export default function Results() {
     </div>
   );
 }
-
-    
