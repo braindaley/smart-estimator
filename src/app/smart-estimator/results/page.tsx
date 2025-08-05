@@ -385,6 +385,10 @@ export default function Results() {
         <Card>
           <CardHeader>
             <CardTitle>Plans that fit your situation</CardTitle>
+            <CardDescription>
+                These plans are designed to help with an estimated debt of{' '}
+                <span className="font-bold text-foreground">{formatCurrency(results.debtAmountEstimate)}</span>.
+              </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -427,51 +431,33 @@ export default function Results() {
                   {!qualification.hideColumns.includes('personalLoan') && <TableCell className="text-center border-x">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
                   {!qualification.hideColumns.includes('standard') && <TableCell className="text-center">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
                 </TableRow>
-                {/* FIX: Updated "Debt Covered" row with proper personal loan logic */}
                 <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && 
-                    <TableCell className="text-center">
-                      {formatCurrency(results.debtAmountEstimate)} Debt Covered
-                    </TableCell>
-                  }
-                  {!qualification.hideColumns.includes('personalLoan') && 
-                    <TableCell className="text-center border-x">
-                      {results.personalLoan.isEligible ? (
-                        <div>
-                          {formatCurrency(results.personalLoan.actualLoanAmount)} Debt Covered
-                          {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
-                            <div className="text-xs text-amber-600 mt-1">
-                              ⚠️ Covers {Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}% of total debt
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not Available</span>
-                      )}
-                    </TableCell>
-                  }
-                  {!qualification.hideColumns.includes('standard') && 
-                    <TableCell className="text-center">
-                      {formatCurrency(results.debtAmountEstimate)} Debt Covered
-                    </TableCell>
-                  }
-                </TableRow>
-                <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && 
+                    {!qualification.hideColumns.includes('momentum') && (
                       <TableCell className="text-center text-xs text-muted-foreground">
-                      <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
+                        <p className="font-bold">Why it matters:</p>A shorter term means you're debt-free sooner.
                       </TableCell>
-                  }
-                  {!qualification.hideColumns.includes('personalLoan') && 
+                    )}
+                    {!qualification.hideColumns.includes('personalLoan') && (
                       <TableCell className="text-center text-xs text-muted-foreground border-x">
-                      <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
+                        {results.personalLoan.isEligible ? (
+                          <>
+                            <p className="font-bold">Why it matters:</p> High APRs can significantly increase the total amount you repay.
+                            {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
+                              <div className="text-amber-600 mt-1">
+                                ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
-                  }
-                  {!qualification.hideColumns.includes('standard') && 
+                    )}
+                    {!qualification.hideColumns.includes('standard') && (
                       <TableCell className="text-center text-xs text-muted-foreground">
-                      <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
+                        <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
                       </TableCell>
-                  }
+                    )}
                 </TableRow>
               </TableBody>
             </Table>
