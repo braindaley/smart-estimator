@@ -43,32 +43,34 @@ export default function Step4() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent>
-            <FormField
-              control={form.control}
-              name="monthlyPaymentEstimate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Monthly essentials</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
-                      <Input
-                        {...field}
-                        placeholder="0,000"
-                        className="pl-7"
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          const numericValue = value.replace(/[^0-9]/g, '');
-                          const formattedValue = new Intl.NumberFormat('en-US').format(Number(numericValue));
-                          field.onChange(formattedValue === '0' ? '' : formattedValue);
-                        }}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="max-w-md mx-auto">
+              <FormField
+                control={form.control}
+                name="monthlyPaymentEstimate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly essentials</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
+                        <Input
+                          {...field}
+                          placeholder="0,000"
+                          className="pl-7"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const numericValue = value.replace(/[^0-9]/g, '');
+                            const formattedValue = new Intl.NumberFormat('en-US').format(Number(numericValue));
+                            field.onChange(formattedValue === '0' ? '' : formattedValue);
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </CardContent>
           <CardFooter className="w-full">
             <StepNavigation currentStep={4} totalSteps={6} />

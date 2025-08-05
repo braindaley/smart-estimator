@@ -28,7 +28,7 @@ export default function Step5() {
         <CardDescription>This helps us understand how urgent your situation might be.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {paymentStatusOptions.map((option) => (
             <Button
               key={option.value}

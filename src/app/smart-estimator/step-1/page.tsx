@@ -29,7 +29,7 @@ export default function Step1() {
         <CardDescription>Just a ballpark is fine - no need to be exact.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {debtOptions.map((option) => (
             <Button
               key={option.label}
@@ -44,7 +44,7 @@ export default function Step1() {
         </div>
       </CardContent>
       <CardFooter className="w-full">
-        <StepNavigation currentStep={1} totalSteps={7} showNext={false} />
+        <StepNavigation currentStep={1} totalSteps={6} showNext={false} />
       </CardFooter>
     </Card>
   );

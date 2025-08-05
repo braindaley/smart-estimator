@@ -29,7 +29,7 @@ export default function Step2() {
         <CardDescription>Think credit cards, lenders, or finance companies.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {creditorOptions.map((option) => (
             <Button
               key={option.value}

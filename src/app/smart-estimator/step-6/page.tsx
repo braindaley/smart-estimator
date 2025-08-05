@@ -19,7 +19,7 @@ export default function Step6() {
   const { setFormData } = useEstimatorStore();
 
   const handleSelection = (userFicoScoreEstimate: number) => {
-    setFormData('step7', { userFicoScoreEstimate });
+    setFormData('step6', { userFicoScoreEstimate });
     router.push('/smart-estimator/results');
   };
 
@@ -30,7 +30,7 @@ export default function Step6() {
         <CardDescription>If you are not sure, we can run your credit for free if you would like.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {ficoScoreOptions.map((option) => (
             <Button
               key={option.label}
