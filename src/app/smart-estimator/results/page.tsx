@@ -99,6 +99,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
       status: "Not Qualified - No Income",
       hideColumns: hideColumns,
       primaryCTA: "See Income-Free Options",
+      secondaryCTA: "Schedule a call",
       message: "We understand income challenges. Here are alternative resources:",
       showScore: true,
       scoreMessage: "Steady income is required for most debt relief programs."
@@ -514,5 +515,3 @@ export default function Results() {
     </div>
   );
 }
-
-    
