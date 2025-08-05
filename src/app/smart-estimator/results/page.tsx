@@ -20,6 +20,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+
 
 type Qualification = {
   status: string;
@@ -141,54 +144,6 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
   };
 }
 
-const ProgressCircle = ({ score, maxScore, label, color, status }: { score: number, maxScore: number, label: string, color: string, status?: string }) => {
-  const radius = 25;
-  const circumference = 2 * Math.PI * radius;
-  const offset = status === "Not Started" || maxScore === 0 ? circumference : circumference - (score / maxScore) * circumference;
-  const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width="60" height="60" viewBox="0 0 60 60" className="transform -rotate-90">
-        <circle
-          cx="30"
-          cy="30"
-          r={radius}
-          strokeWidth="5"
-          className="text-gray-200"
-          fill="transparent"
-          stroke="currentColor"
-        />
-        <circle
-          cx="30"
-          cy="30"
-          r={radius}
-          strokeWidth="5"
-          className={status === "Not Started" ? "text-gray-200" : color}
-          fill="transparent"
-          stroke="currentColor"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
-        />
-        <text
-          x="30"
-          y="30"
-          textAnchor="middle"
-          dy=".3em"
-          className="transform rotate-90 origin-center fill-current text-foreground font-bold"
-          style={{ fontSize: status ? '8px' : '12px' }}
-        >
-          {status ? status : `${percentage}%`}
-        </text>
-      </svg>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-    </div>
-  );
-};
-
-
 export default function Results() {
   const store = useEstimatorStore();
   const [isInitialized, setIsInitialized] = React.useState(false);
@@ -197,6 +152,26 @@ export default function Results() {
   const [results, setResults] = React.useState<any>(null);
   const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
+  const [chartData, setChartData] = React.useState<any[]>([]);
+
+  const chartConfig = {
+    totalCost: {
+      label: "Total Cost",
+    },
+    momentum: {
+      label: "Momentum",
+      color: "hsl(var(--chart-2))",
+    },
+    standard: {
+      label: "Standard",
+      color: "hsl(var(--chart-4))",
+    },
+    personalLoan: {
+      label: "Personal Loan",
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
+
 
   React.useEffect(() => {
     if (store && !isInitialized) {
@@ -247,7 +222,7 @@ export default function Results() {
       const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
       const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0; // FIX: Use actual amount
       
-      setResults({
+      const resultsData = {
         debtAmountEstimate,
         momentum: {
           monthlyPayment: momentumMonthlyPayment,
@@ -270,7 +245,16 @@ export default function Results() {
           isEligible: canGetLoan,
           totalCost: personalLoanMonthlyPayment * 36,
         }
-      });
+      };
+      setResults(resultsData);
+
+      const newChartData = [
+        { name: 'Momentum', term: resultsData.momentum.isEligible ? resultsData.momentum.term : 0, totalCost: resultsData.momentum.isEligible ? resultsData.momentum.totalCost : 0, fill: "var(--color-momentum)" },
+        { name: 'Standard', term: resultsData.standard.isEligible ? resultsData.standard.term : 0, totalCost: resultsData.standard.isEligible ? resultsData.standard.totalCost : 0, fill: "var(--color-standard)" },
+        { name: 'Personal Loan', term: resultsData.personalLoan.isEligible ? resultsData.personalLoan.term : 0, totalCost: resultsData.personalLoan.isEligible ? resultsData.personalLoan.totalCost : 0, fill: "var(--color-personalLoan)" },
+      ].filter(d => d.term > 0);
+      setChartData(newChartData);
+
       setIsInitialized(true);
     }
   }, [store, isInitialized]);
@@ -469,6 +453,56 @@ export default function Results() {
           </CardContent>
         </Card>
         
+        <Card>
+          <CardHeader>
+            <CardTitle>Time to Freedom</CardTitle>
+            <CardDescription>See how long each plan takes and what it will cost you.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <BarChart
+                accessibilityLayer
+                data={chartData}
+                layout="vertical"
+                margin={{ left: 10, right: 10 }}
+              >
+                <CartesianGrid horizontal={false} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  
+                />
+                <XAxis dataKey="term" type="number" hide />
+                <Tooltip
+                  cursor={{ fill: "hsl(var(--muted))" }}
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name, props) => (
+                        <div className="flex flex-col gap-1">
+                            <div className="font-bold">{props.payload.name}</div>
+                            <div>
+                                <span className="text-muted-foreground">Term: </span>
+                                {props.payload.term} months
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground">Total Cost: </span>
+                                {formatCurrency(props.payload.totalCost)}
+                            </div>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                 <Bar dataKey="term" name="Term" layout="vertical" radius={5}>
+                 </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
         <div className="text-center mt-8 space-y-4">
               {renderCtas()}
               {qualification.showScore && qualification.scoreMessage && (
