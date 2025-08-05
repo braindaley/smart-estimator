@@ -279,14 +279,26 @@ export default function Results() {
       );
     };
 
+    const secondaryCTAComponent = () => {
+        if (!qualification.secondaryCTA) return null;
+        if (qualification.secondaryCTA === "Schedule a call") {
+          return (
+            <Button asChild variant="secondary">
+              <Link href="/contact-us">{qualification.secondaryCTA}</Link>
+            </Button>
+          );
+        }
+        return (
+          <Button onClick={() => handleCTAClick(qualification.secondaryCTA!)} variant="secondary">
+            {qualification.secondaryCTA}
+          </Button>
+        );
+      };
+
     return (
       <div className="cta-buttons flex flex-col items-center gap-4">
         {primaryCTAComponent()}
-        {qualification.secondaryCTA && (
-          <Button onClick={() => handleCTAClick(qualification.secondaryCTA)} variant="secondary">
-            {qualification.secondaryCTA}
-          </Button>
-        )}
+        {secondaryCTAComponent()}
       </div>
     );
   };
