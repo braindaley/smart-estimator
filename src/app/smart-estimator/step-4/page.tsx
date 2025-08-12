@@ -1,82 +1,49 @@
-"use client";
+'use client';
 
-import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { StepNavigation } from '@/components/step-navigation';
-import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useEstimatorStore } from '@/lib/estimator-store';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { useEstimatorStore } from '@/lib/estimator-store';
+import { StepNavigation } from '@/components/step-navigation';
 
-const FormSchema = z.object({
-    monthlyPaymentEstimate: z.preprocess(
-    (val) => (typeof val === 'string' ? val.replace(/[$,]/g, '') : val),
-    z.coerce.number({ invalid_type_error: 'Please enter a valid number.' }).positive({ message: 'Please enter a positive number.' })
-  )
-});
-
-type FormData = z.infer<typeof FormSchema>;
+const incomeOptions = [
+  { label: "Yes", value: true },
+  { label: "No", value: false },
+];
 
 export default function Step4() {
-  const { formData, setFormData } = useEstimatorStore();
   const router = useRouter();
+  const { setFormData } = useEstimatorStore();
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: formData.step4 || { monthlyPaymentEstimate: '' },
-  });
-
-  const onSubmit = (data: FormData) => {
-    setFormData('step4', data);
+  const handleSelection = (hasSteadyIncome: boolean) => {
+    setFormData('step-4', { hasSteadyIncome });
     router.push('/smart-estimator/step-5');
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Roughly how much do you spend each month on essentials?</CardTitle>
-        <CardDescription>Don't include credit card or loan payments-- just the basics.</CardDescription>
+        <CardTitle>Do you have a steady source of income?</CardTitle>
+        <CardDescription>This helps us determine if a payment plan is possible for you.</CardDescription>
       </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent>
-            <div className="max-w-md mx-auto">
-              <FormField
-                control={form.control}
-                name="monthlyPaymentEstimate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monthly essentials</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
-                        <Input
-                          {...field}
-                          placeholder="0,000"
-                          className="pl-7"
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const numericValue = value.replace(/[^0-9]/g, '');
-                            const formattedValue = new Intl.NumberFormat('en-US').format(Number(numericValue));
-                            field.onChange(formattedValue === '0' ? '' : formattedValue);
-                          }}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="w-full">
-            <StepNavigation currentStep={4} totalSteps={5} />
-          </CardFooter>
-        </form>
-      </Form>
+      <CardContent>
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
+          {incomeOptions.map((option) => (
+            <Button
+              key={option.label}
+              onClick={() => handleSelection(option.value)}
+              variant="outline"
+              size="lg"
+              className="justify-start"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter className="w-full">
+        <StepNavigation currentStep={4} totalSteps={5} showNext={false} />
+      </CardFooter>
     </Card>
   );
 }

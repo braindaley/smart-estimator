@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import * as React from 'react';
 import { useEstimatorStore } from '@/lib/estimator-store';
@@ -8,10 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   calculateMonthlyMomentumPayment,
-  calculateMonthlyStandardPayment,
   calculatePersonalLoanPayment,
   getMomentumTermLength,
-  getStandardTermLength,
   getPersonalLoanApr,
   getMaximumPersonalLoanAmount,
   calculateMomentumScore
@@ -53,6 +50,13 @@ type Qualification = {
   showScore: boolean;
   scoreMessage: string;
 };
+
+function getPersonalLoanApprovalLikelihood(userFicoScoreEstimate: number): string {
+  if (userFicoScoreEstimate >= 720) return "Very likely";
+  if (userFicoScoreEstimate >= 690) return "Moderate likely";
+  if (userFicoScoreEstimate >= 630) return "Low likely";
+  return "Not likely";
+}
 
 function getQualificationStatus(formData: any, momentumScore: any): Qualification {
   const { debtAmountEstimate, hasSteadyIncome, userFicoScoreEstimate } = formData;
@@ -213,9 +217,8 @@ export default function Results() {
     const requiredKeys = [
       'debtAmountEstimate',
       'creditorCountEstimate',
-      'monthlyIncomeEstimate',
-      'monthlyPaymentEstimate',
       'userFicoScoreEstimate',
+      'hasSteadyIncome',
     ];
     
     const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key) && collectedData[key] !== undefined);
@@ -228,10 +231,17 @@ export default function Results() {
     }
 
     try {
-      // Also set hasSteadyIncome based on income. This is for the getQualificationStatus function.
-      if (!collectedData.hasOwnProperty('hasSteadyIncome')) {
-          collectedData.hasSteadyIncome = collectedData.monthlyIncomeEstimate > 0;
+      // Estimate missing monthly income and payment data based on what we have
+      if (!collectedData.hasOwnProperty('monthlyIncomeEstimate')) {
+        // Estimate income based on steady income status
+        collectedData.monthlyIncomeEstimate = collectedData.hasSteadyIncome ? 4000 : 0;
       }
+      
+      if (!collectedData.hasOwnProperty('monthlyPaymentEstimate')) {
+        // Estimate monthly payment as 4% of total debt (typical minimum payment)
+        collectedData.monthlyPaymentEstimate = collectedData.debtAmountEstimate * 0.04;
+      }
+      
       setAllFormData(collectedData);
         
       const { 
@@ -256,12 +266,9 @@ export default function Results() {
       const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
       setQualification(qualificationStatus);
       
-      // Calculate Momentum and Standard payments
+      // Calculate Momentum payments
       const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
       const momentumTerm = getMomentumTermLength(debtAmountEstimate);
-      
-      const standardMonthlyPayment = calculateMonthlyStandardPayment(debtAmountEstimate);
-      const standardTerm = getStandardTermLength(debtAmountEstimate);
 
       // Calculate Personal Loan with FIXED LOGIC
       const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
@@ -280,12 +287,6 @@ export default function Results() {
           term: momentumTerm,
           isEligible: debtAmountEstimate >= 15000,
           totalCost: momentumMonthlyPayment * momentumTerm,
-        },
-        standard: {
-          monthlyPayment: standardMonthlyPayment,
-          term: standardTerm,
-          isEligible: debtAmountEstimate >= 10000,
-          totalCost: standardMonthlyPayment * standardTerm,
         },
         personalLoan: {
           monthlyPayment: personalLoanMonthlyPayment,
@@ -468,10 +469,6 @@ export default function Results() {
       <Card>
         <CardHeader className="text-center">
           <CardTitle>Plans that fit your situation</CardTitle>
-            <CardDescription>
-              These plans are designed to help with an estimated debt of{' '}
-              <span className="font-bold text-foreground">{formatCurrency(results.debtAmountEstimate)}</span>.
-            </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -484,15 +481,6 @@ export default function Results() {
                 {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/4 border-x pb-4 text-center align-top">
                     <p className="text-lg font-semibold">Personal Loan</p>
                     <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
-                    {results.personalLoan.isEligible && results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
-                      <div className="mt-1 text-xs font-normal text-amber-600">
-                        ⚠️ Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt.
-                      </div>
-                    )}
-                </TableHead>}
-                {!qualification.hideColumns.includes('standard') && <TableHead className="w-1/4 border-x pb-4 text-center align-top">
-                    <p className="text-lg font-semibold">Standard Plan</p>
-                    <p className="text-xs text-muted-foreground">A longer program term that might be easier to manage.</p>
                 </TableHead>}
                 <TableHead className="w-1/4 bg-red-50 pb-4 text-center align-top">
                     <p className="text-lg font-semibold text-red-700">Current Path</p>
@@ -501,6 +489,24 @@ export default function Results() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              <TableRow className="border-b">
+                {!qualification.hideColumns.includes('momentum') && 
+                    <TableCell className="text-center align-top border-r">
+                      <div className="text-sm font-bold mb-2">Will I be approved?</div>
+                      <div>Yes, no minimum credit required</div>
+                    </TableCell>
+                }
+                {!qualification.hideColumns.includes('personalLoan') && 
+                    <TableCell className="border-x text-center align-top">
+                      <div className="text-sm font-bold mb-2">Will I be approved?</div>
+                      <div>{getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</div>
+                    </TableCell>
+                }
+                <TableCell className="bg-red-50 text-center align-top text-red-700">
+                  <div className="text-sm font-bold mb-2">Will I be approved?</div>
+                  <div>N/A</div>
+                </TableCell>
+              </TableRow>
               <TableRow>
                 {!qualification.hideColumns.includes('momentum') && 
                     <TableCell className="text-center align-top">
@@ -518,11 +524,6 @@ export default function Results() {
                         )}
                     </TableCell>
                 }
-                {!qualification.hideColumns.includes('standard') && 
-                    <TableCell className="border-x text-center align-top">
-                    {results.standard.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.standard.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
-                    </TableCell>
-                }
                 <TableCell className="bg-red-50 text-center align-top">
                   <p className="text-3xl font-bold text-red-700">{formatCurrency(results.currentPath.monthlyPayment)}/mo</p>
                   <p className="mt-1 text-xs text-red-600">Then decreasing</p>
@@ -531,46 +532,126 @@ export default function Results() {
               <TableRow>
                 {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
                 {!qualification.hideColumns.includes('personalLoan') && <TableCell className="border-x text-center align-top">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="border-x text-center align-top">{results.standard.isEligible ? `${results.standard.term} Month Program` : '-'}</TableCell>}
                 <TableCell className="bg-red-50 text-center align-top">
                   <span className="text-red-700">{results.currentPath.term} Months</span>
                   <p className="mt-1 text-xs text-red-600">({Math.round(results.currentPath.term / 12)} years)</p>
                 </TableCell>
               </TableRow>
               <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `Total Cost: ${formatCurrency(results.momentum.totalCost)}` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="border-x text-center align-top">{results.personalLoan.isEligible ? `Total Cost: ${formatCurrency(results.personalLoan.totalCost)}` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('standard') && <TableCell className="border-x text-center align-top">{results.standard.isEligible ? `Total Cost: ${formatCurrency(results.standard.totalCost)}` : '-'}</TableCell>}
+                {!qualification.hideColumns.includes('momentum') && 
+                    <TableCell className="text-center align-top">
+                      <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
+                      <div>{results.momentum.isEligible ? formatCurrency(results.debtAmountEstimate) : '-'}</div>
+                    </TableCell>
+                }
+                {!qualification.hideColumns.includes('personalLoan') && 
+                    <TableCell className="border-x text-center align-top">
+                      <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
+                      <div>
+                        {results.personalLoan.isEligible ? (
+                          results.personalLoan.actualLoanAmount < results.debtAmountEstimate ? (
+                            <div>
+                              <div>{formatCurrency(results.personalLoan.actualLoanAmount)}</div>
+                              <div className="text-xs text-amber-600 mt-1">
+                                Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt
+                              </div>
+                            </div>
+                          ) : (
+                            formatCurrency(results.debtAmountEstimate)
+                          )
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                    </TableCell>
+                }
                 <TableCell className="bg-red-50 text-center align-top">
-                  <span className="font-semibold text-red-700">Total Cost: {formatCurrency(results.currentPath.totalCost)}</span>
-                  <p className="mt-1 text-xs text-red-600">({Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your debt!)</p>
+                  <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
+                  <div className="text-red-700">{formatCurrency(results.debtAmountEstimate)}</div>
                 </TableCell>
               </TableRow>
               <TableRow>
                   {!qualification.hideColumns.includes('momentum') && (
-                    <TableCell className="text-center text-xs text-muted-foreground align-top">
-                      <p className="font-bold">Why it matters:</p>Shorter term = Faster freedom + Less total cost (lower direct &amp; 3rd-party fees).
+                    <TableCell className="text-center align-top">
+                      <div className="text-xs font-bold mb-1">Total Savings</div>
+                      <div className="text-xs">
+                        <span className="font-semibold">High</span> – Lower fees & fewer months, faster freedom
+                      </div>
                     </TableCell>
                   )}
                   {!qualification.hideColumns.includes('personalLoan') && (
-                    <TableCell className="border-x text-center text-xs text-muted-foreground align-top">
-                      {results.personalLoan.isEligible ? (
-                        <>
-                          <p className="font-bold">Why it matters:</p> Requires strong credit; total payback can exceed current balances.
-                        </>
-                      ) : (
-                        '-'
-                      )}
+                    <TableCell className="border-x text-center align-top">
+                      <div className="text-xs font-bold mb-1">Total Savings</div>
+                      <div className="text-xs">
+                        {results.personalLoan.isEligible ? (
+                          <><span className="font-semibold">Low</span> – Interest-heavy; may pay back greater than original debt</>
+                        ) : (
+                          '-'
+                        )}
+                      </div>
                     </TableCell>
                   )}
-                  {!qualification.hideColumns.includes('standard') && (
-                    <TableCell className="border-x text-center text-xs text-muted-foreground align-top">
-                      <p className="font-bold">Why it matters:</p> Lower payments can provide budget flexibility, but may cost more over time.
+                  <TableCell className="bg-red-50 text-center align-top">
+                    <div className="text-xs font-bold mb-1">Total Savings</div>
+                    <div className="text-xs text-red-700">
+                      <span className="font-semibold">Low</span> – Debt will likely grow due to interest and fees
+                    </div>
+                  </TableCell>
+              </TableRow>
+              <TableRow>
+                  {!qualification.hideColumns.includes('momentum') && (
+                    <TableCell className="text-center align-top">
+                      <div className="text-xs font-bold mb-1">Pros</div>
+                      <div className="text-xs">
+                        Immediate relief, Faster recovery, lower cost
+                      </div>
                     </TableCell>
                   )}
-                  <TableCell className="bg-red-50 text-center text-xs text-red-600 align-top">
-                    <p className="font-bold">Why it's dangerous:</p>
-                    You'll pay {Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your original debt over {Math.round(results.currentPath.term / 12)} years - that's {formatCurrency(results.currentPath.totalCost - results.debtAmountEstimate)} in interest alone!
+                  {!qualification.hideColumns.includes('personalLoan') && (
+                    <TableCell className="border-x text-center align-top">
+                      <div className="text-xs font-bold mb-1">Pros</div>
+                      <div className="text-xs">
+                        {results.personalLoan.isEligible ? (
+                          <>Immediate relief, but long-term higher costs</>
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  <TableCell className="bg-red-50 text-center align-top">
+                    <div className="text-xs font-bold mb-1">Pros</div>
+                    <div className="text-xs text-red-700">
+                      No monthly payment, but growing debt burden
+                    </div>
+                  </TableCell>
+              </TableRow>
+              <TableRow>
+                  {!qualification.hideColumns.includes('momentum') && (
+                    <TableCell className="text-center align-top">
+                      <div className="text-xs font-bold mb-1">Cons</div>
+                      <div className="text-xs">
+                        Temporary harm to credit
+                      </div>
+                    </TableCell>
+                  )}
+                  {!qualification.hideColumns.includes('personalLoan') && (
+                    <TableCell className="border-x text-center align-top">
+                      <div className="text-xs font-bold mb-1">Cons</div>
+                      <div className="text-xs">
+                        {results.personalLoan.isEligible ? (
+                          <>Credit based qualification, Higher payments, total repayment may exceed the original debt</>
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  <TableCell className="bg-red-50 text-center align-top">
+                    <div className="text-xs font-bold mb-1">Cons</div>
+                    <div className="text-xs text-red-700">
+                      Growing debt due to ongoing interest, no active solution
+                    </div>
                   </TableCell>
               </TableRow>
             </TableBody>
@@ -611,12 +692,10 @@ export default function Results() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Why Current Path is Dangerous</CardTitle>
+            <CardTitle>Why Doing Nothing Is Risky</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              At 24% APR with minimum payments, you'll pay {Math.round((results.currentPath.totalCost / results.debtAmountEstimate) * 10) / 10}x your original debt and stay trapped for {Math.round(results.currentPath.term / 12)} years - wasting {formatCurrency(results.currentPath.totalCost - results.debtAmountEstimate)} on interest.
-            </p>
+            <p className="text-sm text-muted-foreground">Doing nothing means your debt will likely keep growing, adding stress to your financial future</p>
           </CardContent>
         </Card>
       </div>

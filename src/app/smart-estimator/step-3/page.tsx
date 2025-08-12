@@ -1,85 +1,50 @@
-"use client";
+'use client';
 
-import * as React from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { StepNavigation } from '@/components/step-navigation';
-import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useEstimatorStore } from '@/lib/estimator-store';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { useEstimatorStore } from '@/lib/estimator-store';
+import { StepNavigation } from '@/components/step-navigation';
 
-const FormSchema = z.object({
-  monthlyIncomeEstimate: z.preprocess(
-    (val) => (typeof val === 'string' ? val.replace(/[$,]/g, '') : val),
-    z.coerce.number({ required_error: 'This field is required.', invalid_type_error: 'Please enter a valid number.' }).min(0, { message: 'Please enter a positive number.' })
-  )
-});
-
-type FormData = z.infer<typeof FormSchema>;
+const paymentStatusOptions = [
+  { label: "I'm current on all my payments", value: "current" },
+  { label: "I'm late on one or more payments", value: "late" },
+  { label: "My accounts are in collections", value: "collections" },
+];
 
 export default function Step3() {
-  const { formData, setFormData } = useEstimatorStore();
   const router = useRouter();
+  const { setFormData } = useEstimatorStore();
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: formData.step3 || { monthlyIncomeEstimate: '' },
-  });
-
-  const onSubmit = (data: FormData) => {
-    setFormData('step3', data);
-    // Also set hasSteadyIncome based on this input
-    const hasSteadyIncome = data.monthlyIncomeEstimate > 0;
-    setFormData('step-misc', { hasSteadyIncome });
+  const handleSelection = (debtPaymentStatus: string) => {
+    setFormData('step-3', { debtPaymentStatus });
     router.push('/smart-estimator/step-4');
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>What’s your monthly income before taxes?</CardTitle>
-        <CardDescription>This helps us understand what kind of plan might fit your budget.</CardDescription>
+        <CardTitle>What's the current status of your debt payments?</CardTitle>
+        <CardDescription>This helps us understand the urgency of your situation.</CardDescription>
       </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent>
-            <div className="mx-auto max-w-md">
-              <FormField
-                control={form.control}
-                name="monthlyIncomeEstimate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monthly Income</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">$</span>
-                        <Input
-                          {...field}
-                          placeholder="0,000"
-                          className="pl-7"
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const numericValue = value.replace(/[^0-9]/g, '');
-                            const formattedValue = new Intl.NumberFormat('en-US').format(Number(numericValue));
-                            field.onChange(formattedValue === '0' ? '0' : formattedValue);
-                          }}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="w-full">
-            <StepNavigation currentStep={3} totalSteps={5} />
-          </CardFooter>
-        </form>
-      </Form>
+      <CardContent>
+        <div className="flex flex-col space-y-4 max-w-md mx-auto">
+          {paymentStatusOptions.map((option) => (
+            <Button
+              key={option.value}
+              onClick={() => handleSelection(option.value)}
+              variant="outline"
+              size="lg"
+              className="justify-start"
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter className="w-full">
+        <StepNavigation currentStep={3} totalSteps={5} showNext={false} />
+      </CardFooter>
     </Card>
   );
 }
