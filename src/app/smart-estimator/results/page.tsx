@@ -5,6 +5,8 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ChartContainer, ChartConfig } from "@/components/ui/chart";
+import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 import {
   calculateMonthlyMomentumPayment,
   calculatePersonalLoanPayment,
@@ -67,6 +69,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
   // STEP 1: Check income first
   if (hasSteadyIncome === false) {
     hideColumns.push("personalLoan"); // Disable loan offer
+    hideColumns.push("momentum"); // Also disable momentum plan for no income
     
     return {
       status: "With no income you may have limited options",
@@ -219,6 +222,7 @@ export default function Results() {
       'creditorCountEstimate',
       'userFicoScoreEstimate',
       'hasSteadyIncome',
+      'debtPaymentStatus',
     ];
     
     const hasAllRequiredData = requiredKeys.every(key => collectedData.hasOwnProperty(key) && collectedData[key] !== undefined);
@@ -253,12 +257,13 @@ export default function Results() {
         creditorCountEstimate,
       } = collectedData;
 
-      // Calculate Momentum Score
+      // Calculate Momentum Score using new Step-1 Smart Estimator algorithm
       const momentumScoreData = calculateMomentumScore({
           debtAmountEstimate,
-          monthlyIncomeEstimate,
-          monthlyPaymentEstimate,
-          creditorCountEstimate
+          creditorCountEstimate,
+          debtPaymentStatus: collectedData.debtPaymentStatus,
+          hasSteadyIncome,
+          userFicoScoreEstimate
       });
       setMomentumScore(momentumScoreData);
 
@@ -400,283 +405,774 @@ export default function Results() {
   return (
     <div className="space-y-8">
       <div className="space-y-4 text-center">
-        <h1 className="text-3xl font-bold">You are building momentum!</h1>
-        <p className="text-muted-foreground">Here are your results</p>
+        <h1 className="text-3xl font-bold">Smart Estimator</h1>
       </div>
 
+      <div className="space-y-4">
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <Card>
+            <CardHeader className="pb-4">
+              <h2 className="text-xl font-bold text-center">Plans that fit your situation</h2>
+              {allFormData?.hasSteadyIncome === false ? (
+                <div className="text-center mt-2">
+                  <p className="text-sm text-muted-foreground mb-2">See Non-Payment Based Relief Options</p>
+                  <Button asChild variant="link" size="sm">
+                    <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
+                  </Button>
+                </div>
+              ) : allFormData?.userFicoScoreEstimate < 630 ? (
+                <div className="text-center mt-2">
+                  <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
+                </div>
+              ) : allFormData?.userFicoScoreEstimate >= 630 && allFormData?.userFicoScoreEstimate <= 659 ? (
+                <div className="text-center mt-2">
+                  <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
+                </div>
+              ) : allFormData?.userFicoScoreEstimate >= 660 && allFormData?.userFicoScoreEstimate <= 719 ? (
+                <div className="text-center mt-2">
+                  <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
+                </div>
+              ) : allFormData?.userFicoScoreEstimate >= 720 ? (
+                <div className="text-center mt-2">
+                  <p className="text-sm text-muted-foreground">Loan + Settlement Comparison — Choose What Fits Best</p>
+                </div>
+              ) : null}
+            </CardHeader>
+            <CardContent className="p-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/3 pb-4 text-center align-top bg-blue-50">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
+                            Recommended
+                          </div>
+                          <p className="text-base font-semibold text-blue-600">Momentum Plan</p>
+                          <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
+                        </div>
+                    </TableHead>}
+                    {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 border-x pb-4 text-center align-top">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-white border border-gray-600 text-gray-600 text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
+                            Another option
+                          </div>
+                          <p className="text-base font-semibold">Personal Loan</p>
+                          <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
+                        </div>
+                    </TableHead>}
+                    <TableHead className="w-1/3 pb-4 text-center align-top">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-white border border-red-600 text-red-600 text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
+                            Do nothing
+                          </div>
+                          <p className="text-base font-semibold">Current Path</p>
+                          <p className="text-xs text-muted-foreground">Keep making minimum payments at 24% APR.</p>
+                        </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Approval Likelihood Row */}
+                  <TableRow>
+                    {!qualification.hideColumns.includes('momentum') && 
+                        <TableCell className="text-center align-top bg-blue-50">
+                          <div className="text-sm font-bold mb-2">Approval Likelihood</div>
+                          <div className="text-sm font-medium">Yes, no credit required</div>
+                        </TableCell>
+                    }
+                    {!qualification.hideColumns.includes('personalLoan') && 
+                        <TableCell className="border-x text-center align-top">
+                          <div className="text-sm font-bold mb-2">Approval Likelihood</div>
+                          <div className="text-sm">{results.personalLoan.isEligible ? getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate) : 'Not eligible'}</div>
+                        </TableCell>
+                    }
+                    <TableCell className="text-center align-top">
+                      <div className="text-sm font-bold mb-2">Approval Likelihood</div>
+                      <div className="text-sm">N/A</div>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Payment Details Row */}
+                  <TableRow>
+                    {!qualification.hideColumns.includes('momentum') && 
+                        <TableCell className="text-center align-top bg-blue-50">
+                          <div className="text-sm font-bold mb-2">Payment Details</div>
+                          {results.momentum.isEligible ? (
+                            <div className="text-sm space-y-1">
+                              <div className="text-lg font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</div>
+                              <div>{results.momentum.term} months</div>
+                              <div>{formatCurrency(results.debtAmountEstimate)} debt covered</div>
+                            </div>
+                          ) : (
+                            <p>Not Eligible</p>
+                          )}
+                        </TableCell>
+                    }
+                    {!qualification.hideColumns.includes('personalLoan') && 
+                        <TableCell className="border-x text-center align-top">
+                          <div className="text-sm font-bold mb-2">Payment Details</div>
+                          {results.personalLoan.isEligible ? (
+                            <div className="text-sm space-y-1">
+                              <div className="text-lg font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</div>
+                              <div>{results.personalLoan.term} months</div>
+                              <div>{formatCurrency(results.personalLoan.actualLoanAmount)} debt covered</div>
+                              {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
+                                <div className="text-xs">
+                                  Only {Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}% of total debt
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p>Not Eligible</p>
+                          )}
+                        </TableCell>
+                    }
+                    <TableCell className="text-center align-top">
+                      <div className="text-sm font-bold mb-2">Payment Details</div>
+                      <div className="text-sm space-y-1">
+                        <div className="text-lg font-bold">{formatCurrency(results.currentPath.monthlyPayment)}/mo</div>
+                        <div>{results.currentPath.term} months</div>
+                        <div>{formatCurrency(results.debtAmountEstimate)} debt</div>
+                        <div className="text-xs">Payment decreases over time</div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  
+                  {/* Summary Row - Savings, Pros, Cons */}
+                  <TableRow>
+                      {!qualification.hideColumns.includes('momentum') && (
+                        <TableCell className="text-left align-top bg-blue-50 px-4">
+                          <div className="text-sm font-bold mb-2">Summary</div>
+                          <ul className="text-xs space-y-1 list-disc list-inside">
+                            <li><span className="font-semibold">Pros:</span> Immediate relief, faster recovery</li>
+                            <li><span className="font-semibold">Cons:</span> Temporary harm to credit</li>
+                          </ul>
+                        </TableCell>
+                      )}
+                      {!qualification.hideColumns.includes('personalLoan') && (
+                        <TableCell className="border-x text-left align-top px-4">
+                          <div className="text-sm font-bold mb-2">Summary</div>
+                          <div className="text-xs">
+                            {results.personalLoan.isEligible ? (
+                              <ul className="space-y-1 list-disc list-inside">
+                                <li><span className="font-semibold">Pros:</span> Immediate relief</li>
+                                <li><span className="font-semibold">Cons:</span> Credit required, higher total cost</li>
+                              </ul>
+                            ) : (
+                              <div>-</div>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-left align-top px-4">
+                        <div className="text-sm font-bold mb-2">Summary</div>
+                        <ul className="text-xs space-y-1 list-disc list-inside">
+                          <li><span className="font-semibold">Pros:</span> No monthly payment</li>
+                          <li><span className="font-semibold">Cons:</span> Growing debt, no solution</li>
+                        </ul>
+                      </TableCell>
+                  </TableRow>
+
+                  {/* Action Buttons Row */}
+                  <TableRow>
+                    {!qualification.hideColumns.includes('momentum') && 
+                        <TableCell className="text-center align-middle bg-blue-50 py-6">
+                          <Button size="lg" className="bg-blue-600 hover:bg-blue-700 w-full max-w-48">
+                            Choose Plan
+                          </Button>
+                        </TableCell>
+                    }
+                    {!qualification.hideColumns.includes('personalLoan') && 
+                        <TableCell className="border-x text-center align-middle py-6">
+                          <Button size="lg" variant="outline" className="w-full max-w-48">
+                            Explore Loan Option
+                          </Button>
+                        </TableCell>
+                    }
+                    <TableCell className="text-center align-middle py-6">
+                      <Button size="lg" variant="secondary" className="w-full max-w-48">
+                        See Impact
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4">
+          <h2 className="text-xl font-bold text-center">Plans that fit your situation</h2>
+          {allFormData?.hasSteadyIncome === false ? (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-2">See Non-Payment Based Relief Options</p>
+              <Button asChild variant="link" size="sm">
+                <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
+              </Button>
+            </div>
+          ) : allFormData?.userFicoScoreEstimate < 630 ? (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
+            </div>
+          ) : allFormData?.userFicoScoreEstimate >= 630 && allFormData?.userFicoScoreEstimate <= 659 ? (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
+            </div>
+          ) : allFormData?.userFicoScoreEstimate >= 660 && allFormData?.userFicoScoreEstimate <= 719 ? (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
+            </div>
+          ) : allFormData?.userFicoScoreEstimate >= 720 ? (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Loan + Settlement Comparison — Choose What Fits Best</p>
+            </div>
+          ) : null}
+          {/* Momentum Plan Card */}
+          {!qualification.hideColumns.includes('momentum') && (
+            <Card className="bg-blue-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-blue-600">Momentum Plan</h3>
+                  <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    Recommended
+                  </div>
+                </div>
+                <CardDescription className="text-xs">Pay off debt faster with a lower monthly payment.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center">
+                  {results.momentum.isEligible ? (
+                    <p className="text-2xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p>
+                  ) : (
+                    <p className="text-muted-foreground">Not Eligible</p>
+                  )}
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-bold">Will I be approved:</span> Yes, no minimum credit required</div>
+                  <div><span className="font-bold">Program length:</span> {results.momentum.isEligible ? `${results.momentum.term} months` : '-'}</div>
+                  <div><span className="font-bold">Debt covered:</span> {results.momentum.isEligible ? formatCurrency(results.debtAmountEstimate) : '-'}</div>
+                </div>
+                <div className="text-xs space-y-1 pt-2 border-t">
+                  <div><span className="font-bold">Pros:</span> Immediate relief, faster recovery</div>
+                  <div><span className="font-bold">Cons:</span> Temporary harm to credit</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Personal Loan Card */}
+          {!qualification.hideColumns.includes('personalLoan') && (
+            <Card>
+              <CardHeader className="pb-3">
+                <h3 className="text-base font-semibold">Personal Loan</h3>
+                <CardDescription className="text-xs">Consolidate into one payment, but with high interest.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center">
+                  {results.personalLoan.isEligible ? (
+                    <p className="text-2xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p>
+                  ) : (
+                    <p className="text-muted-foreground">Not Eligible</p>
+                  )}
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-bold">Will I be approved:</span> {getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</div>
+                  <div><span className="font-bold">Program length:</span> {results.personalLoan.isEligible ? `${results.personalLoan.term} months` : '-'}</div>
+                  <div>
+                    <span className="font-bold">Debt covered:</span> 
+                    {results.personalLoan.isEligible ? (
+                      results.personalLoan.actualLoanAmount < results.debtAmountEstimate ? (
+                        <div className="mt-1">
+                          <div>{formatCurrency(results.personalLoan.actualLoanAmount)}</div>
+                          <div className="text-xs text-amber-600">
+                            Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt
+                          </div>
+                        </div>
+                      ) : (
+                        formatCurrency(results.debtAmountEstimate)
+                      )
+                    ) : (
+                      ' -'
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs space-y-1 pt-2 border-t">
+                  {results.personalLoan.isEligible ? (
+                    <>
+                      <div><span className="font-bold">Pros:</span> Immediate relief</div>
+                      <div><span className="font-bold">Cons:</span> Credit required, higher total cost</div>
+                    </>
+                  ) : (
+                    <div>Not available</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Current Path Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <h3 className="text-base font-semibold">Current Path</h3>
+              <CardDescription className="text-xs">Keep making minimum payments at 24% APR.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{formatCurrency(results.currentPath.monthlyPayment)}/mo</p>
+                <p className="text-xs text-muted-foreground">Then decreasing</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div><span className="font-bold">Will I be approved:</span> N/A</div>
+                <div><span className="font-bold">Program length:</span> {results.currentPath.term} months ({Math.round(results.currentPath.term / 12)} years)</div>
+                <div><span className="font-bold">Debt covered:</span> {formatCurrency(results.debtAmountEstimate)}</div>
+              </div>
+              <div className="text-xs space-y-1 pt-2 border-t">
+                <div><span className="font-bold">Pros:</span> No monthly payment</div>
+                <div><span className="font-bold">Cons:</span> Growing debt, no solution</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Time to Freedom Visual Bar Graph */}
+      <Card className="mt-8">
+        <CardHeader className="pb-4">
+          <h2 className="text-xl font-bold text-center">Time to Freedom Comparison</h2>
+          <CardDescription className="text-center">
+            Visual comparison of debt payoff timeline and total costs
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row md:justify-center gap-3">
+            {/* Calculate max values for scaling */}
+            {(() => {
+              const maxTerm = Math.max(
+                results.momentum.isEligible ? results.momentum.term : 0,
+                results.personalLoan.isEligible ? results.personalLoan.term : 0,
+                results.currentPath.term
+              );
+              const maxCost = Math.max(
+                results.momentum.isEligible ? results.momentum.totalCost : 0,
+                results.personalLoan.isEligible ? results.personalLoan.totalCost : 0,
+                results.currentPath.totalCost
+              );
+              const maxPayment = Math.max(
+                results.momentum.isEligible ? results.momentum.monthlyPayment : 0,
+                results.personalLoan.isEligible ? results.personalLoan.monthlyPayment : 0,
+                results.currentPath.monthlyPayment
+              );
+              const currentDate = new Date();
+
+              return (
+                <>
+                  {/* Momentum Option */}
+                  {!qualification.hideColumns.includes('momentum') && results.momentum.isEligible && (() => {
+                    const freedomDate = new Date(currentDate);
+                    freedomDate.setMonth(freedomDate.getMonth() + results.momentum.term);
+                    const savingsVsDoNothing = results.currentPath.totalCost - results.momentum.totalCost;
+                    const timeSaved = results.currentPath.term - results.momentum.term;
+                    
+                    return (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full md:max-w-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-blue-700 text-sm">Momentum Plan</div>
+                          </div>
+                        </div>
+                        <div className="space-y-1 mb-2">
+                          {/* Monthly Payment Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-blue-600 mb-1">Monthly Payment:</div>
+                            <div 
+                              className="h-5 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${Math.max((results.momentum.monthlyPayment / maxPayment) * 33, 10)}%`,
+                                minWidth: '80px'
+                              }}
+                            >
+                              {formatCurrency(results.momentum.monthlyPayment)}/mo
+                            </div>
+                          </div>
+                          {/* Time Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-blue-600 mb-1">Time to Freedom:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-blue-400 to-blue-500 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${(results.momentum.term / maxTerm) * 100}%`,
+                                minWidth: '60px'
+                              }}
+                            >
+                              {Math.round(results.momentum.term / 12)} years
+                            </div>
+                          </div>
+                          {/* Cost Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-blue-600 mb-1">Total Program Cost:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-blue-300 to-blue-400 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${(results.momentum.totalCost / maxCost) * 100}%`,
+                                minWidth: '60px'
+                              }}
+                            >
+                              {formatCurrency(results.momentum.totalCost)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-blue-600 font-medium text-xs">
+                            Save {formatCurrency(savingsVsDoNothing)} vs doing nothing
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Personal Loan Option */}
+                  {!qualification.hideColumns.includes('personalLoan') && results.personalLoan.isEligible && (() => {
+                    const freedomDate = new Date(currentDate);
+                    freedomDate.setMonth(freedomDate.getMonth() + results.personalLoan.term);
+                    const savingsVsDoNothing = results.currentPath.totalCost - results.personalLoan.totalCost;
+                    const timeSaved = results.currentPath.term - results.personalLoan.term;
+                    
+                    return (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 w-full md:max-w-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800 text-sm">Personal Loan</div>
+                          </div>
+                        </div>
+                        <div className="space-y-1 mb-2">
+                          {/* Monthly Payment Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-600 mb-1">Monthly Payment:</div>
+                            <div 
+                              className="h-5 bg-gradient-to-r from-gray-500 to-gray-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${Math.max((results.personalLoan.monthlyPayment / maxPayment) * 33, 10)}%`,
+                                minWidth: '80px'
+                              }}
+                            >
+                              {formatCurrency(results.personalLoan.monthlyPayment)}/mo
+                            </div>
+                          </div>
+                          {/* Time Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-600 mb-1">Time to Freedom:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-gray-400 to-gray-500 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${(results.personalLoan.term / maxTerm) * 100}%`,
+                                minWidth: '60px'
+                              }}
+                            >
+                              {Math.round(results.personalLoan.term / 12)} years
+                            </div>
+                          </div>
+                          {/* Cost Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-600 mb-1">Total Program Cost:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-gray-300 to-gray-400 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${(results.personalLoan.totalCost / maxCost) * 100}%`,
+                                minWidth: '60px'
+                              }}
+                            >
+                              {formatCurrency(results.personalLoan.totalCost)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-600 font-medium text-xs">
+                            {savingsVsDoNothing > 0 ? `Save ${formatCurrency(savingsVsDoNothing)} vs doing nothing` : `Costs ${formatCurrency(Math.abs(savingsVsDoNothing))} more vs doing nothing`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Do Nothing Option */}
+                  {(() => {
+                    const neverFreeDate = "Never (debt keeps growing)";
+                    
+                    return (
+                      <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full md:max-w-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 text-sm">Current Path</div>
+                          </div>
+                        </div>
+                        <div className="space-y-1 mb-2">
+                          {/* Monthly Payment Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-700 mb-1">Monthly Payment:</div>
+                            <div 
+                              className="h-5 bg-gradient-to-r from-gray-500 to-gray-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
+                              style={{ 
+                                width: `${Math.max((results.currentPath.monthlyPayment / maxPayment) * 33, 10)}%`,
+                                minWidth: '80px'
+                              }}
+                            >
+                              {formatCurrency(results.currentPath.monthlyPayment)}/mo
+                            </div>
+                          </div>
+                          {/* Time Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-700 mb-1">Time to Freedom:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-gray-600 to-gray-700 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm relative overflow-hidden"
+                              style={{ width: '100%' }}
+                            >
+                              <div className="absolute inset-0 bg-gray-800 opacity-30 animate-pulse"></div>
+                              <span className="relative z-10">{Math.round(results.currentPath.term / 12)}+ years (debt grows)</span>
+                            </div>
+                          </div>
+                          {/* Cost Bar */}
+                          <div className="relative">
+                            <div className="text-xs text-gray-700 mb-1">Total Program Cost:</div>
+                            <div 
+                              className="h-4 bg-gradient-to-r from-gray-600 to-gray-700 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm relative overflow-hidden"
+                              style={{ width: '100%' }}
+                            >
+                              <div className="absolute inset-0 bg-gray-800 opacity-30 animate-pulse"></div>
+                              <span className="relative z-10">{formatCurrency(results.currentPath.totalCost)}+ (keeps growing)</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-700 font-medium text-xs">
+                            Costliest option
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              );
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Momentum Score Section */}
       {qualification.showScore && (
-        <Card>
+        <Card className="mt-8">
           <CardHeader className="pb-4 text-center">
-            <CardTitle>Momentum Score</CardTitle>
-            <CardDescription>You've added {momentumScore.totalScore} points to your score!!</CardDescription>
+            <h3 className="text-xl font-bold">Momentum Score: {momentumScore.score}/95</h3>
+            <CardDescription>
+              Take all assessments to see if settlement is right for you
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="momentum-score-section flex flex-col items-center text-center">
-              {/* Score Bar */}
-              <div
-                className="score-bar relative mt-8 mb-2 h-3 rounded-full bg-gray-200"
-                style={{ maxWidth: '384px', width: '100%' }}
-              >
-                <div
-                  className="progress-fill h-full rounded-full bg-primary transition-all"
-                  style={{
-                    width: `${(momentumScore.totalScore / 95) * 100}%`,
-                  }}
-                />
-                <div
-                  className="absolute -top-10 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground"
-                  style={{
-                    left: `${(momentumScore.totalScore / 95) * 100}%`,
-                  }}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Smart Estimator Chart - First */}
+              <div className="flex flex-col items-center space-y-2">
+                <h4 className="text-base font-semibold">Smart Estimator</h4>
+                <ChartContainer
+                  config={{
+                    score: { label: "Score", color: "hsl(221, 83%, 53%)" },
+                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
+                  } satisfies ChartConfig}
+                  className="mx-auto aspect-square w-full max-w-[150px]"
                 >
-                  {momentumScore.totalScore}
-                </div>
-              </div>
-              
-              {/* Milestones */}
-              <div
-                className="milestones relative mb-6 text-xs text-muted-foreground"
-                style={{ maxWidth: '384px', width: '100%' }}
-              >
-                {[50, 70, 75].map((milestone) => (
-                  <div
-                    key={milestone}
-                    className="absolute -translate-x-1/2"
-                    style={{ left: `${(milestone / 95) * 100}%`, top: '4px' }}
+                  <RadialBarChart
+                    data={[{ score: momentumScore.score, remaining: 50 - momentumScore.score }]}
+                    endAngle={180}
+                    innerRadius={60}
+                    outerRadius={90}
                   >
-                    {milestone}
-                  </div>
-                ))}
+                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                      <Label
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) - 16}
+                                  className="fill-foreground text-2xl font-bold"
+                                >
+                                  {momentumScore.score}
+                                </tspan>
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 4}
+                                  className="fill-muted-foreground"
+                                >
+                                  of 50
+                                </tspan>
+                              </text>
+                            )
+                          }
+                        }}
+                      />
+                    </PolarRadiusAxis>
+                    <RadialBar
+                      dataKey="score"
+                      stackId="a"
+                      cornerRadius={5}
+                      fill="var(--color-score)"
+                      className="stroke-transparent stroke-2"
+                    />
+                    <RadialBar
+                      dataKey="remaining"
+                      fill="var(--color-remaining)"
+                      stackId="a"
+                      cornerRadius={5}
+                      className="stroke-transparent stroke-2"
+                    />
+                  </RadialBarChart>
+                </ChartContainer>
+                <p className="text-xs text-center text-muted-foreground">
+                  Current assessment score
+                </p>
               </div>
-              
-              {/* Bottom Actions - Text and Buttons on Same Line */}
-              <div className="flex items-center justify-center gap-4">
-                <p className="text-sm text-muted-foreground">Earn more Momentum points:</p>
-                <div className="flex gap-4">
-                  <Button asChild variant="link">
-                    <Link href="/readiness-tool">Readiness Tool</Link>
-                  </Button>
-                  <Button asChild variant="link">
-                    <Link href="/customize-plan">Customize Plan</Link>
-                  </Button>
-                </div>
+
+              {/* Readiness Chart - Second */}
+              <div className="flex flex-col items-center space-y-2">
+                <h4 className="text-base font-semibold">Readiness</h4>
+                <ChartContainer
+                  config={{
+                    score: { label: "Score", color: "hsl(142, 76%, 36%)" },
+                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
+                  } satisfies ChartConfig}
+                  className="mx-auto aspect-square w-full max-w-[150px]"
+                >
+                  <RadialBarChart
+                    data={[{ score: 0, remaining: 50 }]}
+                    endAngle={180}
+                    innerRadius={60}
+                    outerRadius={90}
+                  >
+                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                      <Label
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) - 16}
+                                  className="fill-foreground text-2xl font-bold"
+                                >
+                                  0
+                                </tspan>
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 4}
+                                  className="fill-muted-foreground"
+                                >
+                                  of 50
+                                </tspan>
+                              </text>
+                            )
+                          }
+                        }}
+                      />
+                    </PolarRadiusAxis>
+                    <RadialBar
+                      dataKey="score"
+                      stackId="a"
+                      cornerRadius={5}
+                      fill="var(--color-score)"
+                      className="stroke-transparent stroke-2"
+                    />
+                    <RadialBar
+                      dataKey="remaining"
+                      fill="var(--color-remaining)"
+                      stackId="a"
+                      cornerRadius={5}
+                      className="stroke-transparent stroke-2"
+                    />
+                  </RadialBarChart>
+                </ChartContainer>
+                <Button asChild size="sm" className="mt-2">
+                  <Link href="/readiness-tool">Take Assessment</Link>
+                </Button>
+              </div>
+
+              {/* Creditor Profile Chart - Third */}
+              <div className="flex flex-col items-center space-y-2">
+                <h4 className="text-base font-semibold">Creditor Profile</h4>
+                <ChartContainer
+                  config={{
+                    score: { label: "Score", color: "hsl(262, 83%, 58%)" },
+                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
+                  } satisfies ChartConfig}
+                  className="mx-auto aspect-square w-full max-w-[150px]"
+                >
+                  <RadialBarChart
+                    data={[{ score: 0, remaining: 50 }]}
+                    endAngle={180}
+                    innerRadius={60}
+                    outerRadius={90}
+                  >
+                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                      <Label
+                        content={({ viewBox }) => {
+                          if (viewBox.cx && viewBox.cy) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) - 16}
+                                  className="fill-foreground text-2xl font-bold"
+                                >
+                                  0
+                                </tspan>
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 4}
+                                  className="fill-muted-foreground"
+                                >
+                                  of 50
+                                </tspan>
+                              </text>
+                            )
+                          }
+                        }}
+                      />
+                    </PolarRadiusAxis>
+                    <RadialBar
+                      dataKey="score"
+                      stackId="a"
+                      cornerRadius={5}
+                      fill="var(--color-score)"
+                      className="stroke-transparent stroke-2"
+                    />
+                    <RadialBar
+                      dataKey="remaining"
+                      fill="var(--color-remaining)"
+                      stackId="a"
+                      cornerRadius={5}
+                      className="stroke-transparent stroke-2"
+                    />
+                  </RadialBarChart>
+                </ChartContainer>
+                <Button asChild size="sm" className="mt-2">
+                  <Link href="/creditor-profile">Take Assessment</Link>
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle>Plans that fit your situation</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableHead className="w-1/4 pb-4 text-center align-top">
-                    <p className="text-lg font-semibold">Momentum Plan</p>
-                    <p className="text-xs text-muted-foreground">Pay off debt faster with a lower monthly payment.</p>
-                </TableHead>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/4 border-x pb-4 text-center align-top">
-                    <p className="text-lg font-semibold">Personal Loan</p>
-                    <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
-                </TableHead>}
-                <TableHead className="w-1/4 bg-red-50 pb-4 text-center align-top">
-                    <p className="text-lg font-semibold text-red-700">Current Path</p>
-                    <p className="text-xs text-red-600">Keep making minimum payments at 24% APR.</p>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow className="border-b">
-                {!qualification.hideColumns.includes('momentum') && 
-                    <TableCell className="text-center align-top border-r">
-                      <div className="text-sm font-bold mb-2">Will I be approved?</div>
-                      <div>Yes, no minimum credit required</div>
-                    </TableCell>
-                }
-                {!qualification.hideColumns.includes('personalLoan') && 
-                    <TableCell className="border-x text-center align-top">
-                      <div className="text-sm font-bold mb-2">Will I be approved?</div>
-                      <div>{getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</div>
-                    </TableCell>
-                }
-                <TableCell className="bg-red-50 text-center align-top text-red-700">
-                  <div className="text-sm font-bold mb-2">Will I be approved?</div>
-                  <div>N/A</div>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                {!qualification.hideColumns.includes('momentum') && 
-                    <TableCell className="text-center align-top">
-                      {results.momentum.isEligible ? <p className="text-3xl font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</p> : <p className="text-muted-foreground">Not Eligible</p>}
-                    </TableCell>
-                }
-                {!qualification.hideColumns.includes('personalLoan') && 
-                    <TableCell className="border-x text-center align-top">
-                      {results.personalLoan.isEligible ? (
-                        <>
-                          <p className="text-3xl font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</p>
-                        </>
-                        ) : (
-                          <p className="text-muted-foreground">Not Eligible</p>
-                        )}
-                    </TableCell>
-                }
-                <TableCell className="bg-red-50 text-center align-top">
-                  <p className="text-3xl font-bold text-red-700">{formatCurrency(results.currentPath.monthlyPayment)}/mo</p>
-                  <p className="mt-1 text-xs text-red-600">Then decreasing</p>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                {!qualification.hideColumns.includes('momentum') && <TableCell className="text-center align-top">{results.momentum.isEligible ? `${results.momentum.term} Month Program` : '-'}</TableCell>}
-                {!qualification.hideColumns.includes('personalLoan') && <TableCell className="border-x text-center align-top">{results.personalLoan.isEligible ? `${results.personalLoan.term} Month Program` : '-'}</TableCell>}
-                <TableCell className="bg-red-50 text-center align-top">
-                  <span className="text-red-700">{results.currentPath.term} Months</span>
-                  <p className="mt-1 text-xs text-red-600">({Math.round(results.currentPath.term / 12)} years)</p>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                {!qualification.hideColumns.includes('momentum') && 
-                    <TableCell className="text-center align-top">
-                      <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
-                      <div>{results.momentum.isEligible ? formatCurrency(results.debtAmountEstimate) : '-'}</div>
-                    </TableCell>
-                }
-                {!qualification.hideColumns.includes('personalLoan') && 
-                    <TableCell className="border-x text-center align-top">
-                      <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
-                      <div>
-                        {results.personalLoan.isEligible ? (
-                          results.personalLoan.actualLoanAmount < results.debtAmountEstimate ? (
-                            <div>
-                              <div>{formatCurrency(results.personalLoan.actualLoanAmount)}</div>
-                              <div className="text-xs text-amber-600 mt-1">
-                                Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt
-                              </div>
-                            </div>
-                          ) : (
-                            formatCurrency(results.debtAmountEstimate)
-                          )
-                        ) : (
-                          '-'
-                        )}
-                      </div>
-                    </TableCell>
-                }
-                <TableCell className="bg-red-50 text-center align-top">
-                  <div className="text-sm font-bold mb-2">Debt Amount Covered</div>
-                  <div className="text-red-700">{formatCurrency(results.debtAmountEstimate)}</div>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && (
-                    <TableCell className="text-center align-top">
-                      <div className="text-xs font-bold mb-1">Total Savings</div>
-                      <div className="text-xs">
-                        <span className="font-semibold">High</span> – Lower fees & fewer months, faster freedom
-                      </div>
-                    </TableCell>
-                  )}
-                  {!qualification.hideColumns.includes('personalLoan') && (
-                    <TableCell className="border-x text-center align-top">
-                      <div className="text-xs font-bold mb-1">Total Savings</div>
-                      <div className="text-xs">
-                        {results.personalLoan.isEligible ? (
-                          <><span className="font-semibold">Low</span> – Interest-heavy; may pay back greater than original debt</>
-                        ) : (
-                          '-'
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                  <TableCell className="bg-red-50 text-center align-top">
-                    <div className="text-xs font-bold mb-1">Total Savings</div>
-                    <div className="text-xs text-red-700">
-                      <span className="font-semibold">Low</span> – Debt will likely grow due to interest and fees
-                    </div>
-                  </TableCell>
-              </TableRow>
-              <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && (
-                    <TableCell className="text-center align-top">
-                      <div className="text-xs font-bold mb-1">Pros</div>
-                      <div className="text-xs">
-                        Immediate relief, Faster recovery, lower cost
-                      </div>
-                    </TableCell>
-                  )}
-                  {!qualification.hideColumns.includes('personalLoan') && (
-                    <TableCell className="border-x text-center align-top">
-                      <div className="text-xs font-bold mb-1">Pros</div>
-                      <div className="text-xs">
-                        {results.personalLoan.isEligible ? (
-                          <>Immediate relief, but long-term higher costs</>
-                        ) : (
-                          '-'
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                  <TableCell className="bg-red-50 text-center align-top">
-                    <div className="text-xs font-bold mb-1">Pros</div>
-                    <div className="text-xs text-red-700">
-                      No monthly payment, but growing debt burden
-                    </div>
-                  </TableCell>
-              </TableRow>
-              <TableRow>
-                  {!qualification.hideColumns.includes('momentum') && (
-                    <TableCell className="text-center align-top">
-                      <div className="text-xs font-bold mb-1">Cons</div>
-                      <div className="text-xs">
-                        Temporary harm to credit
-                      </div>
-                    </TableCell>
-                  )}
-                  {!qualification.hideColumns.includes('personalLoan') && (
-                    <TableCell className="border-x text-center align-top">
-                      <div className="text-xs font-bold mb-1">Cons</div>
-                      <div className="text-xs">
-                        {results.personalLoan.isEligible ? (
-                          <>Credit based qualification, Higher payments, total repayment may exceed the original debt</>
-                        ) : (
-                          '-'
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                  <TableCell className="bg-red-50 text-center align-top">
-                    <div className="text-xs font-bold mb-1">Cons</div>
-                    <div className="text-xs text-red-700">
-                      Growing debt due to ongoing interest, no active solution
-                    </div>
-                  </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
       
-      <Alert>
-        <AlertTitle>{qualification.status}</AlertTitle>
-        <AlertDescription>{qualification.message}</AlertDescription>
-      </Alert>
-      
-      <div className="mt-8 space-y-4 text-center">
-            <div className="cta-buttons flex flex-row items-center justify-center gap-4">
-              {renderCtas()}
-            </div>
-            <Button asChild onClick={handleRestart} variant="link">
-              <Link href="/smart-estimator/step-1">Start Over</Link>
-            </Button>
-        </div>
+      <div className="mt-8 text-center">
+        <Button asChild onClick={handleRestart} variant="link">
+          <Link href="/smart-estimator/step-1">Start Over</Link>
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Why Momentum May Be Better</CardTitle>
+            <h3 className="text-base font-semibold">Why Momentum May Be Better</h3>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">Low monthly cost, shorter term = less stress + faster recovery.</p>
@@ -684,7 +1180,7 @@ export default function Results() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Why Loans Can Backfire</CardTitle>
+            <h3 className="text-base font-semibold">Why Loans Can Backfire</h3>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">Higher APRs mean you might repay more than you owe today — even if it looks smaller monthly.</p>
@@ -692,7 +1188,7 @@ export default function Results() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Why Doing Nothing Is Risky</CardTitle>
+            <h3 className="text-base font-semibold">Why Doing Nothing Is Risky</h3>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">Doing nothing means your debt will likely keep growing, adding stress to your financial future</p>
@@ -702,7 +1198,7 @@ export default function Results() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Testing &amp; Debugging Information</CardTitle>
+          <h3 className="text-base font-semibold">Testing &amp; Debugging Information</h3>
           <CardDescription>This section is for testing purposes only.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

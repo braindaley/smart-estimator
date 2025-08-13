@@ -139,49 +139,70 @@ function calculateSurplusScore(monthlySurplusEstimate: number) {
 
 interface MomentumScoreInput {
     debtAmountEstimate: number;
-    monthlyIncomeEstimate: number;
-    monthlyPaymentEstimate: number;
     creditorCountEstimate: number;
+    debtPaymentStatus: string;
+    hasSteadyIncome: boolean;
+    userFicoScoreEstimate: number;
+}
+
+function mapDebtAmountToPoints(debtAmount: number): number {
+    if (debtAmount >= 15000 && debtAmount < 25000) return 5;
+    if (debtAmount >= 25000 && debtAmount < 35000) return 15;
+    if (debtAmount >= 35000 && debtAmount < 50000) return 12;
+    if (debtAmount >= 50000 && debtAmount < 75000) return 8;
+    if (debtAmount >= 75000) return 3;
+    return 0; // Below minimum
+}
+
+function mapCreditorsToPoints(creditorCount: number): number {
+    if (creditorCount <= 2) return 2;
+    if (creditorCount <= 5) return 12;
+    if (creditorCount <= 10) return 8;
+    return 5; // 10+
+}
+
+function mapPaymentStatusToPoints(paymentStatus: string): number {
+    switch (paymentStatus) {
+        case 'current': return 3;
+        case 'late': return 12;
+        case 'collections': return 8;
+        default: return 0;
+    }
+}
+
+function mapIncomeToPoints(hasIncome: boolean): number {
+    return hasIncome ? 8 : 0;
+}
+
+function mapCreditScoreToPoints(ficoScore: number): number {
+    if (ficoScore >= 720) return 1;
+    if (ficoScore >= 690) return 2;
+    if (ficoScore >= 630) return 3;
+    return 1; // <630
 }
 
 export function calculateMomentumScore(formData: MomentumScoreInput) {
-    const dti = calculateDtiEstimate(formData.monthlyPaymentEstimate, formData.monthlyIncomeEstimate);
-    const dtiEstimate = dti / 100; // Convert to decimal for calculation
-    const monthlySurplusEstimate = calculateMonthlySurplusEstimate(formData.monthlyIncomeEstimate, formData.monthlyPaymentEstimate);
+    // Calculate points for each component
+    const debtPoints = mapDebtAmountToPoints(formData.debtAmountEstimate);
+    const creditorsPoints = mapCreditorsToPoints(formData.creditorCountEstimate);
+    const paymentPoints = mapPaymentStatusToPoints(formData.debtPaymentStatus);
+    const incomePoints = mapIncomeToPoints(formData.hasSteadyIncome);
+    const creditPoints = mapCreditScoreToPoints(formData.userFicoScoreEstimate);
 
-    // Calculate hardship components
-    const debtHardship = calculateDebtHardship(formData.debtAmountEstimate);
-    const dtiHardship = calculateDTIHardship(dtiEstimate);
-    const creditorHardship = calculateCreditorHardship(formData.creditorCountEstimate);
-
-    // Financial Hardship (40% weight)
-    const financialHardshipScore = (debtHardship + dtiHardship + creditorHardship) / 3;
-
-    // Mental Mindset (30% weight) - Not available in Smart Estimator
-    const mentalMindsetScore = 0;
-
-    // Financial Means (30% weight) - Partial (only surplus available)
-    const surplusScore = calculateSurplusScore(monthlySurplusEstimate);
-    const financialMeansScore = surplusScore / 3; // Only 1/3 components available
-
-    // Calculate raw score
-    const rawScore = (financialHardshipScore * 0.4) + (mentalMindsetScore * 0.3) + (financialMeansScore * 0.3);
-
-    // Apply Smart Estimator cap of 50 points
-    const smartEstimatorScore = Math.min(50, rawScore);
+    // Calculate total score (sum of all points)
+    const totalScore = debtPoints + creditorsPoints + paymentPoints + incomePoints + creditPoints;
 
     return {
-        totalScore: Math.round(smartEstimatorScore),
+        score: totalScore,
         breakdown: {
-            financialHardship: Math.round(financialHardshipScore * 0.4),
-            mentalMindset: 0,
-            financialMeans: Math.round(financialMeansScore * 0.3)
+            debtAmount: debtPoints,
+            creditors: creditorsPoints,
+            paymentStatus: paymentPoints,
+            income: incomePoints,
+            creditScore: creditPoints
         },
-        components: {
-            debtHardship,
-            dtiHardship,
-            creditorHardship,
-            surplusScore
-        }
+        maxPossible: 50, // 15 + 12 + 12 + 8 + 3 = 50
+        // Legacy compatibility
+        totalScore: totalScore
     };
 }
