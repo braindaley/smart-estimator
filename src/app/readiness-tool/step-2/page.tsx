@@ -7,32 +7,32 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Very", value: "very" },
-  { label: "Somewhat", value: "somewhat" },
-  { label: "Not important", value: "not_important" },
-  { label: "Can't afford any drop", value: "no_drop" },
+  { label: "Peace of mind/reduce stress", value: "peace_of_mind", points: 3 },
+  { label: "Save for major goal", value: "save_goal", points: 3 },
+  { label: "Better life for family", value: "better_life", points: 3 },
+  { label: "Stop collection calls", value: "stop_calls", points: 2 },
 ];
 
 export default function Step2() {
   const router = useRouter();
   const { setFormData } = useReadinessStore();
 
-  const handleSelection = (value: string) => {
-    setFormData('step2', { credit_score_importance: value });
+  const handleSelection = (value: string, points: number) => {
+    setFormData('step2', { primary_motivation: value, points });
     router.push('/readiness-tool/step-3');
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>How important is it to you to keep your credit score high in the next year or two?</CardTitle>
+        <CardTitle>What is your primary motivation for becoming debt-free?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {options.map((option) => (
             <Button
               key={option.value}
-              onClick={() => handleSelection(option.value)}
+              onClick={() => handleSelection(option.value, option.points)}
               variant="outline"
               size="lg"
               className="justify-start"
@@ -43,7 +43,7 @@ export default function Step2() {
         </div>
       </CardContent>
       <CardFooter className="w-full">
-        <ReadinessStepNavigation currentStep={2} totalSteps={10} showNext={false} />
+        <ReadinessStepNavigation currentStep={2} totalSteps={9} showNext={false} />
       </CardFooter>
     </Card>
   );

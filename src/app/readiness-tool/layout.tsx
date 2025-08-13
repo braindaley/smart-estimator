@@ -13,15 +13,29 @@ export default function ReadinessToolLayout({
   const isStepPage = /^\/readiness-tool\/step-\d+$/.test(pathname);
   const isResultsPage = pathname.includes('/results');
 
-  // Apply the narrow layout only to step pages and results page
-  if (isStepPage || isResultsPage) {
+  // Apply the narrow layout only to step pages
+  if (isStepPage) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="flex-1 py-8">
           <div className="container mx-auto max-w-3xl px-4">
-            {isStepPage && <ReadinessToolProgress />}
-            <div className={isStepPage ? "mt-8" : ""}>{children}</div>
+            <ReadinessToolProgress />
+            <div className="mt-8">{children}</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Results page gets full width layout
+  if (isResultsPage) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex-1 py-8">
+          <div className="container mx-auto px-4">
+            {children}
           </div>
         </main>
       </div>

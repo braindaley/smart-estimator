@@ -7,32 +7,31 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "I'm barely keeping up with payments", value: "barely_keeping_up" },
-  { label: "I've missed payments or received a collection notice", value: "missed_payments" },
-  { label: "I’ve been denied for new credit recently", value: "denied_credit" },
-  { label: "None of the above", value: "none" },
+  { label: "Very Confident", value: "very_confident", points: 3 },
+  { label: "Somewhat Confident", value: "somewhat_confident", points: 2 },
+  { label: "Not Confident", value: "not_confident", points: 1 },
 ];
 
 export default function Step6() {
   const router = useRouter();
   const { setFormData } = useReadinessStore();
 
-  const handleSelection = (value: string) => {
-    setFormData('step6', { current_situation: value });
+  const handleSelection = (value: string, points: number) => {
+    setFormData('step6', { payment_confidence: value, points });
     router.push('/readiness-tool/step-7');
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Which of these sounds most like your current situation?</CardTitle>
+        <CardTitle>How confident are you in making monthly payments?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {options.map((option) => (
             <Button
               key={option.value}
-              onClick={() => handleSelection(option.value)}
+              onClick={() => handleSelection(option.value, option.points)}
               variant="outline"
               size="lg"
               className="justify-start"
@@ -43,7 +42,7 @@ export default function Step6() {
         </div>
       </CardContent>
       <CardFooter className="w-full">
-        <ReadinessStepNavigation currentStep={6} totalSteps={10} showNext={false} />
+        <ReadinessStepNavigation currentStep={6} totalSteps={9} showNext={false} />
       </CardFooter>
     </Card>
   );

@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
+import { SmartEstimatorLink } from '@/components/SmartEstimatorLink';
+import { ReadinessToolLink } from '@/components/ReadinessToolLink';
 
 export function Footer() {
   return (
@@ -17,8 +19,8 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-foreground">Solutions</h3>
             <ul className="mt-4 space-y-2">
-              <li><Link href="/smart-estimator/step-1" className="hover:text-foreground">Smart Estimator</Link></li>
-              <li><Link href="/readiness-tool" className="hover:text-foreground">Readiness Tool</Link></li>
+              <li><SmartEstimatorLink className="hover:text-foreground">Smart Estimator</SmartEstimatorLink></li>
+              <li><ReadinessToolLink className="hover:text-foreground">Readiness Tool</ReadinessToolLink></li>
               <li><Link href="/customize-plan" className="hover:text-foreground">Customize Plan</Link></li>
             </ul>
           </div>

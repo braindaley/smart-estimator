@@ -7,12 +7,14 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import Image from 'next/image';
 import { useEstimatorStore } from '@/lib/estimator-store';
+import { useSmartEstimatorLink } from '@/hooks/useSmartEstimatorLink';
 
 export default function Home() {
   const [zipCode, setZipCode] = useState('92660');
   const [zipError, setZipError] = useState('');
   const router = useRouter();
   const setFormData = useEstimatorStore((state) => state.setFormData);
+  const smartEstimatorLink = useSmartEstimatorLink();
 
   const handleStartEstimator = () => {
     // Validate zip code
@@ -34,8 +36,8 @@ export default function Home() {
     // Store zip code in the estimator store
     setFormData('step-0', { zipCode });
     
-    // Navigate to step 1
-    router.push('/smart-estimator/step-1');
+    // Navigate to appropriate smart estimator page
+    router.push(smartEstimatorLink);
   };
 
   return (

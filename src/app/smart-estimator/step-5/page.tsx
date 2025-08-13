@@ -9,8 +9,8 @@ import { StepNavigation } from '@/components/step-navigation';
 const ficoOptions = [
   { label: "Prime 720+", value: 740 },
   { label: "Good 690-719", value: 705 },
-  { label: "Fair 630-689", value: 660 },
-  { label: "Subprime <630", value: 600 },
+  { label: "Fair 580-689", value: 635 },
+  { label: "Subprime <580", value: 550 },
 ];
 
 export default function Step5() {

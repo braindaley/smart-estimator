@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useEstimatorStore } from '@/lib/estimator-store';
+import { useReadinessStore } from '@/lib/readiness-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import MomentumScoreSection from '@/components/MomentumScoreSection';
 
 // Calculate current path (doing nothing - minimum payments)
 function calculateCurrentPath(debtAmount: number) {
@@ -56,7 +58,7 @@ type Qualification = {
 function getPersonalLoanApprovalLikelihood(userFicoScoreEstimate: number): string {
   if (userFicoScoreEstimate >= 720) return "Very likely";
   if (userFicoScoreEstimate >= 690) return "Moderate likely";
-  if (userFicoScoreEstimate >= 630) return "Low likely";
+  if (userFicoScoreEstimate >= 580) return "Low likely";
   return "Not likely";
 }
 
@@ -84,8 +86,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 
   // STEP 2: Check credit score ranges with debt thresholds
   
-  // FICO < 630
-  if (userFicoScoreEstimate < 630) {
+  // FICO < 580
+  if (userFicoScoreEstimate < 580) {
     hideColumns.push("personalLoan"); // Disable Loan Offer Column
     
     return {
@@ -99,8 +101,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
 
-  // FICO 630-659 AND debt > $15K
-  if (userFicoScoreEstimate >= 630 && userFicoScoreEstimate <= 659 && debtAmountEstimate > 15000) {
+  // FICO 580-689 AND debt > $15K
+  if (userFicoScoreEstimate >= 580 && userFicoScoreEstimate <= 689 && debtAmountEstimate > 15000) {
     // Highlight Settlement (show all columns but emphasize settlement)
     return {
       status: "Settlement is A good option",
@@ -113,8 +115,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
 
-  // FICO 660-719 AND debt > $15K
-  if (userFicoScoreEstimate >= 660 && userFicoScoreEstimate <= 719 && debtAmountEstimate > 10000) {
+  // FICO 690-719 AND debt > $10K
+  if (userFicoScoreEstimate >= 690 && userFicoScoreEstimate <= 719 && debtAmountEstimate > 10000) {
     // Show All 3 Columns
     return {
       status: "Multiple Options Available",
@@ -143,8 +145,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 
   // Handle cases where debt thresholds aren't met for the credit ranges
   
-  // FICO 630-659 but debt <= $15K
-  if (userFicoScoreEstimate >= 630 && userFicoScoreEstimate <= 659 && debtAmountEstimate <= 15000) {
+  // FICO 580-689 but debt <= $15K
+  if (userFicoScoreEstimate >= 580 && userFicoScoreEstimate <= 689 && debtAmountEstimate <= 15000) {
     hideColumns.push("momentum"); // Hide momentum since debt is too low
     return {
       status: "Limited Options - Debt Below Threshold",
@@ -157,8 +159,8 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
     };
   }
 
-  // FICO 660-719 but debt <= $10K
-  if (userFicoScoreEstimate >= 660 && userFicoScoreEstimate <= 719 && debtAmountEstimate <= 10000) {
+  // FICO 690-719 but debt <= $10K
+  if (userFicoScoreEstimate >= 690 && userFicoScoreEstimate <= 719 && debtAmountEstimate <= 10000) {
     hideColumns.push("momentum"); // Hide momentum since debt is too low
     return {
       status: "Personal Loan Recommended",
@@ -197,6 +199,7 @@ function getQualificationStatus(formData: any, momentumScore: any): Qualificatio
 
 export default function Results() {
   const store = useEstimatorStore();
+  const readinessStore = useReadinessStore();
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -204,6 +207,8 @@ export default function Results() {
   const [results, setResults] = React.useState<any>(null);
   const [qualification, setQualification] = React.useState<Qualification | null>(null);
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
+  const [readinessScore, setReadinessScore] = React.useState(0);
+  const [totalPossibleScore, setTotalPossibleScore] = React.useState(70); // 35 + 35 = 70
 
   React.useEffect(() => {
     // Wait for the store to be hydrated before doing anything.
@@ -267,6 +272,25 @@ export default function Results() {
       });
       setMomentumScore(momentumScoreData);
 
+      // Calculate readiness score if available
+      let readinessScoreValue = 0;
+      if (readinessStore.formData && readinessStore._hasHydrated) {
+        // Calculate readiness score from steps 1-9
+        for (let i = 1; i <= 9; i++) {
+          const stepData = readinessStore.formData[`step${i}`];
+          if (stepData && stepData.points) {
+            readinessScoreValue += stepData.points;
+          }
+        }
+        
+        // Add video bonus points if any
+        const videoData = readinessStore.formData.videos;
+        if (videoData && videoData.bonusPoints) {
+          readinessScoreValue += videoData.bonusPoints;
+        }
+      }
+      setReadinessScore(readinessScoreValue);
+
       // Get qualification status
       const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
       setQualification(qualificationStatus);
@@ -279,7 +303,7 @@ export default function Results() {
       const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
       const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
       const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount);
-      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 620 && hasSteadyIncome !== false;
+      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 580 && hasSteadyIncome !== false;
       const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0;
       
       // Calculate Current Path (doing nothing)
@@ -318,7 +342,17 @@ export default function Results() {
     } finally {
       setIsLoading(false);
     }
-  }, [store._hasHydrated, store.formData, router]);
+  }, [store._hasHydrated, store.formData, readinessStore._hasHydrated, readinessStore.formData, router]);
+
+  // Separate effect to store the momentum score only when it's calculated and not already stored
+  React.useEffect(() => {
+    if (momentumScore && momentumScore.score > 0 && !store.formData.momentumScore) {
+      store.setFormData('momentumScore', { 
+        score: momentumScore.score,
+        calculatedAt: new Date().toISOString()
+      });
+    }
+  }, [momentumScore, store.formData.momentumScore, store]);
 
   const formatCurrency = (value: number) => {
     if (typeof value !== 'number' || isNaN(value)) return '$0';
@@ -421,15 +455,15 @@ export default function Results() {
                     <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
                   </Button>
                 </div>
-              ) : allFormData?.userFicoScoreEstimate < 630 ? (
+              ) : allFormData?.userFicoScoreEstimate < 580 ? (
                 <div className="text-center mt-2">
                   <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
                 </div>
-              ) : allFormData?.userFicoScoreEstimate >= 630 && allFormData?.userFicoScoreEstimate <= 659 ? (
+              ) : allFormData?.userFicoScoreEstimate >= 580 && allFormData?.userFicoScoreEstimate <= 689 ? (
                 <div className="text-center mt-2">
                   <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
                 </div>
-              ) : allFormData?.userFicoScoreEstimate >= 660 && allFormData?.userFicoScoreEstimate <= 719 ? (
+              ) : allFormData?.userFicoScoreEstimate >= 690 && allFormData?.userFicoScoreEstimate <= 719 ? (
                 <div className="text-center mt-2">
                   <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
                 </div>
@@ -612,15 +646,15 @@ export default function Results() {
                 <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
               </Button>
             </div>
-          ) : allFormData?.userFicoScoreEstimate < 630 ? (
+          ) : allFormData?.userFicoScoreEstimate < 580 ? (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
             </div>
-          ) : allFormData?.userFicoScoreEstimate >= 630 && allFormData?.userFicoScoreEstimate <= 659 ? (
+          ) : allFormData?.userFicoScoreEstimate >= 580 && allFormData?.userFicoScoreEstimate <= 689 ? (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
             </div>
-          ) : allFormData?.userFicoScoreEstimate >= 660 && allFormData?.userFicoScoreEstimate <= 719 ? (
+          ) : allFormData?.userFicoScoreEstimate >= 690 && allFormData?.userFicoScoreEstimate <= 719 ? (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
             </div>
@@ -960,208 +994,13 @@ export default function Results() {
       </Card>
 
       {/* Momentum Score Section */}
-      {qualification.showScore && (
-        <Card className="mt-8">
-          <CardHeader className="pb-4 text-center">
-            <h3 className="text-xl font-bold">Momentum Score: {momentumScore.score}/95</h3>
-            <CardDescription>
-              Take all assessments to see if settlement is right for you
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Smart Estimator Chart - First */}
-              <div className="flex flex-col items-center space-y-2">
-                <h4 className="text-base font-semibold">Smart Estimator</h4>
-                <ChartContainer
-                  config={{
-                    score: { label: "Score", color: "hsl(221, 83%, 53%)" },
-                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
-                  } satisfies ChartConfig}
-                  className="mx-auto aspect-square w-full max-w-[150px]"
-                >
-                  <RadialBarChart
-                    data={[{ score: momentumScore.score, remaining: 50 - momentumScore.score }]}
-                    endAngle={180}
-                    innerRadius={60}
-                    outerRadius={90}
-                  >
-                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                      <Label
-                        content={({ viewBox }) => {
-                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                            return (
-                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) - 16}
-                                  className="fill-foreground text-2xl font-bold"
-                                >
-                                  {momentumScore.score}
-                                </tspan>
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) + 4}
-                                  className="fill-muted-foreground"
-                                >
-                                  of 50
-                                </tspan>
-                              </text>
-                            )
-                          }
-                        }}
-                      />
-                    </PolarRadiusAxis>
-                    <RadialBar
-                      dataKey="score"
-                      stackId="a"
-                      cornerRadius={5}
-                      fill="var(--color-score)"
-                      className="stroke-transparent stroke-2"
-                    />
-                    <RadialBar
-                      dataKey="remaining"
-                      fill="var(--color-remaining)"
-                      stackId="a"
-                      cornerRadius={5}
-                      className="stroke-transparent stroke-2"
-                    />
-                  </RadialBarChart>
-                </ChartContainer>
-                <p className="text-xs text-center text-muted-foreground">
-                  Current assessment score
-                </p>
-              </div>
-
-              {/* Readiness Chart - Second */}
-              <div className="flex flex-col items-center space-y-2">
-                <h4 className="text-base font-semibold">Readiness</h4>
-                <ChartContainer
-                  config={{
-                    score: { label: "Score", color: "hsl(142, 76%, 36%)" },
-                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
-                  } satisfies ChartConfig}
-                  className="mx-auto aspect-square w-full max-w-[150px]"
-                >
-                  <RadialBarChart
-                    data={[{ score: 0, remaining: 50 }]}
-                    endAngle={180}
-                    innerRadius={60}
-                    outerRadius={90}
-                  >
-                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                      <Label
-                        content={({ viewBox }) => {
-                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                            return (
-                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) - 16}
-                                  className="fill-foreground text-2xl font-bold"
-                                >
-                                  0
-                                </tspan>
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) + 4}
-                                  className="fill-muted-foreground"
-                                >
-                                  of 50
-                                </tspan>
-                              </text>
-                            )
-                          }
-                        }}
-                      />
-                    </PolarRadiusAxis>
-                    <RadialBar
-                      dataKey="score"
-                      stackId="a"
-                      cornerRadius={5}
-                      fill="var(--color-score)"
-                      className="stroke-transparent stroke-2"
-                    />
-                    <RadialBar
-                      dataKey="remaining"
-                      fill="var(--color-remaining)"
-                      stackId="a"
-                      cornerRadius={5}
-                      className="stroke-transparent stroke-2"
-                    />
-                  </RadialBarChart>
-                </ChartContainer>
-                <Button asChild size="sm" className="mt-2">
-                  <Link href="/readiness-tool">Take Assessment</Link>
-                </Button>
-              </div>
-
-              {/* Creditor Profile Chart - Third */}
-              <div className="flex flex-col items-center space-y-2">
-                <h4 className="text-base font-semibold">Creditor Profile</h4>
-                <ChartContainer
-                  config={{
-                    score: { label: "Score", color: "hsl(262, 83%, 58%)" },
-                    remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
-                  } satisfies ChartConfig}
-                  className="mx-auto aspect-square w-full max-w-[150px]"
-                >
-                  <RadialBarChart
-                    data={[{ score: 0, remaining: 50 }]}
-                    endAngle={180}
-                    innerRadius={60}
-                    outerRadius={90}
-                  >
-                    <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                      <Label
-                        content={({ viewBox }) => {
-                          if (viewBox.cx && viewBox.cy) {
-                            return (
-                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) - 16}
-                                  className="fill-foreground text-2xl font-bold"
-                                >
-                                  0
-                                </tspan>
-                                <tspan
-                                  x={viewBox.cx}
-                                  y={(viewBox.cy || 0) + 4}
-                                  className="fill-muted-foreground"
-                                >
-                                  of 50
-                                </tspan>
-                              </text>
-                            )
-                          }
-                        }}
-                      />
-                    </PolarRadiusAxis>
-                    <RadialBar
-                      dataKey="score"
-                      stackId="a"
-                      cornerRadius={5}
-                      fill="var(--color-score)"
-                      className="stroke-transparent stroke-2"
-                    />
-                    <RadialBar
-                      dataKey="remaining"
-                      fill="var(--color-remaining)"
-                      stackId="a"
-                      cornerRadius={5}
-                      className="stroke-transparent stroke-2"
-                    />
-                  </RadialBarChart>
-                </ChartContainer>
-                <Button asChild size="sm" className="mt-2">
-                  <Link href="/creditor-profile">Take Assessment</Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <MomentumScoreSection
+        smartEstimatorScore={momentumScore.score}
+        readinessScore={readinessScore}
+        totalPossibleScore={totalPossibleScore}
+        hasSmartEstimatorData={true}
+        showScore={qualification.showScore}
+      />
       
       <div className="mt-8 text-center">
         <Button asChild onClick={handleRestart} variant="link">

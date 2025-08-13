@@ -146,39 +146,39 @@ interface MomentumScoreInput {
 }
 
 function mapDebtAmountToPoints(debtAmount: number): number {
-    if (debtAmount >= 15000 && debtAmount < 25000) return 5;
-    if (debtAmount >= 25000 && debtAmount < 35000) return 15;
-    if (debtAmount >= 35000 && debtAmount < 50000) return 12;
-    if (debtAmount >= 50000 && debtAmount < 75000) return 8;
-    if (debtAmount >= 75000) return 3;
+    if (debtAmount >= 15000 && debtAmount < 25000) return 3;   // was 5, now ~3.5 -> 3
+    if (debtAmount >= 25000 && debtAmount < 35000) return 11;  // was 15, now ~10.5 -> 11
+    if (debtAmount >= 35000 && debtAmount < 50000) return 8;   // was 12, now ~8.4 -> 8
+    if (debtAmount >= 50000 && debtAmount < 75000) return 6;   // was 8, now ~5.6 -> 6
+    if (debtAmount >= 75000) return 2;                          // was 3, now ~2.1 -> 2
     return 0; // Below minimum
 }
 
 function mapCreditorsToPoints(creditorCount: number): number {
-    if (creditorCount <= 2) return 2;
-    if (creditorCount <= 5) return 12;
-    if (creditorCount <= 10) return 8;
-    return 5; // 10+
+    if (creditorCount <= 2) return 1;   // was 2, now ~1.4 -> 1
+    if (creditorCount <= 5) return 8;   // was 12, now ~8.4 -> 8
+    if (creditorCount <= 10) return 6;  // was 8, now ~5.6 -> 6
+    return 4; // 10+ (was 5, now ~3.5 -> 4)
 }
 
 function mapPaymentStatusToPoints(paymentStatus: string): number {
     switch (paymentStatus) {
-        case 'current': return 3;
-        case 'late': return 12;
-        case 'collections': return 8;
+        case 'current': return 2;        // was 3, now ~2.1 -> 2
+        case 'late': return 8;           // was 12, now ~8.4 -> 8
+        case 'collections': return 6;    // was 8, now ~5.6 -> 6
         default: return 0;
     }
 }
 
 function mapIncomeToPoints(hasIncome: boolean): number {
-    return hasIncome ? 8 : 0;
+    return hasIncome ? 6 : 0;  // was 8, now ~5.6 -> 6
 }
 
 function mapCreditScoreToPoints(ficoScore: number): number {
-    if (ficoScore >= 720) return 1;
-    if (ficoScore >= 690) return 2;
-    if (ficoScore >= 630) return 3;
-    return 1; // <630
+    if (ficoScore >= 720) return 1;     // Prime 720+ (was 1, stays 1)
+    if (ficoScore >= 690) return 1;     // Good 690-719 (was 2, now ~1.4 -> 1)
+    if (ficoScore >= 580) return 2;     // Fair 580-689 (was 3, now ~2.1 -> 2)
+    return 1; // Subprime <580 (was 1, stays 1)
 }
 
 export function calculateMomentumScore(formData: MomentumScoreInput) {
@@ -201,7 +201,7 @@ export function calculateMomentumScore(formData: MomentumScoreInput) {
             income: incomePoints,
             creditScore: creditPoints
         },
-        maxPossible: 50, // 15 + 12 + 12 + 8 + 3 = 50
+        maxPossible: 35, // 11 + 8 + 8 + 6 + 2 = 35
         // Legacy compatibility
         totalScore: totalScore
     };

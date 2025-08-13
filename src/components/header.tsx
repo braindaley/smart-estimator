@@ -11,49 +11,19 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Logo } from '@/components/logo';
-import { useEstimatorStore } from '@/lib/estimator-store';
+import { useSmartEstimatorLink } from '@/hooks/useSmartEstimatorLink';
+import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
 import { useEffect, useState } from 'react';
 
 export function Header() {
-  const { formData, _hasHydrated } = useEstimatorStore();
-  const [plansLink, setPlansLink] = useState('/smart-estimator/step-1');
+  const smartEstimatorLink = useSmartEstimatorLink();
+  const readinessToolLink = useReadinessToolLink();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     // This effect runs only on the client, after the component mounts
     setIsClient(true);
   }, []);
-
-  useEffect(() => {
-    if (!_hasHydrated || !isClient) return;
-
-    const hasData = Object.keys(formData).length > 0;
-    const hasResultsData = Object.keys(formData).filter(k => k.startsWith('step')).length >= 5;
-
-    if (hasResultsData) {
-      setPlansLink('/smart-estimator/results');
-    } else if (hasData) {
-      const steps = Object.keys(formData)
-        .filter(k => k.startsWith('step'))
-        .map(k => parseInt(k.replace('step', ''), 10))
-        .filter(n => !isNaN(n) && n > 0);
-      
-      const lastStep = steps.length > 0 ? Math.max(...steps) : 0;
-
-      if (lastStep > 0) {
-        const nextStep = lastStep + 1;
-        if (nextStep > 5) {
-            setPlansLink('/smart-estimator/results');
-        } else {
-            setPlansLink(`/smart-estimator/step-${lastStep}`);
-        }
-      } else {
-        setPlansLink('/smart-estimator/step-1');
-      }
-    } else {
-      setPlansLink('/smart-estimator/step-1');
-    }
-  }, [formData, _hasHydrated, isClient]);
 
   const MobileNav = () => (
     <Sheet>
@@ -91,13 +61,13 @@ export function Header() {
             Customize Plan
           </Link>
           <Link
-            href={plansLink}
+            href={smartEstimatorLink}
             className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
           >
             Smart Estimator
           </Link>
            <Link
-            href="/readiness-tool"
+            href={readinessToolLink}
             className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
           >
             Readiness Tool
@@ -117,13 +87,13 @@ export function Header() {
     <>
       <nav className="hidden absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-6 text-sm font-medium md:flex">
         <Link
-          href={plansLink}
+          href={smartEstimatorLink}
           className="transition-colors hover:text-foreground/80 text-foreground/60"
         >
           Smart Estimator
         </Link>
         <Link
-          href="/readiness-tool"
+          href={readinessToolLink}
           className="transition-colors hover:text-foreground/80 text-foreground/60"
         >
           Readiness Tool

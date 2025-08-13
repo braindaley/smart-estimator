@@ -7,31 +7,31 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Yes", value: "yes" },
-  { label: "No", value: "no" },
-  { label: "Maybe", value: "maybe" },
+  { label: "Very important, cannot afford drop", value: "very_important", points: 1 },
+  { label: "Somewhat important, debt is priority", value: "somewhat_important", points: 2 },
+  { label: "Not important, understand it may get worse", value: "not_important", points: 3 },
 ];
 
 export default function Step4() {
   const router = useRouter();
   const { setFormData } = useReadinessStore();
 
-  const handleSelection = (value: string) => {
-    setFormData('step4', { structured_plan_willingness: value });
+  const handleSelection = (value: string, points: number) => {
+    setFormData('step4', { credit_score_importance: value, points });
     router.push('/readiness-tool/step-5');
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Would you be open to following a clear step-by-step plan to become debt-free?</CardTitle>
+        <CardTitle>How important is maintaining your credit score in the next 1-2 years?</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col space-y-4 max-w-md mx-auto">
           {options.map((option) => (
             <Button
               key={option.value}
-              onClick={() => handleSelection(option.value)}
+              onClick={() => handleSelection(option.value, option.points)}
               variant="outline"
               size="lg"
               className="justify-start"
@@ -42,7 +42,7 @@ export default function Step4() {
         </div>
       </CardContent>
       <CardFooter className="w-full">
-        <ReadinessStepNavigation currentStep={4} totalSteps={10} showNext={false} />
+        <ReadinessStepNavigation currentStep={4} totalSteps={9} showNext={false} />
       </CardFooter>
     </Card>
   );
