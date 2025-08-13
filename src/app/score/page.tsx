@@ -120,7 +120,7 @@ export default function ScorePage() {
     );
   }
 
-  const totalPossibleScore = 70;
+  const totalPossibleScore = 67; // 35 (Smart Estimator) + 32 (Readiness Tool: 27 base + 5 bonus)
   const overallScore = readinessScore + smartEstimatorScore;
 
   return (
@@ -230,7 +230,7 @@ export default function ScorePage() {
                 <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                   <span className="font-medium">Total Readiness Score:</span>
                   <div className="text-2xl font-bold text-green-600">
-                    {readinessScore}/35
+                    {readinessScore}/32
                   </div>
                 </div>
                 
@@ -251,8 +251,8 @@ export default function ScorePage() {
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((step) => {
                       const stepData = readinessData[`step${step}`];
                       const points = stepData?.points || 0;
-                      // Most readiness questions have a maximum of 4-5 points, using 5 as general max
-                      const maxPoints = 5;
+                      // Each readiness question has a maximum of 3 points
+                      const maxPoints = 3;
                       return (
                         <div key={step} className="flex justify-between items-center p-2 bg-background rounded">
                           <span>Question {step}</span>
