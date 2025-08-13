@@ -81,7 +81,7 @@ export default function Home() {
                     )}
                   </div>
                   <Button onClick={handleStartEstimator} size="lg">
-                    Smart Estimator
+                    Get started
                   </Button>
                 </div>
               </div>
