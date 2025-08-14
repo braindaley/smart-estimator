@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import MomentumScoreSection from '@/components/MomentumScoreSection';
+import WhatsNext from '@/components/WhatsNext';
 
 // Calculate current path (doing nothing - minimum payments)
 function calculateCurrentPath(debtAmount: number) {
@@ -46,13 +47,8 @@ function calculateCurrentPath(debtAmount: number) {
 }
 
 type Qualification = {
-  status: string;
   hideColumns: string[];
-  primaryCTA: string;
-  secondaryCTA?: string;
-  message: string;
-  showScore: boolean;
-  scoreMessage: string;
+  hideComparison: boolean;
 };
 
 function getPersonalLoanApprovalLikelihood(userFicoScoreEstimate: number): string {
@@ -62,139 +58,25 @@ function getPersonalLoanApprovalLikelihood(userFicoScoreEstimate: number): strin
   return "Not likely";
 }
 
-function getQualificationStatus(formData: any, momentumScore: any): Qualification {
-  const { debtAmountEstimate, hasSteadyIncome, userFicoScoreEstimate } = formData;
+function getQualificationStatus(formData: any): Qualification {
+  const { hasSteadyIncome, userFicoScoreEstimate } = formData;
 
-  // Initialize column hiding array
+  // Initialize column hiding array and comparison hiding flag
   const hideColumns: string[] = [];
   
-  // STEP 1: Check income first
+  // Do not show comparison table or Graph section for:
+  // - No steady income
   if (hasSteadyIncome === false) {
-    hideColumns.push("personalLoan"); // Disable loan offer
-    hideColumns.push("momentum"); // Also disable momentum plan for no income
-    
-    return {
-      status: "With no income you may have limited options",
-      hideColumns: hideColumns,
-      primaryCTA: "See Non-Payment Solutions",
-      secondaryCTA: "Schedule Call",
-      message: "We understand income challenges and have non-payment based relief options available through our legal aid partners.",
-      showScore: true,
-      scoreMessage: "Income-free debt relief options are available."
-    };
+    return { hideColumns, hideComparison: true };
   }
 
-  // STEP 2: Check credit score ranges with debt thresholds
-  
-  // FICO < 580
+  // Hide Personal Loan column when credit score < 580
   if (userFicoScoreEstimate < 580) {
-    hideColumns.push("personalLoan"); // Disable Loan Offer Column
-    
-    return {
-      status: "Settlement Recommended",
-      hideColumns: hideColumns,
-      primaryCTA: "Customize Plan",
-      secondaryCTA: "Take Readiness Quiz",
-      message: "Most clients in this range succeed through settlement. Based on your credit profile, debt settlement is typically the most effective path forward.",
-      showScore: true,
-      scoreMessage: "Settlement programs are designed for your credit range."
-    };
+    hideColumns.push('personalLoan');
   }
 
-  // FICO 580-689 AND debt > $15K
-  if (userFicoScoreEstimate >= 580 && userFicoScoreEstimate <= 689 && debtAmountEstimate > 15000) {
-    // Highlight Settlement (show all columns but emphasize settlement)
-    return {
-      status: "Settlement is A good option",
-      hideColumns: hideColumns,
-      primaryCTA: "Customize Plan",
-      secondaryCTA: "Schedule a Call",
-      message: "Your credit may qualify for loans, but settlement often provides better savings for your situation.",
-      showScore: true,
-      scoreMessage: "Loan approval rates are lower in this credit range - settlement may save more."
-    };
-  }
-
-  // FICO 690-719 AND debt > $10K
-  if (userFicoScoreEstimate >= 690 && userFicoScoreEstimate <= 719 && debtAmountEstimate > 10000) {
-    // Show All 3 Columns
-    return {
-      status: "Multiple Options Available",
-      hideColumns: hideColumns,
-      primaryCTA: "Customize Plan",
-      secondaryCTA: "Schedule a Call",
-      message: "You're eligible for loan or settlement — see what saves you more. You qualify for both loan consolidation and settlement programs.",
-      showScore: true,
-      scoreMessage: "Your credit score opens up multiple debt relief options."
-    };
-  }
-
-  // FICO 720+
-  if (userFicoScoreEstimate >= 720) {
-    // Highlight Both (loan + settlement)
-    return {
-      status: "Excellent Credit - Best Options",
-      hideColumns: hideColumns,
-      primaryCTA: "Customize Plan",
-      secondaryCTA: "Schedule a Call",
-      message: "Compare loans vs settlement and choose what fits best. Your excellent credit qualifies you for the best rates and terms across all programs.",
-      showScore: true,
-      scoreMessage: "Premium loan rates and priority settlement terms available."
-    };
-  }
-
-  // Handle cases where debt thresholds aren't met for the credit ranges
-  
-  // FICO 580-689 but debt <= $15K
-  if (userFicoScoreEstimate >= 580 && userFicoScoreEstimate <= 689 && debtAmountEstimate <= 15000) {
-    hideColumns.push("momentum"); // Hide momentum since debt is too low
-    return {
-      status: "Limited Options - Debt Below Threshold",
-      hideColumns: hideColumns,
-      primaryCTA: "Compare Your Options",
-      secondaryCTA: "Estimate Your Savings",
-      message: "Compare plan options — loans may not help. For debt amounts under $15K, focus on available consolidation options.",
-      showScore: true,
-      scoreMessage: "Consider direct creditor negotiations or smaller consolidation loans."
-    };
-  }
-
-  // FICO 690-719 but debt <= $10K
-  if (userFicoScoreEstimate >= 690 && userFicoScoreEstimate <= 719 && debtAmountEstimate <= 10000) {
-    hideColumns.push("momentum"); // Hide momentum since debt is too low
-    return {
-      status: "Personal Loan Recommended",
-      hideColumns: hideColumns,
-      primaryCTA: "Explore Both Paths",
-      secondaryCTA: "Use Smart Estimator",
-      message: "Explore both paths available to you. Your good credit makes personal loans a viable option for smaller debt amounts.",
-      showScore: true,
-      scoreMessage: "Good credit qualifies you for competitive loan rates."
-    };
-  }
-
-  // Edge case: High debt requiring specialist consultation
-  if (debtAmountEstimate >= 50000) {
-    return {
-      status: "Needs Specialist Consultation",
-      hideColumns: hideColumns,
-      primaryCTA: "Schedule Consultation",
-      message: "For debt over $50,000, let's discuss your custom options.",
-      showScore: true,
-      scoreMessage: "High debt amounts require personalized consultation."
-    };
-  }
-
-  // Default fallback
-  return {
-    status: "Assessment Needed",
-    hideColumns: hideColumns,
-    primaryCTA: "Complete Assessment",
-    secondaryCTA: "Get Help Now",
-    message: "Complete our assessment to determine your best options.",
-    showScore: true,
-    scoreMessage: "We need more information to provide personalized recommendations."
-  };
+  // For all other cases, show comparison table
+  return { hideColumns, hideComparison: false };
 }
 
 export default function Results() {
@@ -292,7 +174,7 @@ export default function Results() {
       setReadinessScore(readinessScoreValue);
 
       // Get qualification status
-      const qualificationStatus = getQualificationStatus(collectedData, momentumScoreData);
+      const qualificationStatus = getQualificationStatus(collectedData);
       setQualification(qualificationStatus);
       
       // Calculate Momentum payments
@@ -363,6 +245,11 @@ export default function Results() {
       maximumFractionDigits: 0,
     }).format(value);
   };
+
+  const handleRestart = () => {
+    store.reset();
+    router.push('/smart-estimator/step-1');
+  };
   
   if (isLoading || !qualification || !results || !momentumScore) {
     return (
@@ -377,102 +264,90 @@ export default function Results() {
     );
   }
 
-  const handleRestart = () => {
-    store.reset();
-    router.push('/smart-estimator/step-1');
-  }
-
-  const handleCTAClick = (cta: string) => {
-    // Placeholder for CTA handling
-    console.log(`${cta} button clicked`);
-  };
-
-  const renderCtas = () => {
-    if (!qualification) return null;
-
-    const primaryCTAComponent = () => {
-      if (qualification.primaryCTA === "See Non-Payment Solutions") {
-        return (
-          <Button asChild size="lg">
-            <Link href="/resources/income-free-debt-options">{qualification.primaryCTA}</Link>
-          </Button>
-        );
-      }
-      if (qualification.primaryCTA === "Customize Plan") {
-        return (
-          <Button asChild size="lg">
-            <Link href="/customize-plan">{qualification.primaryCTA}</Link>
-          </Button>
-        );
-      }
-      return (
-        <Button onClick={() => handleCTAClick(qualification.primaryCTA)} size="lg">
-          {qualification.primaryCTA}
-        </Button>
-      );
-    };
-
-    const secondaryCTAComponent = () => {
-        if (!qualification.secondaryCTA) return null;
-        if (qualification.secondaryCTA === "Schedule Call" || qualification.secondaryCTA === "Schedule a Call") {
-          return (
-            <Button asChild variant="secondary" size="lg">
-              <Link href="/contact-us">{qualification.secondaryCTA}</Link>
-            </Button>
-          );
-        }
-        return (
-          <Button onClick={() => handleCTAClick(qualification.secondaryCTA!)} variant="secondary" size="lg">
-            {qualification.secondaryCTA}
-          </Button>
-        );
-      };
-
-    return (
-      <>
-        {primaryCTAComponent()}
-        {secondaryCTAComponent()}
-      </>
-    );
-  };
 
   return (
     <div className="space-y-8">
       <div className="space-y-4 text-center">
-        <h1 className="text-3xl font-bold">Smart Estimator</h1>
+        <h1 className="text-3xl font-bold">Your Smart Estimate</h1>
+        {allFormData?.hasSteadyIncome === false ? (
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Unfortunately without steady income, we do not have a solutions for you.</p>
+          </div>
+        ) : allFormData?.hasSteadyIncome === true ? (
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Based on info provided, you have the following options.</p>
+          </div>
+        ) : null}
+        
+        {/* Mini Smart Estimator Graph */}
+        <div className="flex justify-center mt-6">
+          <div className="w-[150px] h-[80px]">
+            <ChartContainer
+              config={{
+                score: { label: "Score", color: "hsl(221, 83%, 53%)" },
+                remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
+              } satisfies ChartConfig}
+              className="w-full h-full"
+            >
+              <RadialBarChart
+                width={150}
+                height={80}
+                data={[{ score: momentumScore.score, remaining: Math.max(0, 35 - momentumScore.score) }]}
+                endAngle={180}
+                innerRadius={35}
+                outerRadius={55}
+              >
+                <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                  <Label
+                    content={({ viewBox }: any) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) - 8}
+                              className="fill-foreground text-xl font-bold"
+                            >
+                              {momentumScore.score}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 8}
+                              className="fill-muted-foreground text-xs"
+                            >
+                              of 35
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
+                </PolarRadiusAxis>
+                <RadialBar
+                  dataKey="score"
+                  stackId="a"
+                  cornerRadius={4}
+                  fill="var(--color-score)"
+                  className="stroke-transparent stroke-1"
+                />
+                <RadialBar
+                  dataKey="remaining"
+                  fill="var(--color-remaining)"
+                  stackId="a"
+                  cornerRadius={4}
+                  className="stroke-transparent stroke-1"
+                />
+              </RadialBarChart>
+            </ChartContainer>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {/* Desktop Table View */}
-        <div className="hidden md:block">
-          <Card>
-            <CardHeader className="pb-4">
-              <h2 className="text-xl font-bold text-center">Plans that fit your situation</h2>
-              {allFormData?.hasSteadyIncome === false ? (
-                <div className="text-center mt-2">
-                  <p className="text-sm text-muted-foreground mb-2">See Non-Payment Based Relief Options</p>
-                  <Button asChild variant="link" size="sm">
-                    <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
-                  </Button>
-                </div>
-              ) : allFormData?.userFicoScoreEstimate < 580 ? (
-                <div className="text-center mt-2">
-                  <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
-                </div>
-              ) : allFormData?.userFicoScoreEstimate >= 580 && allFormData?.userFicoScoreEstimate <= 689 ? (
-                <div className="text-center mt-2">
-                  <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
-                </div>
-              ) : allFormData?.userFicoScoreEstimate >= 690 && allFormData?.userFicoScoreEstimate <= 719 ? (
-                <div className="text-center mt-2">
-                  <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
-                </div>
-              ) : allFormData?.userFicoScoreEstimate >= 720 ? (
-                <div className="text-center mt-2">
-                  <p className="text-sm text-muted-foreground">Loan + Settlement Comparison — Choose What Fits Best</p>
-                </div>
-              ) : null}
-            </CardHeader>
+      {!qualification.hideComparison && (
+        <div className="space-y-4">
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Card>
             <CardContent className="p-6">
               <Table>
                 <TableHeader>
@@ -489,7 +364,7 @@ export default function Results() {
                     {!qualification.hideColumns.includes('personalLoan') && <TableHead className="w-1/3 border-x pb-4 text-center align-top">
                         <div className="flex flex-col items-center">
                           <div className="bg-white border border-gray-600 text-gray-600 text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
-                            Another option
+                            Consider
                           </div>
                           <p className="text-base font-semibold">Personal Loan</p>
                           <p className="text-xs text-muted-foreground">Consolidate into one payment, but with high interest.</p>
@@ -507,25 +382,6 @@ export default function Results() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Approval Likelihood Row */}
-                  <TableRow>
-                    {!qualification.hideColumns.includes('momentum') && 
-                        <TableCell className="text-center align-top bg-blue-50">
-                          <div className="text-sm font-bold mb-2">Approval Likelihood</div>
-                          <div className="text-sm font-medium">Yes, no credit required</div>
-                        </TableCell>
-                    }
-                    {!qualification.hideColumns.includes('personalLoan') && 
-                        <TableCell className="border-x text-center align-top">
-                          <div className="text-sm font-bold mb-2">Approval Likelihood</div>
-                          <div className="text-sm">{results.personalLoan.isEligible ? getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate) : 'Not eligible'}</div>
-                        </TableCell>
-                    }
-                    <TableCell className="text-center align-top">
-                      <div className="text-sm font-bold mb-2">Approval Likelihood</div>
-                      <div className="text-sm">N/A</div>
-                    </TableCell>
-                  </TableRow>
 
                   {/* Payment Details Row */}
                   <TableRow>
@@ -579,6 +435,7 @@ export default function Results() {
                         <TableCell className="text-left align-top bg-blue-50 px-4">
                           <div className="text-sm font-bold mb-2">Summary</div>
                           <ul className="text-xs space-y-1 list-disc list-inside">
+                            <li><span className="font-semibold">Approval:</span> Yes, no credit required</li>
                             <li><span className="font-semibold">Pros:</span> Immediate relief, faster recovery</li>
                             <li><span className="font-semibold">Cons:</span> Temporary harm to credit</li>
                           </ul>
@@ -590,11 +447,14 @@ export default function Results() {
                           <div className="text-xs">
                             {results.personalLoan.isEligible ? (
                               <ul className="space-y-1 list-disc list-inside">
+                                <li><span className="font-semibold">Approval:</span> {getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</li>
                                 <li><span className="font-semibold">Pros:</span> Immediate relief</li>
                                 <li><span className="font-semibold">Cons:</span> Credit required, higher total cost</li>
                               </ul>
                             ) : (
-                              <div>-</div>
+                              <ul className="space-y-1 list-disc list-inside">
+                                <li><span className="font-semibold">Approval:</span> Not eligible</li>
+                              </ul>
                             )}
                           </div>
                         </TableCell>
@@ -608,61 +468,14 @@ export default function Results() {
                       </TableCell>
                   </TableRow>
 
-                  {/* Action Buttons Row */}
-                  <TableRow>
-                    {!qualification.hideColumns.includes('momentum') && 
-                        <TableCell className="text-center align-middle bg-blue-50 py-6">
-                          <Button size="lg" className="bg-blue-600 hover:bg-blue-700 w-full max-w-48">
-                            Choose Plan
-                          </Button>
-                        </TableCell>
-                    }
-                    {!qualification.hideColumns.includes('personalLoan') && 
-                        <TableCell className="border-x text-center align-middle py-6">
-                          <Button size="lg" variant="outline" className="w-full max-w-48">
-                            Explore Loan Option
-                          </Button>
-                        </TableCell>
-                    }
-                    <TableCell className="text-center align-middle py-6">
-                      <Button size="lg" variant="secondary" className="w-full max-w-48">
-                        See Impact
-                      </Button>
-                    </TableCell>
-                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
-        {/* Mobile Card View */}
+          {/* Mobile Card View */}
         <div className="md:hidden space-y-4">
-          <h2 className="text-xl font-bold text-center">Plans that fit your situation</h2>
-          {allFormData?.hasSteadyIncome === false ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">See Non-Payment Based Relief Options</p>
-              <Button asChild variant="link" size="sm">
-                <Link href="/resources/legal-aid-partners">View Legal Aid Partners</Link>
-              </Button>
-            </div>
-          ) : allFormData?.userFicoScoreEstimate < 580 ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Settlement Most Likely Path Forward</p>
-            </div>
-          ) : allFormData?.userFicoScoreEstimate >= 580 && allFormData?.userFicoScoreEstimate <= 689 ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Compare Options--loan approval low</p>
-            </div>
-          ) : allFormData?.userFicoScoreEstimate >= 690 && allFormData?.userFicoScoreEstimate <= 719 ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Eligible for loan or settlement--see what saves you more</p>
-            </div>
-          ) : allFormData?.userFicoScoreEstimate >= 720 ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Loan + Settlement Comparison — Choose What Fits Best</p>
-            </div>
-          ) : null}
           {/* Momentum Plan Card */}
           {!qualification.hideColumns.includes('momentum') && (
             <Card className="bg-blue-50">
@@ -684,11 +497,11 @@ export default function Results() {
                   )}
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div><span className="font-bold">Will I be approved:</span> Yes, no minimum credit required</div>
                   <div><span className="font-bold">Program length:</span> {results.momentum.isEligible ? `${results.momentum.term} months` : '-'}</div>
                   <div><span className="font-bold">Debt covered:</span> {results.momentum.isEligible ? formatCurrency(results.debtAmountEstimate) : '-'}</div>
                 </div>
                 <div className="text-xs space-y-1 pt-2 border-t">
+                  <div><span className="font-bold">Approval:</span> Yes, no minimum credit required</div>
                   <div><span className="font-bold">Pros:</span> Immediate relief, faster recovery</div>
                   <div><span className="font-bold">Cons:</span> Temporary harm to credit</div>
                 </div>
@@ -712,7 +525,6 @@ export default function Results() {
                   )}
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div><span className="font-bold">Will I be approved:</span> {getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</div>
                   <div><span className="font-bold">Program length:</span> {results.personalLoan.isEligible ? `${results.personalLoan.term} months` : '-'}</div>
                   <div>
                     <span className="font-bold">Debt covered:</span> 
@@ -735,11 +547,14 @@ export default function Results() {
                 <div className="text-xs space-y-1 pt-2 border-t">
                   {results.personalLoan.isEligible ? (
                     <>
+                      <div><span className="font-bold">Approval:</span> {getPersonalLoanApprovalLikelihood(allFormData.userFicoScoreEstimate)}</div>
                       <div><span className="font-bold">Pros:</span> Immediate relief</div>
                       <div><span className="font-bold">Cons:</span> Credit required, higher total cost</div>
                     </>
                   ) : (
-                    <div>Not available</div>
+                    <>
+                      <div><span className="font-bold">Approval:</span> Not eligible</div>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -758,7 +573,6 @@ export default function Results() {
                 <p className="text-xs text-muted-foreground">Then decreasing</p>
               </div>
               <div className="space-y-2 text-sm">
-                <div><span className="font-bold">Will I be approved:</span> N/A</div>
                 <div><span className="font-bold">Program length:</span> {results.currentPath.term} months ({Math.round(results.currentPath.term / 12)} years)</div>
                 <div><span className="font-bold">Debt covered:</span> {formatCurrency(results.debtAmountEstimate)}</div>
               </div>
@@ -769,7 +583,90 @@ export default function Results() {
             </CardContent>
           </Card>
         </div>
+        </div>
+      )}
+
+      {/* What's Next Section */}
+      <WhatsNext 
+        hasSteadyIncome={allFormData?.hasSteadyIncome}
+        userFicoScoreEstimate={allFormData?.userFicoScoreEstimate}
+        momentumScore={momentumScore?.score}
+      />
+
+      {/* Momentum Score Section */}
+      <MomentumScoreSection
+        smartEstimatorScore={momentumScore.score}
+        readinessScore={readinessScore}
+        totalPossibleScore={totalPossibleScore}
+        hasSmartEstimatorData={true}
+        showScore={true}
+      />
+
+      <div className="mt-8 text-center">
+        <Button asChild onClick={handleRestart} variant="link">
+          <Link href="/smart-estimator/step-1">Start Over</Link>
+        </Button>
       </div>
+      
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <h3 className="text-base font-semibold">Why Momentum May Be Better</h3>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Low monthly cost, shorter term = less stress + faster recovery.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <h3 className="text-base font-semibold">Why Loans Can Backfire</h3>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Higher APRs mean you might repay more than you owe today — even if it looks smaller monthly.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <h3 className="text-base font-semibold">Why Doing Nothing Is Risky</h3>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Doing nothing means your debt will likely keep growing, adding stress to your financial future</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <h3 className="text-base font-semibold">Testing &amp; Debugging Information</h3>
+          <CardDescription>This section is for testing purposes only.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-semibold">Collected Form Data</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(allFormData, null, 2)}</code>
+            </pre>
+          </div>
+          <div>
+            <h4 className="font-semibold">Calculation Results</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(results, null, 2)}</code>
+            </pre>
+          </div>
+          <div>
+            <h4 className="font-semibold">Qualification Rules Applied</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(qualification, null, 2)}</code>
+            </pre>
+          </div>
+          <div>
+            <h4 className="font-semibold">Momentum Score Details</h4>
+            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
+              <code>{JSON.stringify(momentumScore, null, 2)}</code>
+            </pre>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Time to Freedom Visual Bar Graph */}
       <Card className="mt-8">
@@ -989,81 +886,6 @@ export default function Results() {
                 </>
               );
             })()}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Momentum Score Section */}
-      <MomentumScoreSection
-        smartEstimatorScore={momentumScore.score}
-        readinessScore={readinessScore}
-        totalPossibleScore={totalPossibleScore}
-        hasSmartEstimatorData={true}
-        showScore={qualification.showScore}
-      />
-      
-      <div className="mt-8 text-center">
-        <Button asChild onClick={handleRestart} variant="link">
-          <Link href="/smart-estimator/step-1">Start Over</Link>
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <h3 className="text-base font-semibold">Why Momentum May Be Better</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Low monthly cost, shorter term = less stress + faster recovery.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <h3 className="text-base font-semibold">Why Loans Can Backfire</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Higher APRs mean you might repay more than you owe today — even if it looks smaller monthly.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <h3 className="text-base font-semibold">Why Doing Nothing Is Risky</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Doing nothing means your debt will likely keep growing, adding stress to your financial future</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mt-8">
-        <CardHeader>
-          <h3 className="text-base font-semibold">Testing &amp; Debugging Information</h3>
-          <CardDescription>This section is for testing purposes only.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-semibold">Collected Form Data</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(allFormData, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Calculation Results</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(results, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Qualification Rules Applied</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(qualification, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Momentum Score Details</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(momentumScore, null, 2)}</code>
-            </pre>
           </div>
         </CardContent>
       </Card>

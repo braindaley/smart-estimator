@@ -4,10 +4,6 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChartContainer, ChartConfig } from "@/components/ui/chart";
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useSmartEstimatorLink } from '@/hooks/useSmartEstimatorLink';
-import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
 
 interface MomentumScoreSectionProps {
   smartEstimatorScore: number;
@@ -24,19 +20,16 @@ export default function MomentumScoreSection({
   hasSmartEstimatorData = false,
   showScore = true
 }: MomentumScoreSectionProps) {
-  const smartEstimatorLink = useSmartEstimatorLink();
-  const readinessToolLink = useReadinessToolLink();
-  
   if (!showScore) return null;
 
   return (
     <Card className="mt-8">
       <CardHeader className="pb-4 text-center">
         <CardTitle className="text-xl font-bold">
-          Momentum Score: {smartEstimatorScore + readinessScore}/{totalPossibleScore}
+          Momentum Score: {(hasSmartEstimatorData ? smartEstimatorScore : 0) + (readinessScore > 0 ? readinessScore : 0)}/{(hasSmartEstimatorData ? 35 : 0) + (readinessScore > 0 ? 35 : 0)}
         </CardTitle>
         <CardDescription>
-          Complete all assessments to get your full evaluation
+          A high Momentum Score indicates debt settlement is a good fit for you.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -99,15 +92,9 @@ export default function MomentumScoreSection({
                 />
               </RadialBarChart>
             </ChartContainer>
-            {!hasSmartEstimatorData ? (
-              <Button asChild size="sm" className="mt-2">
-                <Link href={smartEstimatorLink}>Take Assessment</Link>
-              </Button>
-            ) : (
-              <p className="text-xs text-center text-muted-foreground">
-                Current assessment score
-              </p>
-            )}
+            <p className="text-xs text-center text-muted-foreground">
+              {hasSmartEstimatorData ? "Completed" : "Not Completed"}
+            </p>
           </div>
 
           {/* Readiness Chart - Second */}
@@ -168,15 +155,9 @@ export default function MomentumScoreSection({
                 />
               </RadialBarChart>
             </ChartContainer>
-            {readinessScore === 0 ? (
-              <Button asChild size="sm" className="mt-2">
-                <Link href={readinessToolLink}>Take Assessment</Link>
-              </Button>
-            ) : (
-              <p className="text-xs text-center text-muted-foreground">
-                Current readiness score
-              </p>
-            )}
+            <p className="text-xs text-center text-muted-foreground">
+              {readinessScore > 0 ? "Completed" : "Not Completed"}
+            </p>
           </div>
 
           {/* Your Plan Chart - Third */}
@@ -237,9 +218,9 @@ export default function MomentumScoreSection({
                 />
               </RadialBarChart>
             </ChartContainer>
-            <Button asChild size="sm" className="mt-2">
-              <Link href="/creditor-profile">Take Assessment</Link>
-            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Not Completed
+            </p>
           </div>
         </div>
       </CardContent>

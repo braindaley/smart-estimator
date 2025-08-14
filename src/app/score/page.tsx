@@ -10,6 +10,7 @@ import { calculateMomentumScore } from '@/lib/calculations';
 import Link from 'next/link';
 import { ArrowRight, Calculator, CheckCircle2, AlertCircle } from 'lucide-react';
 import MomentumScoreSection from '@/components/MomentumScoreSection';
+import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
 
 type ScoreBand = {
   range: [number, number];
@@ -46,6 +47,7 @@ const readinessScoreBands: ScoreBand[] = [
 export default function ScorePage() {
   const { formData: readinessData, _hasHydrated: readinessHydrated } = useReadinessStore();
   const { formData: estimatorData, _hasHydrated: estimatorHydrated } = useEstimatorStore();
+  const readinessToolLink = useReadinessToolLink();
   
   const [readinessScore, setReadinessScore] = useState(0);
   const [smartEstimatorScore, setSmartEstimatorScore] = useState(0);
@@ -279,7 +281,7 @@ export default function ScorePage() {
                   Complete the assessment to see detailed score breakdown
                 </p>
                 <Button asChild>
-                  <Link href="/readiness-tool">Take Readiness Tool</Link>
+                  <Link href={readinessToolLink}>Take Readiness Tool</Link>
                 </Button>
               </div>
             )}
@@ -323,7 +325,7 @@ export default function ScorePage() {
             
             {!hasReadinessData && (
               <Button asChild variant="outline" className="h-auto p-4">
-                <Link href="/readiness-tool" className="text-left">
+                <Link href={readinessToolLink} className="text-left">
                   <div>
                     <div className="font-semibold">Complete Readiness Tool</div>
                     <div className="text-sm text-muted-foreground mt-1">

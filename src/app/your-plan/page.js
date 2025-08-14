@@ -44,23 +44,15 @@ export default function LoanQualificationPage() {
       <Header />
       <main className="flex-1">
         {/* Hero Section */}
-        <div className="bg-background border-b border-border">
+        <div className="bg-background">
           <div className="container mx-auto max-w-7xl px-4 py-12">
             <div className="text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl mb-4">
-                Loan Qualification Check
+              <h1 className="text-3xl font-bold mb-4">
+                View Your Plan
               </h1>
-              <p className="text-lg text-muted-foreground sm:text-xl max-w-3xl mx-auto">
-                Find out if you qualify for a loan in just minutes. No credit check required.
-                Get personalized rates based on your actual financial situation.
+              <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
+                We'll securely verify your financial information to create an accurate, personalized debt settlement plan. This takes 2-3 minutes and shows you real payment amounts based on your actual debts and income.
               </p>
-              
-              {/* Trust Indicators */}
-              <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-                <div>• No impact on credit score</div>
-                <div>• 256-bit encryption</div>
-                <div>• Results in 2 minutes</div>
-              </div>
             </div>
           </div>
         </div>

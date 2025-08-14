@@ -11,6 +11,10 @@ import { calculateMomentumScore } from '@/lib/calculations';
 import Link from 'next/link';
 import { Play, CheckCircle } from 'lucide-react';
 import MomentumScoreSection from '@/components/MomentumScoreSection';
+import ReadinessAssessmentResult from '@/components/ReadinessAssessmentResult';
+import ReadinessWhatsNext from '@/components/ReadinessWhatsNext';
+import { ChartContainer, ChartConfig } from "@/components/ui/chart";
+import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 
 type VideoRecommendation = {
   title: string;
@@ -18,55 +22,11 @@ type VideoRecommendation = {
   watched: boolean;
 };
 
-type ScoreBand = {
-  range: [number, number];
-  label: string;
-  description: string;
-  cta: string;
-  ctaLink: string;
-  videos: string[];
-};
-
-const scoreBands: ScoreBand[] = [
-  {
-    range: [25, 35],
-    label: "HIGH READINESS",
-    description: "You're well-prepared for debt settlement. Your mindset and circumstances align with what it takes to succeed.",
-    cta: "Start Your Application",
-    ctaLink: "/apply",
-    videos: [
-      "Debt Settlement vs. Consolidation",
-      "Dealing with Debt Collectors", 
-      "Debt Relief Checklist",
-      "What Is a Debt Settlement Plan"
-    ]
-  },
-  {
-    range: [18, 24],
-    label: "MODERATE READINESS",
-    description: "You have good potential for success, but may benefit from additional preparation and support.",
-    cta: "Explore Options",
-    ctaLink: "/explore-options",
-    videos: [
-      "Credit Card Overwhelm: First 3 Steps",
-      "What Happens If Creditor Sues Me",
-      "Why Some Debt Plans Fail",
-      "How Long Should Settlement Take"
-    ]
-  },
-  {
-    range: [0, 17],
-    label: "LOW READINESS",
-    description: "You may want to explore other options or work on building readiness before starting settlement.",
-    cta: "Explore Alternatives",
-    ctaLink: "/alternatives",
-    videos: [
-      "Secret Shame of Debt: Mental Health",
-      "Debt Settlement vs. Consolidation",
-      "Credit Card Overwhelm: First 3 Steps",
-      "Debt Relief Checklist"
-    ]
-  }
+const defaultVideos = [
+  "Debt Settlement vs. Consolidation",
+  "Dealing with Debt Collectors", 
+  "Debt Relief Checklist",
+  "What Is a Debt Settlement Plan"
 ];
 
 export default function Results() {
@@ -76,7 +36,6 @@ export default function Results() {
   const [baseScore, setBaseScore] = useState(0);
   const [bonusPoints, setBonusPoints] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
-  const [scoreBand, setScoreBand] = useState<ScoreBand | null>(null);
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [smartEstimatorScore, setSmartEstimatorScore] = useState(0);
   const [hasSmartEstimatorData, setHasSmartEstimatorData] = useState(false);
@@ -135,10 +94,6 @@ export default function Results() {
   const updateTotalScore = (base: number, bonus: number) => {
     const total = base + bonus;
     setTotalScore(total);
-    
-    // Find the appropriate score band
-    const band = scoreBands.find(b => total >= b.range[0] && total <= b.range[1]);
-    setScoreBand(band || scoreBands[2]); // Default to low readiness
   };
 
   const handleWatchVideo = (videoTitle: string) => {
@@ -156,13 +111,9 @@ export default function Results() {
     }
   };
 
-  const handleRestart = () => {
-    useReadinessStore.getState().reset();
-    router.push('/readiness-tool/step-1');
-  };
 
 
-  if (!_hasHydrated || !scoreBand) {
+  if (!_hasHydrated) {
     return (
       <Card>
         <CardHeader>
@@ -185,28 +136,88 @@ export default function Results() {
     <div className="space-y-8">
       {/* Main Header */}
       <div className="text-center max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold">Readiness</h1>
-        <p className="text-muted-foreground mt-2">{scoreBand.description}</p>
+        <h1 className="text-3xl font-bold">Your Readiness Estimate</h1>
+        <p className="text-muted-foreground mt-2">Review the following results to understand if debt settlement may be a good choice for you.</p>
+        
+        {/* Mini Readiness Graph */}
+        <div className="flex justify-center mt-6">
+          <div className="w-[150px] h-[80px]">
+            <ChartContainer
+              config={{
+                score: { label: "Score", color: "hsl(142, 76%, 36%)" },
+                remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
+              } satisfies ChartConfig}
+              className="w-full h-full"
+            >
+              <RadialBarChart
+                width={150}
+                height={80}
+                data={[{ score: totalScore, remaining: Math.max(0, 35 - totalScore) }]}
+                endAngle={180}
+                innerRadius={35}
+                outerRadius={55}
+              >
+                <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                  <Label
+                    content={({ viewBox }: any) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) - 8}
+                              className="fill-foreground text-xl font-bold"
+                            >
+                              {totalScore}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 8}
+                              className="fill-muted-foreground text-xs"
+                            >
+                              of 35
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
+                </PolarRadiusAxis>
+                <RadialBar
+                  dataKey="score"
+                  stackId="a"
+                  cornerRadius={4}
+                  fill="var(--color-score)"
+                  className="stroke-transparent stroke-1"
+                />
+                <RadialBar
+                  dataKey="remaining"
+                  fill="var(--color-remaining)"
+                  stackId="a"
+                  cornerRadius={4}
+                  className="stroke-transparent stroke-1"
+                />
+              </RadialBarChart>
+            </ChartContainer>
+          </div>
+        </div>
       </div>
 
+      {/* Readiness Assessment Results */}
       <div className="max-w-3xl mx-auto">
+        
+        <ReadinessAssessmentResult 
+          totalScore={totalScore} 
+          questionScores={Object.keys(formData).reduce((acc, key) => {
+            if (key.startsWith('step') && formData[key]?.points !== undefined) {
+              acc[key] = formData[key].points;
+            }
+            return acc;
+          }, {} as { [key: string]: number })}
+        />
+        
         {/* What's Next Section */}
-        <Card>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Our assessment based on your answers:</h3>
-              <p>Your readiness level is: {scoreBand.label}</p>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold">What's next?</h3>
-              <p>You're on the right track! Consider these steps to improve your readiness:</p>
-              <ul className="list-disc list-inside space-y-2 text-sm">
-                <li>Watch the recommended videos to learn more</li>
-                <li>Review your budget and financial priorities</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+        <ReadinessWhatsNext readinessScore={totalScore} />
       </div>
 
       {/* Video Recommendations - Full Width Section */}
@@ -221,7 +232,7 @@ export default function Results() {
         </CardHeader>
         <CardContent className="px-0">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {scoreBand.videos.map((videoTitle) => {
+            {defaultVideos.map((videoTitle) => {
               const isWatched = watchedVideos.has(videoTitle);
               return (
                 <Card key={videoTitle} className={`border-0 shadow-none ${isWatched ? "opacity-75" : ""}`}>
@@ -246,20 +257,6 @@ export default function Results() {
 
       <div className="max-w-3xl mx-auto space-y-8">
 
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button asChild size="lg" className="min-w-[200px]">
-          <Link href={scoreBand.ctaLink}>{scoreBand.cta}</Link>
-        </Button>
-        <Button 
-          onClick={handleRestart} 
-          variant="outline" 
-          size="lg"
-          className="min-w-[200px]"
-        >
-          Retake Assessment
-        </Button>
-      </div>
 
 
       {/* Momentum Score Section */}
@@ -303,11 +300,6 @@ export default function Results() {
         </CardContent>
       </Card>
       
-      <div className="mt-8 text-center">
-        <Button asChild onClick={handleRestart} variant="link">
-          <Link href="/readiness-tool/step-1">Start Over</Link>
-        </Button>
-      </div>
       </div>
 
     </div>

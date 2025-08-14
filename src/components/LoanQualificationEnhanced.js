@@ -22,12 +22,6 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
   const MAX_RETRY_ATTEMPTS = 3;
   const RETRY_DELAY = 2000;
 
-  // Step configuration
-  const steps = [
-    { number: 1, name: 'Get Started', description: 'Learn about the process' },
-    { number: 2, name: 'Connect Bank', description: 'Securely link your account' },
-    { number: 3, name: 'View Results', description: 'See your qualification' }
-  ];
 
   // Error types and messages
   const errorMessages = {
@@ -478,57 +472,13 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
     </div>
   );
 
-  // Render step indicator with enhanced visuals
-  const renderStepIndicator = () => (
-    <div className="mb-8">
-      <nav aria-label="Progress">
-        <ol className="flex items-center justify-between">
-          {steps.map((step, index) => (
-            <li key={step.number} className="flex-1">
-              <div className={`flex flex-col items-center ${index !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
-                <div className="relative flex items-center justify-center">
-                  {index !== steps.length - 1 && (
-                    <div 
-                      className={`absolute left-full w-full h-0.5 transition-all duration-500 ${
-                        currentStep > step.number ? 'bg-foreground' : 'bg-border'
-                      }`} 
-                      style={{ width: 'calc(100% + 2rem)' }} 
-                    />
-                  )}
-                  <span className={`relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-300 ${
-                    currentStep > step.number
-                      ? 'border-foreground text-foreground'
-                      : currentStep === step.number
-                      ? 'border-foreground text-foreground'
-                      : 'border-muted-foreground text-muted-foreground'
-                  }`}>
-                    <span className="text-lg font-medium">{step.number}</span>
-                  </span>
-                </div>
-                <div className="mt-3 text-center">
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    currentStep >= step.number ? 'text-foreground' : 'text-muted-foreground'
-                  }`}>
-                    {step.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground hidden sm:block mt-1">
-                    {step.description}
-                  </p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    </div>
-  );
 
   // Render Step 1: Enhanced explanation
   const renderStep1 = () => (
     <div className="space-y-6 animate-fadeIn">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900">
-          Check Your Loan Qualification
+        <h2 className="text-2xl font-bold text-gray-900">
+          Ready to see your plan? Connect your accounts below to get started.
         </h2>
         <p className="mt-2 text-lg text-gray-600">
           Get instant approval decision in 3 simple steps
@@ -540,23 +490,38 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
         </h3>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Secure Connection</h4>
+            <h4 className="font-semibold text-foreground">Bank Account Access</h4>
             <p className="text-sm text-muted-foreground mt-1">
-              256-bit encrypted bank link via Plaid
+              Verify your income and expenses to calculate an affordable monthly payment
             </p>
           </div>
           <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Smart Analysis</h4>
+            <h4 className="font-semibold text-foreground">Credit Check</h4>
             <p className="text-sm text-muted-foreground mt-1">
-              AI-powered financial assessment
+              Review your current debts to determine which accounts qualify for settlement
             </p>
           </div>
           <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Instant Decision</h4>
+            <h4 className="font-semibold text-foreground">Instant Results</h4>
             <p className="text-sm text-muted-foreground mt-1">
-              Results in under 2 minutes
+              Get your customized plan with real payment amounts and projected timelines
             </p>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-4 mt-8">
+          <button
+            onClick={() => setCurrentStep(2)}
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200"
+          >
+            Continue to Bank Connection
+          </button>
+          <button
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200"
+          >
+            Start Credit Check
+          </button>
         </div>
       </div>
 
@@ -572,12 +537,11 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
         </div>
         
         <div className="rounded-lg border border-border p-6">
-          <h4 className="font-semibold text-foreground mb-3">Requirements</h4>
+          <h4 className="font-semibold text-foreground mb-3">Quick and Safe</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>• Minimum $2,000 monthly income</li>
-            <li>• 3+ months transaction history</li>
-            <li>• Debt-to-income under 40%</li>
-            <li>• Active checking account</li>
+            <li>• No impact on credit score</li>
+            <li>• 256-bit encryption</li>
+            <li>• Results in 2 minutes</li>
           </ul>
         </div>
       </div>
@@ -593,14 +557,6 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
         </div>
       </div>
 
-      <div className="flex justify-center">
-        <button
-          onClick={() => setCurrentStep(2)}
-          className="px-8 py-3 border border-border font-semibold rounded-lg hover:bg-muted transition-all duration-200"
-        >
-          Continue to Bank Connection
-        </button>
-      </div>
     </div>
   );
 
@@ -1102,7 +1058,6 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
         }
       `}</style>
       
-      {renderStepIndicator()}
       
       <div className="rounded-xl border border-border p-6 sm:p-8">
         {currentStep === 1 && renderStep1()}

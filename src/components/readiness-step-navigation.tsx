@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
 
 interface ReadinessStepNavigationProps {
   currentStep: number;
@@ -13,6 +14,7 @@ interface ReadinessStepNavigationProps {
 
 export function ReadinessStepNavigation({ currentStep, totalSteps, onNext, showNext = true }: ReadinessStepNavigationProps) {
   const router = useRouter();
+  const readinessToolLink = useReadinessToolLink();
 
   const handleNext = () => {
     if(onNext) {
@@ -29,7 +31,7 @@ export function ReadinessStepNavigation({ currentStep, totalSteps, onNext, showN
     if (currentStep > 1) {
       router.back();
     } else {
-      router.push('/readiness-tool');
+      router.push(readinessToolLink);
     }
   };
 

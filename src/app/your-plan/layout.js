@@ -6,11 +6,11 @@ export const metadata = {
     title: 'Loan Qualification Check',
     description: 'Check if you qualify for a loan in minutes with no impact on your credit score.',
     type: 'website',
-    url: '/loan-qualification',
+    url: '/your-plan',
     siteName: 'Smart Estimator',
     images: [
       {
-        url: '/og-loan-qualification.png',
+        url: '/og-your-plan.png',
         width: 1200,
         height: 630,
         alt: 'Loan Qualification Check',
@@ -21,14 +21,14 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Loan Qualification Check',
     description: 'Check if you qualify for a loan in minutes with no impact on your credit score.',
-    images: ['/og-loan-qualification.png'],
+    images: ['/og-your-plan.png'],
   },
   robots: {
     index: true,
     follow: true,
   },
   alternates: {
-    canonical: '/loan-qualification',
+    canonical: '/your-plan',
   },
 };
 
