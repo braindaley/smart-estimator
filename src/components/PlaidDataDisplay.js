@@ -2,20 +2,41 @@
 
 import { useState, useEffect } from 'react';
 import { getTokenClient } from '@/lib/client-token-store';
+import { getPlaidData } from '@/lib/session-store';
 
 /**
  * PlaidDataDisplay Component - Shows all raw Plaid data after connection
  */
-export default function PlaidDataDisplay({ userId, connectionMetadata }) {
+export default function PlaidDataDisplay({ userId, connectionMetadata, isResultsPage = false }) {
   const [plaidData, setPlaidData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (userId && connectionMetadata) {
+    if (isResultsPage) {
+      // Load from session storage for results page
+      loadFromSession();
+    } else if (userId && connectionMetadata) {
+      // Fetch fresh data for direct usage
       fetchAllPlaidData();
     }
-  }, [userId, connectionMetadata]);
+  }, [userId, connectionMetadata, isResultsPage]);
+
+  const loadFromSession = () => {
+    try {
+      const sessionData = getPlaidData();
+      if (sessionData && sessionData.data) {
+        setPlaidData(sessionData.data);
+      } else {
+        setError('No Plaid data found in session');
+      }
+    } catch (err) {
+      console.error('[PlaidDataDisplay] Error loading from session:', err);
+      setError('Error loading stored data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchAllPlaidData = async () => {
     setLoading(true);
@@ -267,17 +288,19 @@ export default function PlaidDataDisplay({ userId, connectionMetadata }) {
 
       {/* Action Buttons */}
       <div className="flex justify-center space-x-4">
+        {!isResultsPage && (
+          <button 
+            onClick={fetchAllPlaidData}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Refresh Data
+          </button>
+        )}
         <button 
-          onClick={fetchAllPlaidData}
-          className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Refresh Data
-        </button>
-        <button 
-          onClick={() => window.location.reload()}
+          onClick={() => window.location.href = '/'}
           className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors"
         >
-          Start Over
+          {isResultsPage ? 'Back to Home' : 'Start Over'}
         </button>
       </div>
     </div>

@@ -229,10 +229,10 @@ export default function PlaidLinkEnhanced({
 
   // Base button classes
   const baseClasses = `
-    inline-flex items-center justify-center px-6 py-3 
-    text-base font-medium rounded-lg transition-all duration-200
+    inline-flex items-center justify-center px-6 h-10
+    text-sm font-medium rounded-lg transition-all duration-200
     focus:outline-none focus:ring-2 focus:ring-offset-2
-    disabled:cursor-not-allowed
+    disabled:cursor-not-allowed w-full
   `;
 
   // Dynamic button classes based on state
@@ -443,27 +443,6 @@ export default function PlaidLinkEnhanced({
         </div>
       )}
 
-      {/* Development mode debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <details className="mt-4">
-          <summary className="text-xs text-gray-500 cursor-pointer">
-            Component State (Development Only)
-          </summary>
-          <pre className="text-xs text-gray-600 mt-1 bg-gray-100 p-2 rounded overflow-auto">
-            {JSON.stringify({
-              userId,
-              hasLinkToken: !!linkToken,
-              linkTokenLength: linkToken?.length,
-              ready,
-              isLoading,
-              isExchangingToken,
-              error: !!error,
-              connectionStatus,
-              isButtonDisabled
-            }, null, 2)}
-          </pre>
-        </details>
-      )}
     </div>
   );
 }

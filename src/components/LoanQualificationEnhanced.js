@@ -1,84 +1,274 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import PlaidLink from './PlaidLink';
-import PlaidDataDisplay from './PlaidDataDisplay';
+import { 
+  setStepCompleted, 
+  getStepStatus, 
+  isStepCompleted, 
+  storePlaidData, 
+  generateResultsUrl, 
+  storeCreditData 
+} from '@/lib/session-store';
+import { getTokenClient } from '@/lib/client-token-store';
 
 /**
- * Enhanced LoanQualification Component with comprehensive error handling and UX improvements
+ * Step-based LoanQualification Component with session storage
  */
 export default function LoanQualificationEnhanced({ userId, onComplete }) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [connectionMetadata, setConnectionMetadata] = useState(null);
+  const router = useRouter();
+  const [stepStatus, setStepStatus] = useState({});
+  const [isProcessing, setIsProcessing] = useState({});
 
-  // Simple bank connection handler
-  const handleBankConnected = (metadata) => {
+  // Load step status from session
+  useEffect(() => {
+    setStepStatus(getStepStatus());
+  }, []);
+
+  // Bank connection handler
+  const handleBankConnected = async (metadata) => {
     console.log('[LoanQualification] Bank connected:', metadata);
-    setConnectionMetadata(metadata);
-    setCurrentStep(3); // Go directly to results/data display
-    
-    // Call onComplete callback if provided
-    if (onComplete) {
-      onComplete(metadata);
+    setIsProcessing({ ...isProcessing, bank_connection: true });
+
+    try {
+      // Get client token for API calls
+      const clientToken = getTokenClient(userId);
+      
+      // Fetch accounts and transactions
+      const [accountsResponse, transactionsResponse] = await Promise.all([
+        fetch('/api/plaid/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, clientToken }),
+        }),
+        fetch('/api/plaid/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, clientToken }),
+        })
+      ]);
+
+      const accountsData = await accountsResponse.json();
+      const transactionsData = await transactionsResponse.json();
+
+      // Store complete Plaid data in session
+      const plaidData = {
+        connectionMetadata: metadata,
+        accounts: accountsData,
+        transactions: transactionsData,
+        fetchedAt: new Date().toISOString()
+      };
+
+      storePlaidData(userId, plaidData);
+      
+      // Update local state
+      const newStepStatus = getStepStatus();
+      setStepStatus(newStepStatus);
+      
+      // Call onComplete callback if provided
+      if (onComplete) {
+        onComplete(metadata);
+      }
+    } catch (error) {
+      console.error('[LoanQualification] Error storing Plaid data:', error);
+    } finally {
+      setIsProcessing({ ...isProcessing, bank_connection: false });
     }
+  };
+
+  // Credit check handler (placeholder)
+  const handleCreditCheck = () => {
+    setIsProcessing({ ...isProcessing, credit_check: true });
+    
+    // Simulate credit check process
+    setTimeout(() => {
+      const mockCreditData = {
+        score: 720,
+        accounts: ['Credit Card 1', 'Credit Card 2'],
+        totalDebt: 15000
+      };
+      storeCreditData(userId, mockCreditData);
+      setStepStatus(getStepStatus());
+      setIsProcessing({ ...isProcessing, credit_check: false });
+    }, 2000);
   };
 
 
 
 
-  // Render Step 1: Enhanced explanation
-  const renderStep1 = () => (
-    <div className="space-y-6 animate-fadeIn">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">
+
+  return (
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">
           Ready to see your plan? Connect your accounts below to get started.
-        </h2>
-        <p className="mt-2 text-lg text-gray-600">
+        </h1>
+        <p className="text-lg text-gray-600 mt-2">
           Get instant approval decision in 3 simple steps
         </p>
       </div>
 
-      <div className="rounded-xl p-6 border border-border">
-        <h3 className="text-lg font-semibold text-foreground mb-4">How It Works
-        </h3>
+      <div className="rounded-xl p-6 border border-border mb-8">
+        <h3 className="text-lg font-semibold text-foreground mb-4">How It Works</h3>
         <div className="grid md:grid-cols-3 gap-4">
-          <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Bank Account Access</h4>
-            <p className="text-sm text-muted-foreground mt-1">
+          {/* Step 1: Bank Account Access */}
+          <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
+            <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
+              {stepStatus.bank_connection?.completed ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                '1'
+              )}
+            </div>
+            <h4 className="font-semibold text-foreground mb-2 pr-4">Bank Account Access</h4>
+            <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Verify your income and expenses to calculate an affordable monthly payment
             </p>
+            
+            {/* Action Area */}
+            <div className="mt-auto">
+              {stepStatus.bank_connection?.completed ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium text-sm">Bank Connected</span>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/results/bank?session=${Date.now()}`)}
+                    className="text-blue-600 hover:text-blue-800 font-medium underline text-sm"
+                  >
+                    View Results →
+                  </button>
+                </div>
+              ) : isProcessing.bank_connection ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-blue-600 text-sm">Processing...</span>
+                </div>
+              ) : (
+                <PlaidLink
+                  userId={userId}
+                  onSuccess={handleBankConnected}
+                  buttonText="Connect Bank Account"
+                  className="w-full h-10"
+                />
+              )}
+            </div>
           </div>
-          <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Credit Check</h4>
-            <p className="text-sm text-muted-foreground mt-1">
+
+          {/* Step 2: Credit Check */}
+          <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
+            <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
+              {stepStatus.credit_check?.completed ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                '2'
+              )}
+            </div>
+            <h4 className="font-semibold text-foreground mb-2 pr-4">Credit Check</h4>
+            <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Review your current debts to determine which accounts qualify for settlement
             </p>
+            
+            {/* Action Area */}
+            <div className="mt-auto">
+              {stepStatus.credit_check?.completed ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium text-sm">Credit Check Complete</span>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/results/credit?session=${Date.now()}`)}
+                    className="text-blue-600 hover:text-blue-800 font-medium underline text-sm"
+                  >
+                    View Results →
+                  </button>
+                </div>
+              ) : isProcessing.credit_check ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-blue-600 text-sm">Processing...</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleCreditCheck}
+                  className="w-full h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center"
+                >
+                  Start Credit Check
+                </button>
+              )}
+            </div>
           </div>
-          <div className="rounded-lg p-4 border border-border">
-            <h4 className="font-semibold text-foreground">Instant Results</h4>
-            <p className="text-sm text-muted-foreground mt-1">
+
+          {/* Step 3: Instant Results */}
+          <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
+            <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
+              {stepStatus.plan_generation?.completed ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                '3'
+              )}
+            </div>
+            <h4 className="font-semibold text-foreground mb-2 pr-4">Instant Results</h4>
+            <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Get your customized plan with real payment amounts and projected timelines
             </p>
+            
+            {/* Action Area */}
+            <div className="mt-auto">
+              {stepStatus.plan_generation?.completed ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium text-sm">Plan Generated</span>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/your-plan?session=${Date.now()}`)}
+                    className="text-blue-600 hover:text-blue-800 font-medium underline text-sm"
+                  >
+                    View Results →
+                  </button>
+                </div>
+              ) : isProcessing.plan_generation ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-blue-600 text-sm">Processing...</span>
+                </div>
+              ) : (
+                <button
+                  disabled={!stepStatus.bank_connection?.completed || !stepStatus.credit_check?.completed}
+                  className={`w-full h-10 px-4 font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center ${
+                    stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
+                    ? 'Generate Plan'
+                    : 'Complete Steps 1 & 2'
+                  }
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mt-8">
-          <button
-            onClick={() => setCurrentStep(2)}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200"
-          >
-            Start Bank Connection
-          </button>
-          <button
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200"
-          >
-            Start Credit Check
-          </button>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
         <div className="rounded-lg border border-border p-6">
           <h4 className="font-semibold text-foreground mb-3">What We Check</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
@@ -107,113 +297,6 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
             </p>
           </div>
         </div>
-      </div>
-
-    </div>
-  );
-
-  // Render Step 2: Simple bank connection
-  const renderStep2 = () => (
-    <div className="space-y-6 animate-fadeIn">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900">
-          Connect Your Bank Account
-        </h2>
-        <p className="mt-2 text-lg text-gray-600">
-          Securely link your account to view all your financial data
-        </p>
-      </div>
-
-      <div className="rounded-lg border border-border p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-              <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-green-900 mb-2">
-              Bank-Level Security
-            </h3>
-            <ul className="space-y-2 text-sm text-green-700">
-              <li className="flex items-center">
-                <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                256-bit encryption protects your data
-              </li>
-              <li className="flex items-center">
-                <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Read-only access - we can\'t make changes
-              </li>
-              <li className="flex items-center">
-                <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Powered by Plaid, trusted by major banks
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center space-y-4">
-        <PlaidLink
-          userId={userId}
-          onSuccess={handleBankConnected}
-          className="w-full max-w-md"
-          buttonText="Connect Bank Account"
-        />
-        
-        <button
-          onClick={() => setCurrentStep(1)}
-          className="text-gray-600 hover:text-gray-800 text-sm font-medium flex items-center transition-colors"
-        >
-          <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to previous step
-        </button>
-      </div>
-    </div>
-  );
-
-  // Render Step 3: Display Plaid Data
-  const renderStep3 = () => {
-    return <PlaidDataDisplay userId={userId} connectionMetadata={connectionMetadata} />;
-  };
-
-  if (currentStep === 3) {
-    // Render PlaidDataDisplay without wrapper for full-width layout
-    return renderStep3();
-  }
-
-  return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-in-out;
-        }
-      `}</style>
-      
-      <div className="rounded-xl border border-border p-6 sm:p-8">
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
       </div>
     </div>
   );
