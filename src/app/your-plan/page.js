@@ -45,7 +45,7 @@ export default function LoanQualificationPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <div className="bg-background">
-          <div className="container mx-auto max-w-7xl px-4 py-12">
+          <div className="container mx-auto max-w-7xl px-4 py-6">
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-4">
                 View Your Plan
