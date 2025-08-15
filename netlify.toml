@@ -8,6 +8,10 @@
 [build.environment]
   NEXT_USE_NETLIFY_EDGE = "true"
 
+[functions]
+  directory = ".netlify/functions/"
+  included_files = ["src/**"]
+
 [[headers]]
   for = "/api/*"
   [headers.values]

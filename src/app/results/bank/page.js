@@ -1,14 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import PlaidDataDisplay from '@/components/PlaidDataDisplay';
-import { getPlaidData, clearSessionData } from '@/lib/session-store';
+import dynamic from 'next/dynamic';
+
+// Dynamically import session-store to avoid SSR issues
+const getPlaidData = typeof window !== 'undefined' 
+  ? require('@/lib/session-store').getPlaidData 
+  : () => null;
+
+const clearSessionData = typeof window !== 'undefined'
+  ? require('@/lib/session-store').clearSessionData
+  : () => {};
+
+// Dynamically import PlaidDataDisplay to avoid SSR issues
+const PlaidDataDisplay = dynamic(() => import('@/components/PlaidDataDisplay'), {
+  ssr: false,
+  loading: () => <div>Loading...</div>
+});
 
 /**
- * Bank Results Page - Displays Plaid data from session storage
+ * Bank Results Page Content - Wrapped in Suspense
  */
-export default function BankResultsPage() {
+function BankResultsContent() {
   const [plaidData, setPlaidData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -115,5 +129,23 @@ export default function BankResultsPage() {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Main Bank Results Page - Wrapped with Suspense boundary
+ */
+export default function BankResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <BankResultsContent />
+    </Suspense>
   );
 }
