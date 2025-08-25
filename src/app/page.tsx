@@ -10,7 +10,7 @@ import { useEstimatorStore } from '@/lib/estimator-store';
 import { useSmartEstimatorLink } from '@/hooks/useSmartEstimatorLink';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Play, TrendingDown, DollarSign, Clock } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const defaultVideos = [
@@ -150,11 +150,6 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card className="border border-border shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-6 text-center">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <TrendingDown className="h-8 w-8 text-primary" />
-                    </div>
-                  </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">Lower Monthly Payment</h3>
                   <p className="text-muted-foreground">
                     Reduce your monthly obligations and free up cash for other priorities
@@ -164,11 +159,6 @@ export default function Home() {
               
               <Card className="border border-border shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-6 text-center">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <DollarSign className="h-8 w-8 text-primary" />
-                    </div>
-                  </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">Reduce Total Debt</h3>
                   <p className="text-muted-foreground">
                     Negotiate settlements that significantly reduce what you owe
@@ -178,11 +168,6 @@ export default function Home() {
               
               <Card className="border border-border shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-6 text-center">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <Clock className="h-8 w-8 text-primary" />
-                    </div>
-                  </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">Pay Off Faster</h3>
                   <p className="text-muted-foreground">
                     Get out of debt years sooner with our strategic approach

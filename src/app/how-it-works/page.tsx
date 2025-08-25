@@ -193,7 +193,7 @@ export default function HowItWorks() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-10 bg-primary/5">
+        <section className="py-16 bg-primary/5">
           <div className="container mx-auto max-w-4xl px-4 text-center">
             <h2 className="text-3xl font-bold text-foreground mb-4">
               Ready to start your debt-free journey?
