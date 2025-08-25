@@ -144,7 +144,7 @@ export function getPlaidClient() {
 export async function createLinkToken(
   userId,
   clientName = 'Smart Estimator',
-  products = ['transactions', 'income_verification'],
+  products = ['transactions', 'assets', 'identity', 'liabilities', 'income_verification'],
   countryCodes = ['US'],
   language = 'en'
 ) {
@@ -322,6 +322,148 @@ export function isConfigured() {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fetches identity information for KYC compliance and customer verification
+ * 
+ * @param {string} accessToken - The Plaid access token
+ * @returns {Promise<{accounts: Array, item: Object}>} Promise that resolves to identity data
+ * @throws {Error} Throws error if identity fetch fails
+ * 
+ * @example
+ * const { accounts, item } = await getIdentity(accessToken);
+ * console.log(`Retrieved identity data for ${accounts.length} accounts`);
+ */
+export async function getIdentity(accessToken) {
+  try {
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('Access token is required and must be a string');
+    }
+
+    const client = getPlaidClient();
+    const response = await client.identityGet({
+      access_token: accessToken,
+    });
+
+    console.log(`[Plaid] Retrieved identity data for ${response.data.accounts.length} accounts`);
+    return {
+      accounts: response.data.accounts,
+      item: response.data.item,
+    };
+  } catch (error) {
+    console.error('[Plaid] Failed to fetch identity data:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetches liabilities data including credit cards, mortgages, and student loans
+ * 
+ * @param {string} accessToken - The Plaid access token
+ * @returns {Promise<{accounts: Array, item: Object}>} Promise that resolves to liabilities data
+ * @throws {Error} Throws error if liabilities fetch fails
+ * 
+ * @example
+ * const { accounts, item } = await getLiabilities(accessToken);
+ * console.log(`Retrieved liabilities for ${accounts.length} accounts`);
+ */
+export async function getLiabilities(accessToken) {
+  try {
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('Access token is required and must be a string');
+    }
+
+    const client = getPlaidClient();
+    const response = await client.liabilitiesGet({
+      access_token: accessToken,
+    });
+
+    console.log(`[Plaid] Retrieved liabilities for ${response.data.accounts.length} accounts`);
+    return {
+      accounts: response.data.accounts,
+      item: response.data.item,
+    };
+  } catch (error) {
+    console.error('[Plaid] Failed to fetch liabilities:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetches income verification data for employment and income analysis
+ * 
+ * @param {string} accessToken - The Plaid access token
+ * @returns {Promise<{income: Object, item: Object}>} Promise that resolves to income data
+ * @throws {Error} Throws error if income fetch fails
+ * 
+ * @example
+ * const { income, item } = await getIncome(accessToken);
+ * console.log(`Retrieved ${income.income_streams.length} income streams`);
+ */
+export async function getIncome(accessToken) {
+  try {
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('Access token is required and must be a string');
+    }
+
+    const client = getPlaidClient();
+    const response = await client.incomeGet({
+      access_token: accessToken,
+    });
+
+    console.log(`[Plaid] Retrieved ${response.data.income.income_streams.length} income streams`);
+    return {
+      income: response.data.income,
+      item: response.data.item,
+    };
+  } catch (error) {
+    console.error('[Plaid] Failed to fetch income data:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Creates a payment recipient for ACH settlement payments
+ * 
+ * @param {string} name - Recipient name
+ * @param {string} iban - Recipient IBAN
+ * @param {Object} [address] - Recipient address
+ * @returns {Promise<{recipient_id: string}>} Promise that resolves to recipient ID
+ * @throws {Error} Throws error if recipient creation fails
+ * 
+ * @example
+ * const { recipient_id } = await createPaymentRecipient('Settlement Company', 'US123456789012345');
+ */
+export async function createPaymentRecipient(name, iban, address = null) {
+  try {
+    if (!name || typeof name !== 'string') {
+      throw new Error('Recipient name is required and must be a string');
+    }
+    if (!iban || typeof iban !== 'string') {
+      throw new Error('IBAN is required and must be a string');
+    }
+
+    const client = getPlaidClient();
+    const response = await client.paymentInitiationRecipientCreate({
+      name,
+      iban,
+      address: address || {
+        street: [''],
+        city: '',
+        postal_code: '',
+        country: 'US'
+      }
+    });
+
+    console.log(`[Plaid] Payment recipient created: ${response.data.recipient_id}`);
+    return {
+      recipient_id: response.data.recipient_id,
+    };
+  } catch (error) {
+    console.error('[Plaid] Failed to create payment recipient:', error.message);
+    throw error;
   }
 }
 
