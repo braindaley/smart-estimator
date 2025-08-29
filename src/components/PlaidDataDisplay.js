@@ -177,13 +177,119 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
     );
   }
 
+  // Calculate summary metrics
+  const calculateSummaryMetrics = () => {
+    const accounts = plaidData.accounts?.accounts || [];
+    const transactions = plaidData.transactions?.transactions || [];
+    const income = plaidData.income?.income_summary || {};
+    const liabilities = plaidData.liabilities?.debt_summary || {};
+
+    // Total assets
+    const totalAssets = accounts.reduce((sum, acc) => {
+      return sum + (acc.balances?.current || 0);
+    }, 0);
+
+    // Total debts
+    const totalDebts = (liabilities.total_credit_card_debt || 0) + 
+                      (liabilities.total_mortgage_debt || 0) + 
+                      (liabilities.total_student_loan_debt || 0);
+
+    // Monthly expenses from transactions (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const monthlyExpenses = transactions
+      .filter(t => new Date(t.date) >= thirtyDaysAgo && t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Debt to income ratio
+    const monthlyIncome = income.total_monthly_income || 0;
+    const debtToIncomeRatio = monthlyIncome > 0 ? (totalDebts / (monthlyIncome * 12)) : 0;
+
+    // Available funds for settlement
+    const availableFunds = totalAssets - (monthlyExpenses * 1.5); // Conservative estimate
+
+    return {
+      totalAssets,
+      totalDebts,
+      monthlyExpenses,
+      monthlyIncome,
+      debtToIncomeRatio,
+      availableFunds: Math.max(0, availableFunds),
+      netWorth: totalAssets - totalDebts
+    };
+  };
+
+  const summaryMetrics = plaidData ? calculateSummaryMetrics() : {};
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Your Plaid Data</h1>
-        <p className="text-gray-600">Complete information retrieved from your connected bank account</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Your Financial Overview</h1>
+        <p className="text-gray-600">Complete analysis for debt settlement planning</p>
         <p className="text-sm text-gray-500">Data fetched at: {formatDate(plaidData.fetchedAt)}</p>
       </div>
+
+      {/* Financial Summary Dashboard */}
+      {plaidData && (
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Financial Summary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Total Assets</h3>
+              <p className={`text-2xl font-bold ${
+                summaryMetrics.totalAssets >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {formatCurrency(summaryMetrics.totalAssets)}
+              </p>
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Total Debts</h3>
+              <p className="text-2xl font-bold text-red-600">
+                {formatCurrency(summaryMetrics.totalDebts)}
+              </p>
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Monthly Income</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(summaryMetrics.monthlyIncome)}
+              </p>
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Net Worth</h3>
+              <p className={`text-2xl font-bold ${
+                summaryMetrics.netWorth >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {formatCurrency(summaryMetrics.netWorth)}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Monthly Expenses</h3>
+              <p className="text-lg font-semibold text-orange-600">
+                {formatCurrency(summaryMetrics.monthlyExpenses)}
+              </p>
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Debt-to-Income Ratio</h3>
+              <p className={`text-lg font-semibold ${
+                summaryMetrics.debtToIncomeRatio > 0.4 ? 'text-red-600' : 
+                summaryMetrics.debtToIncomeRatio > 0.3 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {(summaryMetrics.debtToIncomeRatio * 100).toFixed(1)}%
+              </p>
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Settlement Funds Available</h3>
+              <p className="text-lg font-semibold text-blue-600">
+                {formatCurrency(summaryMetrics.availableFunds)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Connection Metadata */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -254,10 +360,62 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
         )}
       </div>
 
+      {/* Expense Analysis from Transactions */}
+      {plaidData.transactions && plaidData.transactions.transactions && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-yellow-900 mb-4">
+            Monthly Expense Breakdown
+          </h2>
+          
+          {(() => {
+            const transactions = plaidData.transactions.transactions;
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const monthlyExpenses = transactions
+              .filter(t => new Date(t.date) >= thirtyDaysAgo && t.amount > 0)
+              .reduce((categories, transaction) => {
+                const category = transaction.personal_finance_category?.primary || 
+                               (transaction.category ? transaction.category[0] : 'Other');
+                if (!categories[category]) {
+                  categories[category] = { total: 0, count: 0, transactions: [] };
+                }
+                categories[category].total += transaction.amount;
+                categories[category].count += 1;
+                categories[category].transactions.push(transaction);
+                return categories;
+              }, {});
+            
+            const sortedCategories = Object.entries(monthlyExpenses)
+              .sort(([,a], [,b]) => b.total - a.total)
+              .slice(0, 10);
+            
+            return (
+              <div className="bg-white rounded-lg border border-yellow-300 p-4">
+                <h3 className="font-semibold text-yellow-800 mb-3">Top Expense Categories (Last 30 Days)</h3>
+                <div className="space-y-3">
+                  {sortedCategories.map(([category, data]) => (
+                    <div key={category} className="flex justify-between items-center p-3 bg-yellow-25 rounded">
+                      <div>
+                        <span className="font-medium text-yellow-900">{category}</span>
+                        <span className="text-sm text-yellow-600 ml-2">({data.count} transactions)</span>
+                      </div>
+                      <span className="font-semibold text-yellow-800">
+                        {formatCurrency(data.total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Transactions Information */}
       <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-orange-900 mb-4">
-          Transactions ({plaidData.transactions.transactions?.length || 0})
+          Recent Transactions ({plaidData.transactions.transactions?.length || 0})
         </h2>
         
         {plaidData.transactions.transactions && plaidData.transactions.transactions.length > 0 ? (
@@ -401,7 +559,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
       {plaidData.liabilities && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-red-900 mb-4">
-            Liabilities & Debt Analysis
+            Debt Portfolio Analysis
           </h2>
           
           {plaidData.liabilities.debt_summary && (
@@ -524,11 +682,46 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
         </div>
       )}
 
+      {/* Settlement Capacity Analysis */}
+      {plaidData.income && plaidData.liabilities && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-blue-900 mb-4">
+            Debt Settlement Capacity Analysis
+          </h2>
+          
+          <div className="bg-white rounded-lg border border-blue-300 p-4 mb-4">
+            <h3 className="font-semibold text-blue-800 mb-3">Settlement Recommendations</h3>
+            <div className="space-y-3">
+              {summaryMetrics.debtToIncomeRatio > 0.4 && (
+                <div className="bg-red-100 border border-red-300 rounded p-3">
+                  <p className="text-red-800 font-medium">⚠️ High Debt-to-Income Ratio</p>
+                  <p className="text-red-700 text-sm">Your debt-to-income ratio of {(summaryMetrics.debtToIncomeRatio * 100).toFixed(1)}% indicates you may benefit from debt settlement.</p>
+                </div>
+              )}
+              
+              {summaryMetrics.availableFunds > 1000 && (
+                <div className="bg-green-100 border border-green-300 rounded p-3">
+                  <p className="text-green-800 font-medium">✅ Settlement Funds Available</p>
+                  <p className="text-green-700 text-sm">You have approximately {formatCurrency(summaryMetrics.availableFunds)} available for potential settlements.</p>
+                </div>
+              )}
+              
+              {summaryMetrics.monthlyIncome > 3000 && (
+                <div className="bg-blue-100 border border-blue-300 rounded p-3">
+                  <p className="text-blue-800 font-medium">💼 Stable Income</p>
+                  <p className="text-blue-700 text-sm">Your monthly income of {formatCurrency(summaryMetrics.monthlyIncome)} provides a good foundation for settlement planning.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Income Information - Settlement Capacity Analysis */}
       {plaidData.income && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-emerald-900 mb-4">
-            Income Analysis & Settlement Capacity
+            Income Analysis & Employment Details
           </h2>
           
           {plaidData.income.income_summary && (

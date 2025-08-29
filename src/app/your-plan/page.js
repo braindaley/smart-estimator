@@ -63,6 +63,16 @@ export default function LoanQualificationPage() {
             userId={userId}
             onComplete={handleQualificationComplete}
           />
+          
+          {/* Deal Sheet Link */}
+          <div className="mt-12 text-center">
+            <a 
+              href="/your-plan/deal-sheet"
+              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            >
+              View Deal Sheet
+            </a>
+          </div>
         </div>
       </main>
     </div>
