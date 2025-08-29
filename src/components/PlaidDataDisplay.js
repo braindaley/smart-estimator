@@ -292,7 +292,18 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
                         {transaction.amount > 0 ? '-' : '+'}{formatCurrency(Math.abs(transaction.amount))}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-600">
-                        {transaction.category ? transaction.category.join(' > ') : 'Uncategorized'}
+                        <div className="space-y-1">
+                          <div>
+                            {transaction.personal_finance_category 
+                              ? transaction.personal_finance_category.primary 
+                              : (transaction.category ? transaction.category.join(' > ') : 'Uncategorized')}
+                          </div>
+                          {transaction.personal_finance_category?.detailed && (
+                            <div className="text-xs text-gray-500">
+                              {transaction.personal_finance_category.detailed.replace(/_/g, ' ').toLowerCase()}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500 font-mono">
                         {transaction.account_id.slice(-4)}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PlaidLink from './PlaidLink';
+import CreditCheckForm from './CreditCheckForm';
 import { 
   setStepCompleted, 
   getStepStatus, 
@@ -77,21 +78,21 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
     }
   };
 
-  // Credit check handler (placeholder)
-  const handleCreditCheck = () => {
-    setIsProcessing({ ...isProcessing, credit_check: true });
+  // Credit check handler
+  const handleCreditCheck = (creditData) => {
+    console.log('[LoanQualification] Credit check completed:', creditData);
     
-    // Simulate credit check process
-    setTimeout(() => {
-      const mockCreditData = {
-        score: 720,
-        accounts: ['Credit Card 1', 'Credit Card 2'],
-        totalDebt: 15000
-      };
-      storeCreditData(userId, mockCreditData);
-      setStepStatus(getStepStatus());
-      setIsProcessing({ ...isProcessing, credit_check: false });
-    }, 2000);
+    // Store credit data in session
+    storeCreditData(userId, creditData);
+    
+    // Update local state
+    const newStepStatus = getStepStatus();
+    setStepStatus(newStepStatus);
+    
+    // Call onComplete callback if provided
+    if (onComplete) {
+      onComplete(creditData);
+    }
   };
 
 
@@ -200,12 +201,12 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                   <span className="text-blue-600 text-sm">Processing...</span>
                 </div>
               ) : (
-                <button
-                  onClick={handleCreditCheck}
-                  className="w-full h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center"
-                >
-                  Start Credit Check
-                </button>
+                <CreditCheckForm
+                  userId={userId}
+                  onSuccess={handleCreditCheck}
+                  buttonText="Start Credit Check"
+                  className="w-full h-10"
+                />
               )}
             </div>
           </div>
