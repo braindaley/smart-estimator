@@ -144,7 +144,7 @@ export function getPlaidClient() {
 export async function createLinkToken(
   userId,
   clientName = 'Smart Estimator',
-  products = ['transactions', 'assets', 'identity', 'liabilities', 'income_verification'],
+  products = ['transactions', 'assets', 'identity', 'liabilities'],
   countryCodes = ['US'],
   language = 'en'
 ) {
