@@ -107,6 +107,12 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
     mappedData.transactionDetails[field] = [];
   });
 
+  // Ensure transactions is an array
+  if (!Array.isArray(transactions)) {
+    console.warn('Transactions is not an array:', transactions);
+    return mappedData;
+  }
+
   // Process transactions
   transactions.forEach(transaction => {
     const category = transaction.personal_finance_category;
