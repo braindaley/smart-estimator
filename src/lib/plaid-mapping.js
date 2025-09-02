@@ -2,48 +2,55 @@
  * Plaid to Deal Sheet Mapping Utilities
  */
 
-// Income category mappings
+// Income category mappings - based on actual Plaid category structure
 const INCOME_MAPPINGS = {
+  // Primary INCOME categories
   'INCOME_WAGES': 'netMonthlyEmploymentIncome',
-  'INCOME_OTHER_INCOME': 'otherIncome', // This needs subcategorization
-  'INCOME_UNEMPLOYMENT': 'unemployment',
   'INCOME_DIVIDENDS': 'dividends',
-  'INCOME_RETIREMENT_PENSION': 'retirement',
+  'INCOME_RETIREMENT': 'retirement',
   'INCOME_INTEREST_EARNED': 'otherIncome',
-  'INCOME_TAX_REFUND': 'otherIncome'
+  'INCOME_TAX_REFUND': 'otherIncome',
+  'INCOME_UNEMPLOYMENT': 'unemployment',
+  'INCOME_OTHER_INCOME': 'otherIncome',
+  'INCOME_RENTAL': 'otherIncome',
+  'INCOME_SOCIAL_SECURITY': 'socialSecurity',
+  'INCOME_CHILD_SUPPORT': 'childSupport',
+  'INCOME_ALIMONY': 'alimony'
 };
 
-// Expense category mappings
+// Expense category mappings - updated to match actual Plaid detailed categories
 const EXPENSE_MAPPINGS = {
   // Housing
   'RENT_AND_UTILITIES_RENT': 'housingPayment',
   'LOAN_PAYMENTS_MORTGAGE_PAYMENT': 'housingPayment',
-  'GENERAL_SERVICES_INSURANCE_homeowners': 'homeOwnersInsurance',
+  'LOAN_PAYMENTS_CAR_PAYMENT': 'autoPayments',
+  'GENERAL_SERVICES_INSURANCE': 'homeOwnersInsurance', // Will need context-based detection
+  
+  // Travel (for the United Airlines example we saw)
+  'TRAVEL_FLIGHTS': 'entertainment', // Could map to entertainment or travel category
   
   // Medical
-  'GENERAL_SERVICES_INSURANCE_health': 'healthLifeInsurance',
   'MEDICAL_PRIMARY_CARE': 'medicalCare',
-  'MEDICAL_PHARMACY': 'prescriptionsMedicalExp',
+  'MEDICAL_PHARMACIES_AND_SUPPLEMENTS': 'prescriptionsMedicalExp',
   'MEDICAL_DENTAL_CARE': 'medicalCare',
   'MEDICAL_EYE_CARE': 'medicalCare',
-  'MEDICAL_VETERINARY_SERVICES': 'medicalCare',
+  'MEDICAL_VETERINARY_SERVICES': 'petCare', // Actually pet care, not medical
   
-  // Transportation
-  'LOAN_PAYMENTS_CAR_PAYMENT': 'autoPayments',
-  'GENERAL_SERVICES_INSURANCE_auto': 'autoInsurance',
+  // Transportation  
   'TRANSPORTATION_GAS': 'gasoline',
   'TRANSPORTATION_PARKING': 'parking',
-  'TRANSPORTATION_PUBLIC_TRANSPORTATION': 'commuting',
+  'TRANSPORTATION_PUBLIC_TRANSIT': 'commuting',
   'TRANSPORTATION_TAXIS_AND_RIDE_SHARES': 'commuting',
   'TRANSPORTATION_TOLLS': 'commuting',
   'GENERAL_SERVICES_AUTOMOTIVE': 'repairsMaintenance',
   
   // Food
   'FOOD_AND_DRINK_GROCERIES': 'groceries',
-  'FOOD_AND_DRINK_RESTAURANTS': 'eatingOut',
+  'FOOD_AND_DRINK_RESTAURANT': 'eatingOut',
   'FOOD_AND_DRINK_FAST_FOOD': 'eatingOut',
   'FOOD_AND_DRINK_COFFEE': 'eatingOut',
-  'FOOD_AND_DRINK_BEER_WINE_LIQUOR': 'eatingOut',
+  'FOOD_AND_DRINK_COFFEE_SHOPS': 'eatingOut',
+  'FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR_STORES': 'eatingOut',
   
   // Utilities
   'RENT_AND_UTILITIES_GAS_AND_ELECTRICITY': 'gasElectricOil',
@@ -56,9 +63,12 @@ const EXPENSE_MAPPINGS = {
   // Personal Care
   'GENERAL_MERCHANDISE_CLOTHING_AND_ACCESSORIES': 'clothing',
   'GENERAL_MERCHANDISE_DEPARTMENT_STORES': 'householdItems',
+  'GENERAL_MERCHANDISE_OTHER_GENERAL_MERCHANDISE': 'householdItems',
+  'GENERAL_MERCHANDISE_SPORTING_GOODS': 'entertainment',
   'ENTERTAINMENT_MUSIC_AND_AUDIO': 'entertainment',
   'ENTERTAINMENT_TV_AND_MOVIES': 'entertainment',
   'ENTERTAINMENT_SPORTING_EVENTS': 'entertainment',
+  'ENTERTAINMENT_SPORTING_EVENTS_AMUSEMENT_PARKS_AND_MUSEUMS': 'entertainment',
   'GENERAL_MERCHANDISE_PET_SUPPLIES': 'petCare',
   'GENERAL_MERCHANDISE_GIFTS_AND_NOVELTIES': 'gifts',
   'PERSONAL_CARE_HAIR_AND_BEAUTY': 'hairCare',
@@ -68,6 +78,7 @@ const EXPENSE_MAPPINGS = {
   
   // Debt (not in program)
   'LOAN_PAYMENTS_OTHER_PAYMENT': 'debtOther',
+  'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT': 'debtOther',
   'LOAN_PAYMENTS_STUDENT_LOAN': 'govtStudentLoans',
   'LOAN_PAYMENTS_PERSONAL_LOAN': 'privateStudentLoans',
   
@@ -79,7 +90,17 @@ const EXPENSE_MAPPINGS = {
   
   // Dependent Care
   'GENERAL_SERVICES_CHILD_CARE': 'daycareChildExpenses',
-  'MEDICAL_NURSING_CARE': 'nursingCare'
+  'MEDICAL_NURSING_CARE': 'nursingCare',
+  
+  // Financial Services
+  'GENERAL_SERVICES_ACCOUNTING_AND_FINANCIAL_PLANNING': 'misc',
+  'GENERAL_SERVICES_FINANCIAL_ADVISORS': 'misc',
+  'GENERAL_SERVICES_LEGAL': 'misc',
+  
+  // Additional mappings for completeness
+  'CHARITY_AND_GIFTS_CHARITY': 'charityDonations',
+  'GENERAL_MERCHANDISE_TOILETRIES': 'toiletries',
+  'TRANSFER_OUT_TRANSFER': 'misc'
 };
 
 /**
@@ -89,6 +110,8 @@ const EXPENSE_MAPPINGS = {
  * @returns {Object} Mapped data for deal sheet
  */
 export function mapPlaidToDealsSheet(transactions, accounts) {
+  console.log('[Mapping] Starting with transactions:', transactions?.length, 'accounts:', accounts?.length);
+  
   const mappedData = {
     income: {},
     expenses: {},
@@ -97,9 +120,19 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
   };
 
   // Initialize all fields to 0
-  Object.values(INCOME_MAPPINGS).forEach(field => {
-    mappedData.income[field] = 0;
-    mappedData.transactionDetails[field] = [];
+  Object.entries(INCOME_MAPPINGS).forEach(([key, field]) => {
+    if (typeof field === 'string') {
+      mappedData.income[field] = 0;
+      mappedData.transactionDetails[field] = [];
+    } else if (typeof field === 'object') {
+      // Handle INCOME_OTHER_INCOME subcategories
+      Object.values(field).forEach(subField => {
+        if (typeof subField === 'string') {
+          mappedData.income[subField] = 0;
+          mappedData.transactionDetails[subField] = [];
+        }
+      });
+    }
   });
   
   Object.values(EXPENSE_MAPPINGS).forEach(field => {
@@ -114,9 +147,14 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
   }
 
   // Process transactions
+  let incomeCount = 0;
+  let expenseCount = 0;
+  const categoryStats = {};
+  
   transactions.forEach(transaction => {
     const category = transaction.personal_finance_category;
     if (!category) {
+      console.log('[Mapping] No category for transaction:', transaction.name);
       mappedData.unmapped.push(transaction);
       return;
     }
@@ -125,24 +163,127 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
     const detailedCategory = category.detailed;
     const amount = Math.abs(transaction.amount); // Plaid amounts are negative for outflows
     
+    // Track category statistics
+    const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
+    if (!categoryStats[categoryKey]) {
+      categoryStats[categoryKey] = {
+        count: 0,
+        totalAmount: 0,
+        primary: primaryCategory,
+        detailed: detailedCategory,
+        mapped: false
+      };
+    }
+    categoryStats[categoryKey].count++;
+    categoryStats[categoryKey].totalAmount += amount;
+    
+    // Log first few transactions for debugging
+    if (incomeCount < 3 && primaryCategory === 'INCOME') {
+      console.log('[Mapping] Income transaction:', {
+        name: transaction.name,
+        primary: primaryCategory,
+        detailed: detailedCategory,
+        amount: amount,
+        rawAmount: transaction.amount
+      });
+      incomeCount++;
+    }
+    if (expenseCount < 5 && transaction.amount < 0) {
+      console.log('[Mapping] Expense transaction:', {
+        name: transaction.name,
+        primary: primaryCategory,
+        detailed: detailedCategory,
+        amount: amount,
+        rawAmount: transaction.amount
+      });
+      expenseCount++;
+    }
+    
+    // Special debugging for Uber transactions
+    if (transaction.name && transaction.name.toLowerCase().includes('uber')) {
+      console.log('[Mapping] UBER DEBUG:', {
+        name: transaction.name,
+        primary: primaryCategory,
+        detailed: detailedCategory,
+        amount: amount,
+        rawAmount: transaction.amount,
+        isIncome: primaryCategory === 'INCOME',
+        isNegative: transaction.amount < 0
+      });
+    }
+    
     // Handle income
     if (primaryCategory === 'INCOME') {
-      const mappedField = INCOME_MAPPINGS[detailedCategory];
+      // The detailedCategory already includes the primary, so just use it directly
+      const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
+      const mappedField = INCOME_MAPPINGS[categoryKey];
+      
       if (mappedField) {
+        if (!mappedData.income[mappedField]) {
+          mappedData.income[mappedField] = 0;
+          mappedData.transactionDetails[mappedField] = [];
+        }
         mappedData.income[mappedField] += amount;
         mappedData.transactionDetails[mappedField].push({
           ...transaction,
           mappedAmount: amount
         });
+        categoryStats[categoryKey].mapped = true;
+        console.log(`[Mapping] Mapped income: ${categoryKey} -> ${mappedField} ($${amount})`);
       } else {
+        console.log(`[Mapping] Unmapped income category: ${categoryKey}`);
         mappedData.unmapped.push(transaction);
       }
     }
-    // Handle expenses (negative amounts in Plaid represent money going out)
-    else if (transaction.amount < 0) {
-      // Convert detailed category to mapping key format
-      const categoryKey = `${primaryCategory}_${detailedCategory}`.toUpperCase().replace(/[^A-Z_]/g, '_');
-      const mappedField = EXPENSE_MAPPINGS[categoryKey];
+    // Handle expenses (negative amounts in Plaid represent money going out, but some categories might be positive)
+    else if (transaction.amount < 0 || 
+             primaryCategory === 'TRANSPORTATION' || 
+             primaryCategory === 'FOOD_AND_DRINK' || 
+             primaryCategory === 'GENERAL_MERCHANDISE' ||
+             primaryCategory === 'GENERAL_SERVICES' ||
+             primaryCategory === 'ENTERTAINMENT' ||
+             primaryCategory === 'PERSONAL_CARE' ||
+             primaryCategory === 'LOAN_PAYMENTS' ||
+             primaryCategory === 'TRAVEL') {
+      // The detailedCategory already includes the primary, so just use it directly
+      const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
+      let mappedField = EXPENSE_MAPPINGS[categoryKey];
+      
+      // Special handling for GENERAL_SERVICES_INSURANCE - need to detect type
+      if (categoryKey === 'GENERAL_SERVICES_INSURANCE') {
+        const transactionName = (transaction.name || '').toLowerCase();
+        const merchantName = (transaction.merchant_name || '').toLowerCase();
+        
+        if (transactionName.includes('home') || transactionName.includes('renters') || 
+            merchantName.includes('home') || merchantName.includes('renters')) {
+          mappedField = 'homeOwnersInsurance';
+        } else if (transactionName.includes('auto') || transactionName.includes('car') || 
+                   merchantName.includes('auto') || merchantName.includes('geico') || 
+                   merchantName.includes('progressive') || merchantName.includes('allstate')) {
+          mappedField = 'autoInsurance';
+        } else if (transactionName.includes('health') || transactionName.includes('life') ||
+                   transactionName.includes('medical') || merchantName.includes('health')) {
+          mappedField = 'healthLifeInsurance';
+        } else {
+          // Default to health/life insurance if we can't determine
+          mappedField = 'healthLifeInsurance';
+        }
+      }
+      
+      // Special handling for LOAN_PAYMENTS - distinguish between mortgage and auto
+      if (primaryCategory === 'LOAN_PAYMENTS') {
+        const transactionName = (transaction.name || '').toLowerCase();
+        const merchantName = (transaction.merchant_name || '').toLowerCase();
+        
+        if (detailedCategory === 'CAR_PAYMENT' || 
+            transactionName.includes('auto') || transactionName.includes('car') ||
+            merchantName.includes('auto') || merchantName.includes('motor')) {
+          mappedField = 'autoPayments';
+        } else if (detailedCategory === 'MORTGAGE_PAYMENT' || 
+                   transactionName.includes('mortgage') || transactionName.includes('home loan')) {
+          mappedField = 'housingPayment';
+        }
+      }
       
       if (mappedField) {
         if (!mappedData.expenses[mappedField]) {
@@ -154,7 +295,10 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
           ...transaction,
           mappedAmount: amount
         });
+        categoryStats[categoryKey].mapped = true;
+        console.log(`[Mapping] Mapped expense: ${categoryKey} -> ${mappedField} ($${amount})`);
       } else {
+        console.log(`[Mapping] Unmapped expense category: ${categoryKey}`);
         mappedData.unmapped.push(transaction);
       }
     } else {
@@ -173,6 +317,29 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
   
   Object.keys(mappedData.expenses).forEach(field => {
     mappedData.expenses[field] = Math.round(mappedData.expenses[field] * monthlyMultiplier * 100) / 100;
+  });
+
+  // Log comprehensive category analysis
+  console.log('[Mapping] Category Analysis:');
+  const unmappedCategories = Object.entries(categoryStats)
+    .filter(([key, stats]) => !stats.mapped)
+    .sort((a, b) => b[1].totalAmount - a[1].totalAmount);
+    
+  console.table(unmappedCategories.map(([key, stats]) => ({
+    Category: key,
+    Primary: stats.primary,
+    Count: stats.count,
+    'Total Amount': `$${stats.totalAmount.toFixed(2)}`
+  })));
+
+  // Log summary
+  console.log('[Mapping] Summary:', {
+    totalIncome: Object.values(mappedData.income).reduce((a, b) => a + b, 0),
+    totalExpenses: Object.values(mappedData.expenses).reduce((a, b) => a + b, 0),
+    unmappedCount: mappedData.unmapped.length,
+    unmappedCategories: unmappedCategories.length,
+    incomeFields: Object.entries(mappedData.income).filter(([k, v]) => v > 0).map(([k, v]) => `${k}: $${v}`),
+    expenseFields: Object.entries(mappedData.expenses).filter(([k, v]) => v > 0).map(([k, v]) => `${k}: $${v}`)
   });
 
   return mappedData;
@@ -231,7 +398,17 @@ export function getFieldDisplayName(fieldName) {
     judgmentPayments: 'Judgment Payments',
     backTaxes: 'Back Taxes',
     daycareChildExpenses: 'Daycare/Child Expenses',
-    nursingCare: 'Nursing Care'
+    nursingCare: 'Nursing Care',
+    
+    // Additional expense fields
+    secondaryHousingPayment: 'Secondary Housing Payment',
+    healthLifeInsurance: 'Health/Life Insurance',
+    debtOther: 'Debt Expenses Other',
+    medicalDebt: 'Medical Debt',
+    charityDonations: 'Charity Donations',
+    toiletries: 'Toiletries',
+    misc: 'Miscellaneous',
+    fundsAvailable: 'Funds Available'
   };
   
   return fieldNames[fieldName] || fieldName;

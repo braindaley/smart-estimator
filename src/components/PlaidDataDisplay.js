@@ -424,9 +424,9 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
               Total transactions available: {plaidData.transactions.total_transactions}
             </div>
             
-            <div className="bg-white rounded-lg border border-orange-300 max-h-96 overflow-y-auto">
+            <div className="bg-white rounded-lg border border-orange-300">
               <table className="min-w-full">
-                <thead className="bg-orange-100 sticky top-0">
+                <thead className="bg-orange-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Date</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Description</th>
@@ -436,7 +436,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {plaidData.transactions.transactions.slice(0, 100).map((transaction, index) => (
+                  {plaidData.transactions.transactions.map((transaction, index) => (
                     <tr key={transaction.transaction_id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(transaction.date)}
@@ -470,12 +470,6 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
                   ))}
                 </tbody>
               </table>
-              
-              {plaidData.transactions.transactions.length > 100 && (
-                <div className="p-4 text-center text-sm text-gray-600 bg-gray-50">
-                  Showing first 100 of {plaidData.transactions.transactions.length} transactions
-                </div>
-              )}
             </div>
           </>
         ) : (

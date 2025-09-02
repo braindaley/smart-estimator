@@ -17,11 +17,34 @@ const getPlaidData = typeof window !== 'undefined'
   ? require('@/lib/session-store').getPlaidData 
   : () => null;
 
+// Component to show transaction details
+const TransactionSummary = ({ transactions, totalAmount, fieldName }) => {
+  if (!transactions || transactions.length === 0) return null;
+  
+  return (
+    <div className="mt-2">
+      <p className="text-xs text-green-600 mb-1">
+        Auto-filled from Plaid: {formatCurrency(totalAmount)}
+      </p>
+      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+        <div className="font-medium mb-1">Transactions ({transactions.length}):</div>
+        {transactions.map((tx, idx) => (
+          <div key={idx} className="flex justify-between py-1 border-b border-gray-200 last:border-b-0">
+            <span className="truncate mr-2">{tx.name || 'Unknown'}</span>
+            <span className="font-mono">{formatCurrency(tx.mappedAmount)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function DealSheetPage() {
   const [plaidData, setPlaidData] = useState(null);
   const [mappedData, setMappedData] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedField, setSelectedField] = useState(null);
+  const [hasPlaidData, setHasPlaidData] = useState(false);
   const [formData, setFormData] = useState({
     // Monthly Expenditure Details
     totalMonthlyIncome: '',
@@ -63,29 +86,135 @@ export default function DealSheetPage() {
     coApplicantRetirement: '',
     coApplicantOtherIncome: '',
     coApplicantIncomeFrequency: '',
-    coApplicantComments: ''
+    coApplicantComments: '',
+    
+    // Monthly Expense fields
+    housingPayment: '',
+    homeOwnersInsurance: '',
+    secondaryHousingPayment: '',
+    healthLifeInsurance: '',
+    medicalCare: '',
+    prescriptionsMedicalExp: '',
+    autoPayments: '',
+    autoInsurance: '',
+    repairsMaintenance: '',
+    gasoline: '',
+    parking: '',
+    commuting: '',
+    groceries: '',
+    eatingOut: '',
+    gasElectricOil: '',
+    phoneIncludeCell: '',
+    waterSewerGarbage: '',
+    cableSatelliteInternet: '',
+    clothing: '',
+    householdItems: '',
+    entertainment: '',
+    petCare: '',
+    gifts: '',
+    toiletries: '',
+    hairCare: '',
+    laundry: '',
+    gym: '',
+    personalCare: '',
+    charityDonations: '',
+    daycareChildExpenses: '',
+    nursingCare: '',
+    misc: '',
+    fundsAvailable: ''
   });
 
   // Load Plaid data on component mount
   useEffect(() => {
     try {
       const storedPlaidData = getPlaidData();
+      console.log('[DealSheet] Stored Plaid data:', storedPlaidData);
+      
+      if (!storedPlaidData) {
+        console.log('[DealSheet] No Plaid data found in session storage. Please connect your bank account first.');
+        setHasPlaidData(false);
+        return;
+      }
+      
       if (storedPlaidData && storedPlaidData.data) {
+        setHasPlaidData(true);
         setPlaidData(storedPlaidData.data);
         
         // Map Plaid data to deal sheet format
+        // Note: data structure is { data: { transactions: [...], accounts: [...] } }
         if (storedPlaidData.data.transactions && storedPlaidData.data.accounts) {
-          const mapped = mapPlaidToDealsSheet(
-            storedPlaidData.data.transactions,
-            storedPlaidData.data.accounts
-          );
+          console.log('[DealSheet] Processing transactions:', storedPlaidData.data.transactions.transactions?.length || storedPlaidData.data.transactions.length);
+          
+          // Extract the actual transactions array from the API response
+          const transactionsArray = storedPlaidData.data.transactions.transactions || storedPlaidData.data.transactions;
+          const accountsArray = storedPlaidData.data.accounts.accounts || storedPlaidData.data.accounts;
+          
+          console.log('[DealSheet] Transactions array:', transactionsArray);
+          console.log('[DealSheet] Accounts array:', accountsArray);
+          
+          const mapped = mapPlaidToDealsSheet(transactionsArray, accountsArray);
+          console.log('[DealSheet] Mapped data:', mapped);
           setMappedData(mapped);
           
           // Update form data with mapped values
+          // Start with a fresh object, don't reference initial formData
+          const updatedFormData = {};
+          
+          // Map income fields
+          Object.keys(mapped.income).forEach(key => {
+            if (mapped.income[key] > 0) {
+              updatedFormData[key] = mapped.income[key].toFixed(2);
+            }
+          });
+          
+          // Map expense fields - need to convert field names
+          const expenseFieldMapping = {
+            housingPayment: 'housingPayment',
+            homeOwnersInsurance: 'homeOwnersInsurance',
+            secondaryHousingPayment: 'secondaryHousingPayment',
+            healthLifeInsurance: 'healthLifeInsurance',
+            medicalCare: 'medicalCare',
+            prescriptionsMedicalExp: 'prescriptionsMedicalExp',
+            autoPayments: 'autoPayments',
+            autoInsurance: 'autoInsurance',
+            repairsMaintenance: 'repairsMaintenance',
+            gasoline: 'gasoline',
+            parking: 'parking',
+            commuting: 'commuting',
+            groceries: 'groceries',
+            eatingOut: 'eatingOut',
+            gasElectricOil: 'gasElectricOil',
+            phoneIncludeCell: 'phoneIncludeCell',
+            waterSewerGarbage: 'waterSewerGarbage',
+            cableSatelliteInternet: 'cableSatelliteInternet',
+            clothing: 'clothing',
+            householdItems: 'householdItems',
+            entertainment: 'entertainment',
+            petCare: 'petCare',
+            gifts: 'gifts',
+            toiletries: 'toiletries',
+            hairCare: 'hairCare',
+            laundry: 'laundry',
+            gym: 'gym',
+            personalCare: 'personalCare',
+            charityDonations: 'charityDonations',
+            daycareChildExpenses: 'daycareChildExpenses',
+            nursingCare: 'nursingCare',
+            misc: 'misc'
+          };
+          
+          Object.keys(mapped.expenses).forEach(key => {
+            if (mapped.expenses[key] > 0 && expenseFieldMapping[key]) {
+              updatedFormData[expenseFieldMapping[key]] = mapped.expenses[key].toFixed(2);
+            }
+          });
+          
+          console.log('[DealSheet] Setting form data with:', updatedFormData);
+          
+          // Update the form data state with the new values
           setFormData(prev => ({
             ...prev,
-            ...mapped.income,
-            ...mapped.expenses
+            ...updatedFormData
           }));
         }
       }
@@ -114,7 +243,60 @@ export default function DealSheetPage() {
   };
 
   const handleSave = () => {
-    console.log('Saving deal sheet data:', formData);
+    // Create comprehensive deal sheet data including Plaid mappings
+    const dealSheetData = {
+      // Basic form data
+      ...formData,
+      
+      // Plaid integration metadata
+      plaidData: {
+        connected: hasPlaidData,
+        sessionId: plaidData?.storedAt,
+        mappingSource: '/admin/plaid', // Reference to mapping definitions
+        lastUpdated: new Date().toISOString(),
+      },
+      
+      // Mapped amounts from Plaid (read-only, for reference)
+      plaidMappings: mappedData ? {
+        income: {
+          totalMappedIncome: Object.values(mappedData.income).reduce((a, b) => a + b, 0),
+          mappedFields: Object.entries(mappedData.income)
+            .filter(([key, value]) => value > 0)
+            .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
+        },
+        expenses: {
+          totalMappedExpenses: Object.values(mappedData.expenses).reduce((a, b) => a + b, 0),
+          mappedFields: Object.entries(mappedData.expenses)
+            .filter(([key, value]) => value > 0)
+            .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
+        },
+        transactionSummary: {
+          totalTransactions: (mappedData.unmapped?.length || 0) + 
+            Object.values(mappedData.transactionDetails || {}).reduce((sum, arr) => sum + (arr?.length || 0), 0),
+          mappedTransactions: Object.values(mappedData.transactionDetails || {}).reduce((sum, arr) => sum + (arr?.length || 0), 0),
+          unmappedTransactions: mappedData.unmapped?.length || 0,
+        }
+      } : null,
+      
+      // Deal sheet calculations
+      calculations: {
+        totalMonthlyIncome: mappedData ? Object.values(mappedData.income).reduce((a, b) => a + b, 0) : 0,
+        totalMonthlyExpenses: mappedData ? Object.values(mappedData.expenses).reduce((a, b) => a + b, 0) : 0,
+        netCashFlow: mappedData ? 
+          Object.values(mappedData.income).reduce((a, b) => a + b, 0) - 
+          Object.values(mappedData.expenses).reduce((a, b) => a + b, 0) : 0,
+      },
+      
+      // Timestamp
+      savedAt: new Date().toISOString(),
+    };
+    
+    console.log('Saving comprehensive deal sheet data:', dealSheetData);
+    
+    // Here you would typically send this to your backend API
+    // Example: await fetch('/api/deal-sheet', { method: 'POST', body: JSON.stringify(dealSheetData) })
+    
+    alert(`Deal Sheet Saved!\n\nPlaid Data: ${hasPlaidData ? 'Connected' : 'Not Connected'}\nTotal Income: ${formatCurrency(dealSheetData.calculations.totalMonthlyIncome)}\nTotal Expenses: ${formatCurrency(dealSheetData.calculations.totalMonthlyExpenses)}\nNet Cash Flow: ${formatCurrency(dealSheetData.calculations.netCashFlow)}`);
   };
 
   const handleCancel = () => {
@@ -139,6 +321,28 @@ export default function DealSheetPage() {
         </div>
 
         <div className="container mx-auto max-w-7xl px-4 py-12">
+          {/* No Plaid Data Warning */}
+          {!hasPlaidData && (
+            <div className="mb-8">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-amber-800">No Bank Data Connected</h3>
+                    <p className="mt-1 text-sm text-amber-700">
+                      To see auto-filled income and expense data in your deal sheet, you need to connect your bank account first. 
+                      <a href="/your-plan" className="ml-1 underline hover:no-underline">Go back to connect your bank account</a>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-8">
             {/* Monthly Expenditure Details */}
             <Card className="p-6">
@@ -202,9 +406,11 @@ export default function DealSheetPage() {
                         onChange={(e) => handleInputChange('netMonthlyEmploymentIncome', e.target.value)}
                       />
                       {mappedData && mappedData.income.netMonthlyEmploymentIncome > 0 && (
-                        <p className="text-xs text-green-600">
-                          Auto-filled from Plaid: {formatCurrency(mappedData.income.netMonthlyEmploymentIncome)}
-                        </p>
+                        <TransactionSummary 
+                          transactions={mappedData.transactionDetails.netMonthlyEmploymentIncome}
+                          totalAmount={mappedData.income.netMonthlyEmploymentIncome}
+                          fieldName="netMonthlyEmploymentIncome"
+                        />
                       )}
                     </div>
                     <div className="space-y-2">
@@ -511,8 +717,22 @@ export default function DealSheetPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Housing Payment</Label>
-                        <Input placeholder="$0.00" />
+                        <ClickableLabel 
+                          hasData={mappedData && mappedData.transactionDetails.housingPayment?.length > 0}
+                          onClick={() => handleFieldClick('housingPayment')}
+                        >
+                          Housing Payment
+                        </ClickableLabel>
+                        <Input 
+                          placeholder="$0.00" 
+                          value={formData.housingPayment}
+                          onChange={(e) => handleInputChange('housingPayment', e.target.value)}
+                        />
+                        {mappedData && mappedData.expenses.housingPayment > 0 && (
+                          <p className="text-xs text-green-600">
+                            Auto-filled: {formatCurrency(mappedData.expenses.housingPayment)}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Home Owners Insurance</Label>
@@ -567,8 +787,24 @@ export default function DealSheetPage() {
                         <Input placeholder="$0.00" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Gasoline</Label>
-                        <Input placeholder="$0.00" />
+                        <ClickableLabel 
+                          hasData={mappedData && mappedData.transactionDetails.gasoline?.length > 0}
+                          onClick={() => handleFieldClick('gasoline')}
+                        >
+                          Gasoline
+                        </ClickableLabel>
+                        <Input 
+                          placeholder="$0.00" 
+                          value={formData.gasoline}
+                          onChange={(e) => handleInputChange('gasoline', e.target.value)}
+                        />
+                        {mappedData && mappedData.expenses.gasoline > 0 && (
+                          <TransactionSummary 
+                            transactions={mappedData.transactionDetails.gasoline}
+                            totalAmount={mappedData.expenses.gasoline}
+                            fieldName="gasoline"
+                          />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Parking</Label>
@@ -589,12 +825,44 @@ export default function DealSheetPage() {
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Groceries</Label>
-                        <Input placeholder="$0.00" />
+                        <ClickableLabel 
+                          hasData={mappedData && mappedData.transactionDetails.groceries?.length > 0}
+                          onClick={() => handleFieldClick('groceries')}
+                        >
+                          Groceries
+                        </ClickableLabel>
+                        <Input 
+                          placeholder="$0.00" 
+                          value={formData.groceries}
+                          onChange={(e) => handleInputChange('groceries', e.target.value)}
+                        />
+                        {mappedData && mappedData.expenses.groceries > 0 && (
+                          <TransactionSummary 
+                            transactions={mappedData.transactionDetails.groceries}
+                            totalAmount={mappedData.expenses.groceries}
+                            fieldName="groceries"
+                          />
+                        )}
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Eating Out</Label>
-                        <Input placeholder="$0.00" />
+                        <ClickableLabel 
+                          hasData={mappedData && mappedData.transactionDetails.eatingOut?.length > 0}
+                          onClick={() => handleFieldClick('eatingOut')}
+                        >
+                          Eating Out
+                        </ClickableLabel>
+                        <Input 
+                          placeholder="$0.00" 
+                          value={formData.eatingOut}
+                          onChange={(e) => handleInputChange('eatingOut', e.target.value)}
+                        />
+                        {mappedData && mappedData.expenses.eatingOut > 0 && (
+                          <TransactionSummary 
+                            transactions={mappedData.transactionDetails.eatingOut}
+                            totalAmount={mappedData.expenses.eatingOut}
+                            fieldName="eatingOut"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -696,8 +964,24 @@ export default function DealSheetPage() {
                         <Input placeholder="$0.00" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Entertainment</Label>
-                        <Input placeholder="$0.00" />
+                        <ClickableLabel 
+                          hasData={mappedData && mappedData.transactionDetails.entertainment?.length > 0}
+                          onClick={() => handleFieldClick('entertainment')}
+                        >
+                          Entertainment
+                        </ClickableLabel>
+                        <Input 
+                          placeholder="$0.00" 
+                          value={formData.entertainment}
+                          onChange={(e) => handleInputChange('entertainment', e.target.value)}
+                        />
+                        {mappedData && mappedData.expenses.entertainment > 0 && (
+                          <TransactionSummary 
+                            transactions={mappedData.transactionDetails.entertainment}
+                            totalAmount={mappedData.expenses.entertainment}
+                            fieldName="entertainment"
+                          />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Pet Care</Label>
@@ -789,8 +1073,8 @@ export default function DealSheetPage() {
                   These transactions from your Plaid data could not be automatically mapped to deal sheet fields:
                 </p>
                 
-                <div className="max-h-64 overflow-y-auto space-y-2">
-                  {mappedData.unmapped.slice(0, 20).map((transaction, index) => (
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {mappedData.unmapped.map((transaction, index) => (
                     <div key={transaction.transaction_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                       <div className="flex-1">
                         <p className="font-medium text-sm">
@@ -815,11 +1099,6 @@ export default function DealSheetPage() {
                       </div>
                     </div>
                   ))}
-                  {mappedData.unmapped.length > 20 && (
-                    <p className="text-xs text-gray-500 text-center py-2">
-                      ... and {mappedData.unmapped.length - 20} more transactions
-                    </p>
-                  )}
                 </div>
               </Card>
             )}

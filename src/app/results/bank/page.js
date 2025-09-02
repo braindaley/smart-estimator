@@ -104,7 +104,7 @@ function BankResultsContent() {
             </div>
             <div className="flex space-x-3">
               <button
-                onClick={() => window.location.href = '/mapping-table'}
+                onClick={() => window.location.href = '/admin/plaid'}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 View Mapping Table
