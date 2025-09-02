@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getTokenClient } from '@/lib/client-token-store';
 import { getPlaidData } from '@/lib/session-store';
+import { INCOME_MAPPINGS, EXPENSE_MAPPINGS, getFieldDisplayName } from '@/lib/plaid-mapping';
 
 /**
  * PlaidDataDisplay Component - Shows all raw Plaid data after connection
@@ -134,11 +135,155 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const date = new Date(dateString);
+    // Add 1 day to fix the date offset issue
+    date.setDate(date.getDate() + 1);
+    // Return in ISO format (YYYY-MM-DD)
+    return date.toISOString().split('T')[0];
+  };
+
+  // Helper function to determine if a transaction is income based on category and transaction details
+  const isIncomeTransaction = (transaction) => {
+    const category = transaction.personal_finance_category;
+    const primaryCategory = category?.primary;
+    const transactionName = (transaction.name || '').toLowerCase();
+    
+    // Explicit income category
+    if (primaryCategory === 'INCOME') {
+      return true;
+    }
+    
+    // Check for income indicators in transaction names (payroll, salary, etc.)
+    const incomeKeywords = ['gusto pay', 'payroll', 'salary', 'wage', 'deposit', 'direct deposit', 'intrst pymnt', 'interest payment'];
+    const hasIncomeKeyword = incomeKeywords.some(keyword => transactionName.includes(keyword));
+    
+    if (hasIncomeKeyword) {
+      return true;
+    }
+    
+    // Most importantly: negative amounts represent money coming INTO the account (income/refunds/credits)
+    // unless it's a known expense category that might have positive/negative inconsistencies
+    if (transaction.amount < 0) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Helper function to determine payment type based on transaction characteristics
+  const getPaymentType = (transaction) => {
+    const transactionName = (transaction.name || '').toLowerCase();
+    const merchantName = (transaction.merchant_name || '').toLowerCase();
+    const category = transaction.personal_finance_category;
+    
+    // Check for direct deposit/ACH
+    if (transactionName.includes('direct deposit') || 
+        transactionName.includes('ach') || 
+        transactionName.includes('gusto pay') ||
+        transactionName.includes('payroll')) {
+      return 'ACH/Direct Deposit';
+    }
+    
+    // Check for wire transfers
+    if (transactionName.includes('wire') || transactionName.includes('transfer')) {
+      return 'Wire Transfer';
+    }
+    
+    // Check for card payments based on payment channel and merchant
+    if (transaction.payment_channel === 'online') {
+      return 'Card/Online';
+    } else if (transaction.payment_channel === 'in store') {
+      return 'Card/In-Store';
+    }
+    
+    // Check for check payments
+    if (transactionName.includes('check') || transactionName.includes('chk')) {
+      return 'Check';
+    }
+    
+    // Check for recurring/automatic payments
+    if (transactionName.includes('auto') || 
+        transactionName.includes('recurring') ||
+        transactionName.includes('automatic')) {
+      return 'Automatic Payment';
+    }
+    
+    // Check for ATM transactions
+    if (transactionName.includes('atm') || transactionName.includes('cash withdrawal')) {
+      return 'ATM';
+    }
+    
+    // Check for fee-related transactions
+    if (category?.primary === 'BANK_FEES' || 
+        transactionName.includes('fee') || 
+        transactionName.includes('service charge')) {
+      return 'Bank Fee';
+    }
+    
+    // Default based on payment channel
+    if (transaction.payment_channel === 'other') {
+      return 'Bank Transaction';
+    }
+    
+    return 'Debit/Credit Card';
+  };
+
+  const getDealSheetField = (transaction) => {
+    const category = transaction.personal_finance_category;
+    if (!category || !category.detailed) {
+      return '';
+    }
+
+    const detailedCategory = category.detailed;
+    const primaryCategory = category.primary;
+    
+    // Format the detailed category for mapping lookup
+    const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
+    
+    // Check if this is income
+    if (isIncomeTransaction(transaction)) {
+      const mappedField = INCOME_MAPPINGS[categoryKey] || 'netMonthlyEmploymentIncome'; // Default to employment income
+      return mappedField ? getFieldDisplayName(mappedField) : '';
+    } 
+    // Check if this is an expense (positive amounts or known expense categories)
+    else if (transaction.amount > 0 || 
+             primaryCategory === 'TRANSPORTATION' || 
+             primaryCategory === 'FOOD_AND_DRINK' || 
+             primaryCategory === 'GENERAL_MERCHANDISE' ||
+             primaryCategory === 'GENERAL_SERVICES' ||
+             primaryCategory === 'ENTERTAINMENT' ||
+             primaryCategory === 'PERSONAL_CARE' ||
+             primaryCategory === 'LOAN_PAYMENTS' ||
+             primaryCategory === 'RENT_AND_UTILITIES' ||
+             primaryCategory === 'MEDICAL' ||
+             primaryCategory === 'TRAVEL') {
+      
+      let mappedField = EXPENSE_MAPPINGS[categoryKey];
+      
+      // Special handling for GENERAL_SERVICES_INSURANCE - need to detect type
+      if (categoryKey === 'GENERAL_SERVICES_INSURANCE') {
+        const transactionName = (transaction.name || '').toLowerCase();
+        const merchantName = (transaction.merchant_name || '').toLowerCase();
+        
+        if (transactionName.includes('home') || transactionName.includes('renters') || 
+            merchantName.includes('home') || merchantName.includes('renters')) {
+          mappedField = 'homeOwnersInsurance';
+        } else if (transactionName.includes('auto') || transactionName.includes('car') || 
+                   merchantName.includes('auto') || merchantName.includes('geico') || 
+                   merchantName.includes('progressive') || merchantName.includes('allstate')) {
+          mappedField = 'autoInsurance';
+        } else if (transactionName.includes('health') || transactionName.includes('life') ||
+                   transactionName.includes('medical') || merchantName.includes('health')) {
+          mappedField = 'healthLifeInsurance';
+        } else {
+          mappedField = 'healthLifeInsurance';
+        }
+      }
+      
+      return mappedField ? getFieldDisplayName(mappedField) : '';
+    }
+    
+    return '';
   };
 
   if (loading) {
@@ -412,7 +557,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
         </div>
       )}
 
-      {/* Transactions Information */}
+      {/* Transactions Information - Grouped by Account */}
       <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-orange-900 mb-4">
           Recent Transactions ({plaidData.transactions.transactions?.length || 0})
@@ -424,53 +569,139 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
               Total transactions available: {plaidData.transactions.total_transactions}
             </div>
             
-            <div className="bg-white rounded-lg border border-orange-300">
-              <table className="min-w-full">
-                <thead className="bg-orange-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Date</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Description</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Amount</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Category</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-orange-900 uppercase">Account</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {plaidData.transactions.transactions.map((transaction, index) => (
-                    <tr key={transaction.transaction_id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(transaction.date)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900">
-                        {transaction.name}
-                      </td>
-                      <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${
-                        transaction.amount > 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {transaction.amount > 0 ? '-' : '+'}{formatCurrency(Math.abs(transaction.amount))}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        <div className="space-y-1">
-                          <div>
-                            {transaction.personal_finance_category 
-                              ? transaction.personal_finance_category.primary 
-                              : (transaction.category ? transaction.category.join(' > ') : 'Uncategorized')}
-                          </div>
-                          {transaction.personal_finance_category?.detailed && (
-                            <div className="text-xs text-gray-500">
-                              {transaction.personal_finance_category.detailed.replace(/_/g, ' ').toLowerCase()}
+            {(() => {
+              const accounts = plaidData.accounts.accounts || [];
+              const transactions = plaidData.transactions.transactions || [];
+              
+              // Group transactions by account
+              const transactionsByAccount = transactions.reduce((grouped, transaction) => {
+                const accountId = transaction.account_id;
+                if (!grouped[accountId]) {
+                  grouped[accountId] = [];
+                }
+                grouped[accountId].push(transaction);
+                return grouped;
+              }, {});
+
+              return (
+                <div className="space-y-6">
+                  {Object.entries(transactionsByAccount).map(([accountId, accountTransactions]) => {
+                    const account = accounts.find(acc => acc.account_id === accountId);
+                    
+                    return (
+                      <div key={accountId} className="bg-white rounded-lg border border-orange-300">
+                        <div className="bg-orange-100 px-4 py-3 rounded-t-lg">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h3 className="font-semibold text-orange-900">
+                                {account?.name || 'Unknown Account'}
+                              </h3>
+                              <p className="text-sm text-orange-700">
+                                {account?.subtype} • {account?.type} • ID: ...{accountId.slice(-4)}
+                              </p>
                             </div>
-                          )}
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-orange-700">
+                                {accountTransactions.length} transactions
+                              </p>
+                              {account && (
+                                <p className="text-sm text-orange-600">
+                                  Balance: {formatCurrency(account.balances.current)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-500 font-mono">
-                        {transaction.account_id.slice(-4)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Date</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Description</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Amount</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Payment Channel</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Payment Type</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Category</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Deal Sheet Field</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {accountTransactions.map((transaction, index) => (
+                                <tr key={transaction.transaction_id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                    {formatDate(transaction.date)}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">
+                                    {transaction.name}
+                                  </td>
+                                  <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${
+                                    isIncomeTransaction(transaction) ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {isIncomeTransaction(transaction) 
+                                      ? `+${formatCurrency(Math.abs(transaction.amount))}` 
+                                      : `-${formatCurrency(Math.abs(transaction.amount))}`}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-600">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      transaction.payment_channel === 'online' ? 'bg-blue-100 text-blue-800' :
+                                      transaction.payment_channel === 'in store' ? 'bg-green-100 text-green-800' :
+                                      transaction.payment_channel === 'other' ? 'bg-gray-100 text-gray-800' :
+                                      'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {transaction.payment_channel || 'unknown'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-600">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      getPaymentType(transaction).includes('ACH') || getPaymentType(transaction).includes('Direct') ? 'bg-purple-100 text-purple-800' :
+                                      getPaymentType(transaction).includes('Card') ? 'bg-indigo-100 text-indigo-800' :
+                                      getPaymentType(transaction).includes('Wire') ? 'bg-red-100 text-red-800' :
+                                      getPaymentType(transaction).includes('Check') ? 'bg-orange-100 text-orange-800' :
+                                      getPaymentType(transaction).includes('ATM') ? 'bg-yellow-100 text-yellow-800' :
+                                      getPaymentType(transaction).includes('Fee') ? 'bg-red-100 text-red-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {getPaymentType(transaction)}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-600">
+                                    <div className="space-y-1">
+                                      <div>
+                                        {transaction.personal_finance_category 
+                                          ? transaction.personal_finance_category.primary 
+                                          : (transaction.category ? transaction.category.join(' > ') : 'Uncategorized')}
+                                      </div>
+                                      {transaction.personal_finance_category?.detailed && (
+                                        <div className="text-xs text-gray-500">
+                                          {transaction.personal_finance_category.detailed.replace(/_/g, ' ').toLowerCase()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-gray-600">
+                                    {(() => {
+                                      const dealSheetField = getDealSheetField(transaction);
+                                      return dealSheetField ? (
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                          {dealSheetField}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400 italic">No mapping</span>
+                                      );
+                                    })()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         ) : (
           <p className="text-orange-700">No transactions found</p>
@@ -810,7 +1041,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
           <summary className="text-blue-600 hover:text-blue-800 font-medium">
             Click to view complete raw data
           </summary>
-          <pre className="mt-4 bg-gray-800 text-green-400 p-4 rounded text-xs overflow-x-auto max-h-64 overflow-y-auto">
+          <pre className="mt-4 bg-gray-800 text-green-400 p-4 rounded text-xs overflow-x-auto">
             {JSON.stringify(plaidData, null, 2)}
           </pre>
         </details>

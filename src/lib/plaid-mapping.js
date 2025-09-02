@@ -3,7 +3,7 @@
  */
 
 // Income category mappings - based on actual Plaid category structure
-const INCOME_MAPPINGS = {
+export const INCOME_MAPPINGS = {
   // Primary INCOME categories
   'INCOME_WAGES': 'netMonthlyEmploymentIncome',
   'INCOME_DIVIDENDS': 'dividends',
@@ -19,7 +19,7 @@ const INCOME_MAPPINGS = {
 };
 
 // Expense category mappings - updated to match actual Plaid detailed categories
-const EXPENSE_MAPPINGS = {
+export const EXPENSE_MAPPINGS = {
   // Housing
   'RENT_AND_UTILITIES_RENT': 'housingPayment',
   'LOAN_PAYMENTS_MORTGAGE_PAYMENT': 'housingPayment',
@@ -76,11 +76,47 @@ const EXPENSE_MAPPINGS = {
   'PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS': 'gym',
   'PERSONAL_CARE_OTHER_PERSONAL_CARE': 'personalCare',
   
+  // Alternative mappings without primary category prefix (in case Plaid sends detailed category only)
+  'HAIR_AND_BEAUTY': 'hairCare',
+  'LAUNDRY_AND_DRY_CLEANING': 'laundry',
+  'GYMS_AND_FITNESS_CENTERS': 'gym',
+  'OTHER_PERSONAL_CARE': 'personalCare',
+  
+  // Additional food category alternatives
+  'GROCERIES': 'groceries',
+  'RESTAURANT': 'eatingOut',
+  'FAST_FOOD': 'eatingOut',
+  'COFFEE': 'eatingOut',
+  'COFFEE_SHOPS': 'eatingOut',
+  'BEER_WINE_AND_LIQUOR_STORES': 'eatingOut',
+  
+  // Additional transportation alternatives
+  'GAS': 'gasoline',
+  'PARKING': 'parking',
+  'PUBLIC_TRANSIT': 'commuting',
+  'TAXIS_AND_RIDE_SHARES': 'commuting',
+  'TOLLS': 'commuting',
+  'AUTOMOTIVE': 'repairsMaintenance',
+  
+  // Additional utility alternatives
+  'GAS_AND_ELECTRICITY': 'gasElectricOil',
+  'INTERNET_AND_CABLE': 'cableSatelliteInternet',
+  'TELEPHONE': 'phoneIncludeCell',
+  'WATER': 'waterSewerGarbage',
+  'SEWAGE_AND_WASTE_MANAGEMENT': 'waterSewerGarbage',
+  'OTHER_UTILITIES': 'gasElectricOil',
+  
   // Debt (not in program)
   'LOAN_PAYMENTS_OTHER_PAYMENT': 'debtOther',
   'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT': 'debtOther',
   'LOAN_PAYMENTS_STUDENT_LOAN': 'govtStudentLoans',
   'LOAN_PAYMENTS_PERSONAL_LOAN': 'privateStudentLoans',
+  
+  // Alternative debt mappings without primary category prefix
+  'OTHER_PAYMENT': 'debtOther',
+  'CREDIT_CARD_PAYMENT': 'debtOther',
+  'STUDENT_LOAN': 'govtStudentLoans',
+  'PERSONAL_LOAN': 'privateStudentLoans',
   
   // Legal & Court-Ordered
   'TRANSFER_OUT_CHILD_SUPPORT': 'childSupportExpense',
@@ -161,7 +197,7 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
 
     const primaryCategory = category.primary;
     const detailedCategory = category.detailed;
-    const amount = Math.abs(transaction.amount); // Plaid amounts are negative for outflows
+    const amount = Math.abs(transaction.amount);
     
     // Track category statistics
     const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
@@ -188,7 +224,7 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
       });
       incomeCount++;
     }
-    if (expenseCount < 5 && transaction.amount < 0) {
+    if (expenseCount < 5 && transaction.amount > 0) {
       console.log('[Mapping] Expense transaction:', {
         name: transaction.name,
         primary: primaryCategory,
@@ -223,20 +259,20 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
           mappedData.income[mappedField] = 0;
           mappedData.transactionDetails[mappedField] = [];
         }
-        mappedData.income[mappedField] += amount;
+        mappedData.income[mappedField] += Math.abs(transaction.amount);
         mappedData.transactionDetails[mappedField].push({
           ...transaction,
-          mappedAmount: amount
+          mappedAmount: -transaction.amount // Income should show as negative in Plaid (money coming in)
         });
         categoryStats[categoryKey].mapped = true;
-        console.log(`[Mapping] Mapped income: ${categoryKey} -> ${mappedField} ($${amount})`);
+        console.log(`[Mapping] Mapped income: ${categoryKey} -> ${mappedField} ($${amount}) [rawAmount: ${transaction.amount}]`);
       } else {
         console.log(`[Mapping] Unmapped income category: ${categoryKey}`);
         mappedData.unmapped.push(transaction);
       }
     }
-    // Handle expenses (negative amounts in Plaid represent money going out, but some categories might be positive)
-    else if (transaction.amount < 0 || 
+    // Handle expenses (positive amounts in Plaid represent money going out)
+    else if (transaction.amount > 0 || 
              primaryCategory === 'TRANSPORTATION' || 
              primaryCategory === 'FOOD_AND_DRINK' || 
              primaryCategory === 'GENERAL_MERCHANDISE' ||
@@ -290,19 +326,25 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
           mappedData.expenses[mappedField] = 0;
           mappedData.transactionDetails[mappedField] = [];
         }
-        mappedData.expenses[mappedField] += amount;
+        mappedData.expenses[mappedField] += transaction.amount;
         mappedData.transactionDetails[mappedField].push({
           ...transaction,
-          mappedAmount: amount
+          mappedAmount: transaction.amount // Expenses should show as positive (money going out)
         });
         categoryStats[categoryKey].mapped = true;
-        console.log(`[Mapping] Mapped expense: ${categoryKey} -> ${mappedField} ($${amount})`);
+        console.log(`[Mapping] Mapped expense: ${categoryKey} -> ${mappedField} ($${amount}) [rawAmount: ${transaction.amount}]`);
       } else {
         console.log(`[Mapping] Unmapped expense category: ${categoryKey}`);
         mappedData.unmapped.push(transaction);
       }
     } else {
-      // Positive non-income transactions
+      // Negative non-income transactions (potential income/refunds not categorized as INCOME)
+      console.log('[Mapping] Unmapped negative transaction (possible income):', {
+        name: transaction.name,
+        primary: primaryCategory,
+        detailed: detailedCategory,
+        amount: transaction.amount
+      });
       mappedData.unmapped.push(transaction);
     }
   });

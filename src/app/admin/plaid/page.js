@@ -6,28 +6,150 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function PlaidAdminPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [fieldMappings, setFieldMappings] = useState({});
+
+  // All available deal sheet fields
+  const dealSheetFields = [
+    // Income fields
+    { value: 'netMonthlyEmploymentIncome', label: 'Net Monthly Employment Income', category: 'Income' },
+    { value: 'selfEmployment', label: 'Self Employment', category: 'Income' },
+    { value: 'socialSecurity', label: 'Social Security', category: 'Income' },
+    { value: 'unemployment', label: 'Unemployment', category: 'Income' },
+    { value: 'alimony', label: 'Alimony', category: 'Income' },
+    { value: 'childSupport', label: 'Child Support', category: 'Income' },
+    { value: 'otherGovtAssistance', label: 'Other Govt. Assistance', category: 'Income' },
+    { value: 'annuities', label: 'Annuities', category: 'Income' },
+    { value: 'dividends', label: 'Dividends', category: 'Income' },
+    { value: 'retirement', label: 'Retirement', category: 'Income' },
+    { value: 'otherIncome', label: 'Other Income', category: 'Income' },
+    
+    // Housing & Utilities
+    { value: 'housingPayment', label: 'Housing Payment', category: 'Housing' },
+    { value: 'secondaryHousingPayment', label: 'Secondary Housing Payment', category: 'Housing' },
+    { value: 'homeOwnersInsurance', label: 'Home Owners Insurance', category: 'Housing' },
+    { value: 'gasElectricOil', label: 'Gas/Electric/Oil', category: 'Utilities' },
+    { value: 'cableSatelliteInternet', label: 'Cable/Satellite/Internet', category: 'Utilities' },
+    { value: 'phoneIncludeCell', label: 'Phone (incl. cell)', category: 'Utilities' },
+    { value: 'waterSewerGarbage', label: 'Water/Sewer/Garbage', category: 'Utilities' },
+    
+    // Transportation
+    { value: 'autoPayments', label: 'Auto Payments', category: 'Transportation' },
+    { value: 'autoInsurance', label: 'Auto Insurance', category: 'Transportation' },
+    { value: 'gasoline', label: 'Gasoline', category: 'Transportation' },
+    { value: 'parking', label: 'Parking', category: 'Transportation' },
+    { value: 'commuting', label: 'Commuting', category: 'Transportation' },
+    { value: 'repairsMaintenance', label: 'Repairs/Maintenance', category: 'Transportation' },
+    
+    // Food & Living Expenses
+    { value: 'groceries', label: 'Food - Groceries', category: 'Food' },
+    { value: 'eatingOut', label: 'Food - Eating Out', category: 'Food' },
+    { value: 'clothing', label: 'Clothing', category: 'Living Expenses' },
+    { value: 'householdItems', label: 'Household Items', category: 'Living Expenses' },
+    { value: 'personalCare', label: 'Personal Care', category: 'Living Expenses' },
+    { value: 'toiletries', label: 'Toiletries', category: 'Living Expenses' },
+    
+    // Healthcare
+    { value: 'healthLifeInsurance', label: 'Health/Life Insurance', category: 'Healthcare' },
+    { value: 'medicalCare', label: 'Medical Care', category: 'Healthcare' },
+    { value: 'prescriptionsMedicalExp', label: 'Prescriptions/Medical Exp', category: 'Healthcare' },
+    { value: 'medicalDebt', label: 'Medical Debt', category: 'Healthcare' },
+    { value: 'nursingCare', label: 'Nursing Care', category: 'Healthcare' },
+    
+    // Recreation & Personal
+    { value: 'entertainment', label: 'Entertainment', category: 'Recreation' },
+    { value: 'petCare', label: 'Pet Care', category: 'Recreation' },
+    { value: 'gifts', label: 'Gifts', category: 'Recreation' },
+    { value: 'hairCare', label: 'Hair Care', category: 'Personal Care' },
+    { value: 'laundry', label: 'Laundry', category: 'Personal Care' },
+    { value: 'gym', label: 'Gym', category: 'Personal Care' },
+    
+    // Debt & Financial
+    { value: 'debtOther', label: 'Debt Other', category: 'Debt' },
+    { value: 'govtStudentLoans', label: 'Gov\'t Student Loans (non-deferred)', category: 'Debt' },
+    { value: 'privateStudentLoans', label: 'Private Student Loans (non-deferred)', category: 'Debt' },
+    
+    // Legal & Court-Ordered
+    { value: 'childSupportExpense', label: 'Child Support (Expense)', category: 'Legal' },
+    { value: 'alimonyExpense', label: 'Alimony (Expense)', category: 'Legal' },
+    { value: 'judgmentPayments', label: 'Judgment Payments', category: 'Legal' },
+    { value: 'backTaxes', label: 'Back Taxes', category: 'Legal' },
+    
+    // Dependent Care
+    { value: 'daycareChildExpenses', label: 'Daycare/Child Expenses', category: 'Dependent Care' },
+    
+    // Other
+    { value: 'charityDonations', label: 'Charity Donations', category: 'Other' },
+    { value: 'misc', label: 'Miscellaneous', category: 'Other' },
+    { value: 'fundsAvailable', label: 'Funds Available', category: 'Other' }
+  ];
+
+  // Handle mapping changes
+  const handleMappingChange = (categoryId, newMapping) => {
+    setFieldMappings(prev => ({
+      ...prev,
+      [categoryId]: newMapping
+    }));
+  };
+
+  // Save mapping configuration
+  const handleSaveMapping = () => {
+    const mappingConfig = {
+      timestamp: new Date().toISOString(),
+      mappings: fieldMappings
+    };
+    
+    // Save to localStorage for now - in production this would go to a database
+    localStorage.setItem('plaid-dealsheet-mapping', JSON.stringify(mappingConfig));
+    alert('Mapping configuration saved successfully!');
+  };
+
+  // Export mapping as JSON
+  const handleExportMapping = () => {
+    const mappingConfig = {
+      timestamp: new Date().toISOString(),
+      mappings: fieldMappings,
+      incomeCategories: incomeCategories.map(cat => ({
+        plaidCategory: cat.detailed,
+        dealSheetField: fieldMappings[cat.id] || cat.dealSheetField
+      })),
+      expenseCategories: allCategories.map(cat => ({
+        plaidCategory: cat.detailed,
+        dealSheetField: fieldMappings[cat.id || cat.detailed] || cat.dealSheetField
+      }))
+    };
+    
+    const dataStr = JSON.stringify(mappingConfig, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'plaid-dealsheet-mapping.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const incomeCategories = [
-    { primary: 'INCOME', detailed: 'INCOME_DIVIDENDS', dealSheetField: 'Dividends', formField: 'dividends / coApplicantDividends', description: 'Dividends from investment accounts' },
-    { primary: 'INCOME', detailed: 'INCOME_INTEREST_EARNED', dealSheetField: 'Other Income', formField: 'otherIncome / coApplicantOtherIncome', description: 'Income from interest on savings accounts' },
-    { primary: 'INCOME', detailed: 'INCOME_RETIREMENT_PENSION', dealSheetField: 'Retirement', formField: 'retirement / coApplicantRetirement', description: 'Income from pension payments' },
-    { primary: 'INCOME', detailed: 'INCOME_TAX_REFUND', dealSheetField: 'Other Income', formField: 'otherIncome / coApplicantOtherIncome', description: 'Income from tax refunds' },
-    { primary: 'INCOME', detailed: 'INCOME_UNEMPLOYMENT', dealSheetField: 'Unemployment', formField: 'unemployment / coApplicantUnemployment', description: 'Income from unemployment benefits, including unemployment insurance and healthcare' },
-    { primary: 'INCOME', detailed: 'INCOME_WAGES', dealSheetField: 'Net Monthly Employment Income', formField: 'netMonthlyEmploymentIncome / coApplicantNetMonthlyIncome', description: 'Income from salaries, gig-economy work, and tips earned' },
-    { primary: 'INCOME', detailed: 'INCOME_OTHER_INCOME', dealSheetField: 'Other Income', formField: 'otherIncome / coApplicantOtherIncome', description: 'Other miscellaneous income, including alimony, social security, child support, and rental' }
+    { id: 'INCOME_DIVIDENDS', primary: 'INCOME', detailed: 'INCOME_DIVIDENDS', dealSheetField: 'dividends', formField: 'dividends / coApplicantDividends', description: 'Dividends from investment accounts' },
+    { id: 'INCOME_INTEREST_EARNED', primary: 'INCOME', detailed: 'INCOME_INTEREST_EARNED', dealSheetField: 'otherIncome', formField: 'otherIncome / coApplicantOtherIncome', description: 'Income from interest on savings accounts' },
+    { id: 'INCOME_RETIREMENT_PENSION', primary: 'INCOME', detailed: 'INCOME_RETIREMENT_PENSION', dealSheetField: 'retirement', formField: 'retirement / coApplicantRetirement', description: 'Income from pension payments' },
+    { id: 'INCOME_TAX_REFUND', primary: 'INCOME', detailed: 'INCOME_TAX_REFUND', dealSheetField: 'otherIncome', formField: 'otherIncome / coApplicantOtherIncome', description: 'Income from tax refunds' },
+    { id: 'INCOME_UNEMPLOYMENT', primary: 'INCOME', detailed: 'INCOME_UNEMPLOYMENT', dealSheetField: 'unemployment', formField: 'unemployment / coApplicantUnemployment', description: 'Income from unemployment benefits, including unemployment insurance and healthcare' },
+    { id: 'INCOME_WAGES', primary: 'INCOME', detailed: 'INCOME_WAGES', dealSheetField: 'netMonthlyEmploymentIncome', formField: 'netMonthlyEmploymentIncome / coApplicantNetMonthlyIncome', description: 'Income from salaries, gig-economy work, and tips earned' },
+    { id: 'INCOME_OTHER_INCOME', primary: 'INCOME', detailed: 'INCOME_OTHER_INCOME', dealSheetField: 'otherIncome', formField: 'otherIncome / coApplicantOtherIncome', description: 'Other miscellaneous income, including alimony, social security, child support, and rental' }
   ];
 
   const allCategories = [
     // TRANSFER_IN
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_CASH_ADVANCES_AND_LOANS', dealSheetField: 'Other Income', description: 'Loans and cash advances deposited into a bank account' },
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_DEPOSIT', dealSheetField: 'Other Income', description: 'Cash, checks, and ATM deposits into a bank account' },
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS', dealSheetField: 'Other Income', description: 'Inbound transfers to an investment or retirement account' },
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_SAVINGS', dealSheetField: 'Other Income', description: 'Inbound transfers to a savings account' },
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_ACCOUNT_TRANSFER', dealSheetField: 'Other Income', description: 'General inbound transfers from another account' },
-    { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_OTHER_TRANSFER_IN', dealSheetField: 'Other Income', description: 'Other miscellaneous inbound transactions' },
+    { id: 'TRANSFER_IN_CASH_ADVANCES_AND_LOANS', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_CASH_ADVANCES_AND_LOANS', dealSheetField: 'otherIncome', description: 'Loans and cash advances deposited into a bank account' },
+    { id: 'TRANSFER_IN_DEPOSIT', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_DEPOSIT', dealSheetField: 'otherIncome', description: 'Cash, checks, and ATM deposits into a bank account' },
+    { id: 'TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS', dealSheetField: 'otherIncome', description: 'Inbound transfers to an investment or retirement account' },
+    { id: 'TRANSFER_IN_SAVINGS', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_SAVINGS', dealSheetField: 'otherIncome', description: 'Inbound transfers to a savings account' },
+    { id: 'TRANSFER_IN_ACCOUNT_TRANSFER', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_ACCOUNT_TRANSFER', dealSheetField: 'otherIncome', description: 'General inbound transfers from another account' },
+    { id: 'TRANSFER_IN_OTHER_TRANSFER_IN', primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_OTHER_TRANSFER_IN', dealSheetField: 'otherIncome', description: 'Other miscellaneous inbound transactions' },
     
     // TRANSFER_OUT
     { primary: 'TRANSFER_OUT', detailed: 'TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS', dealSheetField: 'Miscellaneous', description: 'Transfers to an investment or retirement account, including investment apps such as Acorns, Betterment' },
@@ -233,7 +355,28 @@ export default function PlaidAdminPage() {
                         </Badge>
                       </td>
                       <td className="p-3 font-mono text-sm text-blue-600">{item.detailed}</td>
-                      <td className="p-3 font-medium">{item.dealSheetField}</td>
+                      <td className="p-3">
+                        <Select 
+                          value={fieldMappings[item.id] || item.dealSheetField} 
+                          onValueChange={(value) => handleMappingChange(item.id, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id] || item.dealSheetField))?.label || 'Select Field'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dealSheetFields
+                              .filter(field => field.category === 'Income')
+                              .map(field => (
+                                <SelectItem key={field.value} value={field.value}>
+                                  {field.label}
+                                </SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
+                      </td>
                       <td className="p-3 text-sm text-gray-600">{item.description}</td>
                     </tr>
                   ))}
@@ -275,7 +418,30 @@ export default function PlaidAdminPage() {
                         </Badge>
                       </td>
                       <td className="p-3 font-mono text-sm text-blue-600">{item.detailed}</td>
-                      <td className="p-3 font-medium">{item.dealSheetField}</td>
+                      <td className="p-3">
+                        <Select 
+                          value={fieldMappings[item.id || item.detailed] || item.dealSheetField} 
+                          onValueChange={(value) => handleMappingChange(item.id || item.detailed, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id || item.detailed] || item.dealSheetField))?.label || 
+                               dealSheetFields.find(field => field.label === item.dealSheetField)?.label || 
+                               item.dealSheetField}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px] overflow-y-auto">
+                            {dealSheetFields
+                              .filter(field => field.category !== 'Income')
+                              .map(field => (
+                                <SelectItem key={field.value} value={field.value}>
+                                  <span className="text-xs text-gray-500">{field.category}:</span> {field.label}
+                                </SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
+                      </td>
                       <td className="p-3 text-sm text-gray-600">{item.description}</td>
                     </tr>
                   ))}
@@ -306,6 +472,31 @@ export default function PlaidAdminPage() {
               <p className="mb-2">This mapping is based on the official Plaid Personal Finance Category Taxonomy CSV file:</p>
               <p className="font-mono text-xs bg-gray-100 p-2 rounded">transactions-personal-finance-category-taxonomy.csv</p>
               <p className="mt-2">Updated to include all primary and detailed categories with their official descriptions and suggested deal sheet field mappings.</p>
+            </div>
+          </Card>
+
+          {/* Mapping Control Buttons */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-700">Mapping Controls</h2>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Button
+                onClick={handleSaveMapping}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Save Mapping Configuration
+              </Button>
+              <Button
+                onClick={handleExportMapping}
+                variant="outline"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                Export Mapping as JSON
+              </Button>
+              {Object.keys(fieldMappings).length > 0 && (
+                <span className="text-sm text-gray-600 self-center">
+                  {Object.keys(fieldMappings).length} mappings modified
+                </span>
+              )}
             </div>
           </Card>
 
