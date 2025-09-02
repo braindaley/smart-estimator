@@ -34,7 +34,7 @@ export const useEstimatorStore = create<EstimatorState>()(
     }),
     {
       name: 'estimator-storage', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => sessionStorage), // (optional) by default, 'localStorage' is used
+      storage: createJSONStorage(() => localStorage), // using localStorage for persistence across tabs
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);

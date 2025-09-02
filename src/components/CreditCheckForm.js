@@ -136,8 +136,8 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
         return;
       }
       
-      // Store credit data in session storage
-      sessionStorage.setItem(`credit_data_${userId}`, JSON.stringify({
+      // Store credit data in local storage
+      localStorage.setItem(`credit_data_${userId}`, JSON.stringify({
         ...data,
         requestedAt: new Date().toISOString(),
         personalInfo: {
@@ -152,9 +152,9 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
       }));
       
       // Mark step as completed
-      const stepStatus = JSON.parse(sessionStorage.getItem('loan_step_status') || '{}');
+      const stepStatus = JSON.parse(localStorage.getItem('loan_step_status') || '{}');
       stepStatus.credit_check = { completed: true, timestamp: new Date().toISOString() };
-      sessionStorage.setItem('loan_step_status', JSON.stringify(stepStatus));
+      localStorage.setItem('loan_step_status', JSON.stringify(stepStatus));
       
       // Close modal
       setIsOpen(false);

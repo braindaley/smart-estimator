@@ -20,8 +20,8 @@ export default function CreditResultsPage() {
       return;
     }
 
-    // Get credit data from session storage
-    const storedCreditData = sessionStorage.getItem(`credit_data_${userId}`);
+    // Get credit data from local storage
+    const storedCreditData = localStorage.getItem(`credit_data_${userId}`);
     console.log('Credit Results - Stored data exists:', !!storedCreditData);
     console.log('Credit Results - Raw stored data:', storedCreditData);
     

@@ -22,7 +22,7 @@ const getCreditData = () => {
   if (typeof window === 'undefined') return null;
   const userId = localStorage.getItem('loan_user_id');
   if (!userId) return null;
-  const storedCreditData = sessionStorage.getItem(`credit_data_${userId}`);
+  const storedCreditData = localStorage.getItem(`credit_data_${userId}`);
   if (!storedCreditData) return null;
   try {
     return JSON.parse(storedCreditData);

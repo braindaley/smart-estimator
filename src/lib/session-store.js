@@ -19,14 +19,14 @@ export const setStepCompleted = (stepId, completed = true, data = null) => {
       completedAt: completed ? new Date().toISOString() : null,
       data
     };
-    sessionStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
+    localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
   }
 };
 
 // Get step completion status
 export const getStepStatus = () => {
   if (typeof window !== 'undefined') {
-    const stored = sessionStorage.getItem(SESSION_KEYS.USER_STEPS);
+    const stored = localStorage.getItem(SESSION_KEYS.USER_STEPS);
     return stored ? JSON.parse(stored) : {};
   }
   return {};
@@ -52,7 +52,7 @@ export const storePlaidData = (userId, data) => {
       data,
       storedAt: new Date().toISOString()
     };
-    sessionStorage.setItem(SESSION_KEYS.PLAID_DATA, JSON.stringify(plaidData));
+    localStorage.setItem(SESSION_KEYS.PLAID_DATA, JSON.stringify(plaidData));
     setStepCompleted('bank_connection', true, { userId, connectionTime: new Date().toISOString() });
   }
 };
@@ -60,7 +60,7 @@ export const storePlaidData = (userId, data) => {
 // Get Plaid data
 export const getPlaidData = () => {
   if (typeof window !== 'undefined') {
-    const stored = sessionStorage.getItem(SESSION_KEYS.PLAID_DATA);
+    const stored = localStorage.getItem(SESSION_KEYS.PLAID_DATA);
     return stored ? JSON.parse(stored) : null;
   }
   return null;
@@ -70,7 +70,7 @@ export const getPlaidData = () => {
 export const clearSessionData = () => {
   if (typeof window !== 'undefined') {
     Object.values(SESSION_KEYS).forEach(key => {
-      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
     });
   }
 };
@@ -89,7 +89,7 @@ export const storeCreditData = (userId, data) => {
       data,
       storedAt: new Date().toISOString()
     };
-    sessionStorage.setItem(SESSION_KEYS.CREDIT_DATA, JSON.stringify(creditData));
+    localStorage.setItem(SESSION_KEYS.CREDIT_DATA, JSON.stringify(creditData));
     setStepCompleted('credit_check', true, { userId, checkTime: new Date().toISOString() });
   }
 };
@@ -97,7 +97,7 @@ export const storeCreditData = (userId, data) => {
 // Get credit check data
 export const getCreditData = () => {
   if (typeof window !== 'undefined') {
-    const stored = sessionStorage.getItem(SESSION_KEYS.CREDIT_DATA);
+    const stored = localStorage.getItem(SESSION_KEYS.CREDIT_DATA);
     return stored ? JSON.parse(stored) : null;
   }
   return null;
