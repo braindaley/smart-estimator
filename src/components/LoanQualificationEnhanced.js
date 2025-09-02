@@ -252,6 +252,11 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
               ) : (
                 <button
                   disabled={!stepStatus.bank_connection?.completed || !stepStatus.credit_check?.completed}
+                  onClick={() => {
+                    if (stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed) {
+                      router.push('/your-plan/results');
+                    }
+                  }}
                   className={`w-full h-10 px-4 font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center ${
                     stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
                       ? 'bg-green-600 hover:bg-green-700 text-white'

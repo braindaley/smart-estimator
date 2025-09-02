@@ -17,6 +17,66 @@ const getPlaidData = typeof window !== 'undefined'
   ? require('@/lib/session-store').getPlaidData 
   : () => null;
 
+// Function to get credit data
+const getCreditData = () => {
+  if (typeof window === 'undefined') return null;
+  const userId = localStorage.getItem('loan_user_id');
+  if (!userId) return null;
+  const storedCreditData = sessionStorage.getItem(`credit_data_${userId}`);
+  if (!storedCreditData) return null;
+  try {
+    return JSON.parse(storedCreditData);
+  } catch {
+    return null;
+  }
+};
+
+// Function to match account types with fuzzy logic
+const matchesAccountType = (account, targetTypes) => {
+  const getDescription = (field) => {
+    if (!field) return '';
+    return field.description || field.code || field || '';
+  };
+  
+  const accountType = getDescription(account.portfolioTypeCode).toLowerCase();
+  const accountTypeCode = getDescription(account.accountTypeCode).toLowerCase();
+  const customerName = (account.customerName || '').toLowerCase();
+  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0] 
+    ? getDescription(account.narrativeCodes[0]).toLowerCase() 
+    : '';
+  
+  const searchText = `${accountType} ${accountTypeCode} ${customerName} ${narrativeDescription}`;
+  
+  for (const targetType of targetTypes) {
+    const keywords = targetType.keywords;
+    const hasMatch = keywords.some(keyword => searchText.includes(keyword));
+    if (hasMatch) {
+      return targetType.type;
+    }
+  }
+  return null;
+};
+
+// Account type matching configuration
+const DEBT_ACCOUNT_TYPES = [
+  {
+    type: 'Credit Card',
+    keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi']
+  },
+  {
+    type: 'Personal Loan',
+    keywords: ['personal loan', 'personal', 'loan', 'installment', 'lending', 'upstart', 'prosper', 'sofi', 'marcus']
+  },
+  {
+    type: 'Medical',
+    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health']
+  },
+  {
+    type: 'Retail Credit',
+    keywords: ['retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'sears', 'nordstrom']
+  }
+];
+
 // Component to show transaction details
 const TransactionSummary = ({ transactions, totalAmount, fieldName }) => {
   const [showAll, setShowAll] = useState(false);
@@ -59,10 +119,13 @@ export default function DealSheetPage() {
   const [selectedField, setSelectedField] = useState(null);
   const [hasPlaidData, setHasPlaidData] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [creditData, setCreditData] = useState(null);
+  const [debtAccounts, setDebtAccounts] = useState([]);
   const [formData, setFormData] = useState({
     // Monthly Expenditure Details
     totalMonthlyIncome: '',
     programCost: '',
+    settlementDebt: '',
     totalExpenses: '',
     totalMonthlyExpenseWithProgram: '',
     availableFunds: '',
@@ -137,6 +200,42 @@ export default function DealSheetPage() {
     misc: '',
     fundsAvailable: ''
   });
+
+  // Function to load and process credit data
+  const loadCreditData = () => {
+    try {
+      const data = getCreditData();
+      if (data && data.trades && Array.isArray(data.trades)) {
+        setCreditData(data);
+        
+        // Filter and categorize debt accounts
+        const matchedAccounts = data.trades
+          .map(account => {
+            const matchedType = matchesAccountType(account, DEBT_ACCOUNT_TYPES);
+            if (matchedType) {
+              return {
+                ...account,
+                matchedType,
+                balance: account.balance || 0
+              };
+            }
+            return null;
+          })
+          .filter(account => account !== null);
+          
+        setDebtAccounts(matchedAccounts);
+        console.log('[DealSheet] Loaded debt accounts:', matchedAccounts);
+      } else {
+        console.log('[DealSheet] No credit data or trades found');
+        setCreditData(null);
+        setDebtAccounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading credit data:', error);
+      setCreditData(null);
+      setDebtAccounts([]);
+    }
+  };
 
   // Function to load and process Plaid data
   const loadPlaidData = () => {
@@ -240,9 +339,10 @@ export default function DealSheetPage() {
     }
   };
 
-  // Load Plaid data on component mount
+  // Load data on component mount
   useEffect(() => {
     loadPlaidData();
+    loadCreditData();
   }, []);
 
   // Listen for storage events to refresh when Plaid data is updated
@@ -401,6 +501,139 @@ export default function DealSheetPage() {
         </div>
 
         <div className="container mx-auto max-w-7xl px-4 py-12">
+          {/* Debt Portfolio Section */}
+          <Card className="p-6 mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-6 h-6 bg-red-500 rounded flex items-center justify-center">
+                <span className="text-white text-sm font-bold">💳</span>
+              </div>
+              <h2 className="text-lg font-semibold text-red-700">Debt Portfolio</h2>
+            </div>
+            
+            {debtAccounts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {debtAccounts.map((account, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                            {account.matchedType}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ...{(account.accountNumber || '').slice(-4)}
+                          </span>
+                        </div>
+                        
+                        <div>
+                          <h3 className="font-semibold text-sm text-gray-900 truncate">
+                            {account.customerName || 'Unknown Creditor'}
+                          </h3>
+                          <p className="text-xs text-gray-600">
+                            {account.portfolioTypeCode?.description || account.portfolioTypeCode?.code || 'N/A'}
+                          </p>
+                        </div>
+                        
+                        <div className="pt-2 border-t">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">Balance</span>
+                            <span className="font-semibold text-sm text-red-600">
+                              {account.balance && account.balance !== 'N/A' 
+                                ? `$${account.balance.toLocaleString()}` 
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          {account.scheduledPaymentAmount && account.scheduledPaymentAmount !== 'N/A' && (
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-xs text-gray-600">Monthly Payment</span>
+                              <span className="text-xs text-gray-800">
+                                ${account.scheduledPaymentAmount.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {account.rate?.description && (
+                          <div className="pt-1">
+                            <span className={`inline-block px-2 py-1 text-xs rounded ${
+                              account.rate.description.toLowerCase().includes('current') 
+                                ? 'bg-green-100 text-green-700' 
+                                : account.rate.description.toLowerCase().includes('past due')
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {account.rate.description}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Summary row */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {debtAccounts.length}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Accounts</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">
+                        ${debtAccounts
+                          .reduce((sum, account) => sum + (account.balance || 0), 0)
+                          .toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Balance</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        ${debtAccounts
+                          .reduce((sum, account) => sum + (account.scheduledPaymentAmount || 0), 0)
+                          .toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">Monthly Payments</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {[...new Set(debtAccounts.map(account => account.matchedType))].length}
+                      </div>
+                      <div className="text-sm text-gray-600">Account Types</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8">
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                      <span className="text-2xl text-gray-400">💳</span>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Credit Data Available</h3>
+                    <p className="text-sm text-gray-600 mb-4 max-w-md">
+                      Complete your credit check to see your debt portfolio including credit cards, personal loans, medical debts, and retail credit accounts.
+                    </p>
+                    <div className="space-y-2 text-xs text-gray-500">
+                      <p>• Credit Card accounts (Visa, Mastercard, Discover, etc.)</p>
+                      <p>• Personal Loans (SoFi, Upstart, Prosper, etc.)</p>
+                      <p>• Medical debts and healthcare accounts</p>
+                      <p>• Retail Credit (Macy's, Best Buy, Target, etc.)</p>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = '/your-plan'}
+                      className="mt-6 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Complete Credit Check
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
           {/* No Plaid Data Warning */}
           {!hasPlaidData && (
             <div className="mb-8">
@@ -465,6 +698,16 @@ export default function DealSheetPage() {
                           {formatCurrency(programCost)}
                         </div>
                         <div className="text-xs text-gray-500">To be determined</div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm text-gray-600">Settlement Debt</Label>
+                        <Input
+                          placeholder="$0.00"
+                          value={formData.settlementDebt ? formatCurrency(formData.settlementDebt) : ''}
+                          onChange={(e) => handleInputChange('settlementDebt', e.target.value)}
+                          className="text-lg font-semibold"
+                        />
+                        <div className="text-xs text-gray-500">Enter total settlement debt</div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Total Expenses</Label>

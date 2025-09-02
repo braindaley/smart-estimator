@@ -78,6 +78,12 @@ export function Header() {
           >
             Sign in
           </Link>
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Admin
+          </Link>
         </nav>
       </SheetContent>
     </Sheet>

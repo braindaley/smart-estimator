@@ -81,11 +81,11 @@ export default function CreditResultsPage() {
 
   // Determine credit score rating
   const getScoreRating = (score) => {
-    if (score >= 800) return { rating: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
-    if (score >= 740) return { rating: 'Very Good', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
-    if (score >= 670) return { rating: 'Good', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' };
-    if (score >= 580) return { rating: 'Fair', color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
-    return { rating: 'Poor', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
+    if (score >= 800) return { rating: 'Excellent', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (score >= 740) return { rating: 'Very Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (score >= 670) return { rating: 'Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (score >= 580) return { rating: 'Fair', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    return { rating: 'Poor', color: '', bgColor: '', borderColor: 'border-gray-200' };
   };
 
   const scoreInfo = creditData.creditScore ? getScoreRating(creditData.creditScore.score) : null;
@@ -95,7 +95,7 @@ export default function CreditResultsPage() {
       <Header />
       <main className="flex-1">
         {/* Hero Section */}
-        <div className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="">
           <div className="container mx-auto max-w-7xl px-4 py-8">
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-4">
@@ -104,6 +104,14 @@ export default function CreditResultsPage() {
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
                 Here's a comprehensive overview of your credit profile and qualifying debts
               </p>
+              {creditData.isMockData && (
+                <div className="mt-4 inline-block px-4 py-2 border rounded-lg">
+                  <span className="font-semibold">⚠️ Mock Data</span>
+                  <span className="text-sm ml-2">
+                    {creditData.mockReason || 'API temporarily unavailable'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -140,10 +148,10 @@ export default function CreditResultsPage() {
               <div className={`rounded-xl p-6 border ${scoreInfo.borderColor} ${scoreInfo.bgColor}`}>
                 <h2 className="text-lg font-semibold mb-4">Credit Score</h2>
                 <div className="text-center py-4">
-                  <div className={`text-5xl font-bold ${scoreInfo.color}`}>
+                  <div className="text-5xl font-bold">
                     {creditData.creditScore.score}
                   </div>
-                  <div className={`text-lg font-medium mt-2 ${scoreInfo.color}`}>
+                  <div className="text-lg font-medium mt-2">
                     {scoreInfo.rating}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
@@ -259,7 +267,7 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Credit Accounts ({creditData.trades.length})</h2>
               <div className="space-y-4">
                 {creditData.trades.map((account, index) => (
-                  <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div key={index} className="border rounded-lg p-4">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Creditor</span>
@@ -438,7 +446,7 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Address History ({creditData.addresses.length})</h2>
               <div className="space-y-3">
                 {creditData.addresses.map((address, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-blue-50">
+                  <div key={index} className="border rounded-lg p-3">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div className="md:col-span-2">
                         <span className="text-sm font-medium text-gray-700">Address</span>
@@ -470,7 +478,7 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Employment Information</h2>
               <div className="space-y-3">
                 {creditData.employments.map((employment, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-green-50">
+                  <div key={index} className="border rounded-lg p-3">
                     <div className="grid md:grid-cols-2 gap-3">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Employer</span>
@@ -493,7 +501,7 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Bankruptcies ({creditData.bankruptcies.length})</h2>
               <div className="space-y-3">
                 {creditData.bankruptcies.map((bankruptcy, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-red-50">
+                  <div key={index} className="border rounded-lg p-3">
                     <div className="grid md:grid-cols-3 gap-3">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Type</span>
@@ -520,7 +528,7 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Collections Accounts ({creditData.collections.length})</h2>
               <div className="space-y-3">
                 {creditData.collections.map((collection, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-yellow-50">
+                  <div key={index} className="border rounded-lg p-3">
                     <div className="grid md:grid-cols-4 gap-3">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Agency</span>
@@ -547,18 +555,18 @@ export default function CreditResultsPage() {
 
           {/* Fraud Alerts */}
           {creditData.fraudIDScanAlertCodes && creditData.fraudIDScanAlertCodes.length > 0 && (
-            <div className="mt-6 rounded-xl p-6 border border-red-300 bg-red-50">
-              <h2 className="text-lg font-semibold mb-4 text-red-800">Fraud Alerts ({creditData.fraudIDScanAlertCodes.length})</h2>
+            <div className="mt-6 rounded-xl p-6 border">
+              <h2 className="text-lg font-semibold mb-4">Fraud Alerts ({creditData.fraudIDScanAlertCodes.length})</h2>
               <div className="space-y-3">
                 {creditData.fraudIDScanAlertCodes.map((alert, index) => (
-                  <div key={index} className="border border-red-200 rounded-lg p-3 bg-red-100">
+                  <div key={index} className="border rounded-lg p-3">
                     <div className="flex items-center space-x-3">
-                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <div>
-                        <p className="font-medium text-red-800">Code: {alert.code}</p>
-                        <p className="text-sm text-red-700">{alert.description}</p>
+                        <p className="font-medium">Code: {alert.code}</p>
+                        <p className="text-sm">{alert.description}</p>
                       </div>
                     </div>
                   </div>
@@ -598,7 +606,7 @@ export default function CreditResultsPage() {
                       <span className="text-sm font-medium text-gray-700 block mb-2">
                         {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                       </span>
-                      <div className="bg-gray-50 rounded p-3">
+                      <div className="border rounded p-3">
                         {Object.entries(value).map(([subKey, subValue]) => (
                           <div key={subKey} className="flex justify-between items-center py-1">
                             <span className="text-xs text-gray-600">
@@ -647,7 +655,7 @@ export default function CreditResultsPage() {
             {creditData.rawResponse && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Raw Response Content</h3>
-                <div className="bg-gray-50 rounded p-3 overflow-auto max-h-60">
+                <div className="border rounded p-3 overflow-auto max-h-60">
                   <pre className="text-xs text-gray-600 whitespace-pre-wrap">
                     {creditData.rawResponse}
                   </pre>
@@ -659,7 +667,7 @@ export default function CreditResultsPage() {
           {/* Complete Raw API Response Data */}
           <div className="mt-6 rounded-xl p-6 border border-border bg-white">
             <h2 className="text-lg font-semibold mb-4">Complete API Response (JSON)</h2>
-            <div className="bg-gray-50 rounded-lg p-4 overflow-auto max-h-96">
+            <div className="border rounded-lg p-4 overflow-auto max-h-96">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap">
                 {JSON.stringify(creditData, null, 2)}
               </pre>
@@ -670,30 +678,24 @@ export default function CreditResultsPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => router.push('/your-plan')}
-              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-3 border font-semibold rounded-lg hover:bg-gray-100 transition-colors"
             >
               Back to Your Plan
             </button>
             <button
               onClick={() => {
-                // Check if both bank and credit are complete
-                const stepStatus = JSON.parse(sessionStorage.getItem('loan_step_status') || '{}');
-                if (stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed) {
-                  router.push('/results/plan');
-                } else {
-                  alert('Please complete both bank connection and credit check first.');
-                  router.push('/your-plan');
-                }
+                // Navigate to the debt settlement program results page
+                router.push('/your-plan/results');
               }}
-              className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              className="px-6 py-3 border font-semibold rounded-lg hover:bg-gray-100 transition-colors"
             >
-              View Complete Plan
+              View Debt Settlement Program
             </button>
           </div>
 
           {/* Disclaimer */}
-          <div className="mt-8 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-            <p className="text-xs text-yellow-800">
+          <div className="mt-8 rounded-lg border p-4">
+            <p className="text-xs">
               <strong>Important:</strong> This is a soft credit inquiry that does not affect your credit score. 
               The information shown is for debt settlement planning purposes only. Actual settlement amounts 
               and terms will be negotiated with your creditors if you choose to enroll in our program.

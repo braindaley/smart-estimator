@@ -362,7 +362,7 @@ export default function PlaidAdminPage() {
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue>
-                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id] || item.dealSheetField))?.label || 'Select Field'}
+                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id] || item.dealSheetField))?.label || item.dealSheetField}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -420,13 +420,17 @@ export default function PlaidAdminPage() {
                       <td className="p-3 font-mono text-sm text-blue-600">{item.detailed}</td>
                       <td className="p-3">
                         <Select 
-                          value={fieldMappings[item.id || item.detailed] || item.dealSheetField} 
+                          value={fieldMappings[item.id || item.detailed] || 
+                                dealSheetFields.find(field => field.label === item.dealSheetField)?.value || 
+                                item.dealSheetField} 
                           onValueChange={(value) => handleMappingChange(item.id || item.detailed, value)}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue>
-                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id || item.detailed] || item.dealSheetField))?.label || 
-                               dealSheetFields.find(field => field.label === item.dealSheetField)?.label || 
+                              {dealSheetFields.find(field => 
+                                field.value === (fieldMappings[item.id || item.detailed] || 
+                                dealSheetFields.find(f => f.label === item.dealSheetField)?.value || 
+                                item.dealSheetField))?.label || 
                                item.dealSheetField}
                             </SelectValue>
                           </SelectTrigger>
