@@ -132,6 +132,7 @@ export default function Home() {
                 width={600}
                 height={400}
                 className="rounded-lg"
+                priority
                 data-ai-hint="abstract lines"
               />
             </div>
