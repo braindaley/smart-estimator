@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import TransactionDetailsModal from '@/components/TransactionDetailsModal';
 import ClickableLabel from '@/components/ClickableLabel';
 import { mapPlaidToDealsSheet, getFieldDisplayName, formatCurrency } from '@/lib/plaid-mapping';
@@ -77,40 +79,6 @@ const DEBT_ACCOUNT_TYPES = [
   }
 ];
 
-// Component to show transaction details
-const TransactionSummary = ({ transactions, totalAmount, fieldName }) => {
-  const [showAll, setShowAll] = useState(false);
-  if (!transactions || transactions.length === 0) return null;
-  
-  return (
-    <div className="mt-2">
-      <p className="text-xs text-green-600 mb-1">
-        Auto-filled from Plaid: {formatCurrency(totalAmount)}
-      </p>
-      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-        <div className="font-medium mb-1 flex justify-between items-center">
-          <span>Transactions ({transactions.length}):</span>
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className="text-blue-600 hover:text-blue-800 underline"
-          >
-            {showAll ? 'Hide' : 'Show All'}
-          </button>
-        </div>
-        {showAll && (
-          <div className="max-h-48 overflow-y-auto">
-            {transactions.map((tx, idx) => (
-              <div key={idx} className="flex justify-between py-1 border-b border-gray-200 last:border-b-0">
-                <span className="truncate mr-2">{tx.name || 'Unknown'}</span>
-                <span className="font-mono">{formatCurrency(tx.mappedAmount)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export default function DealSheetPage() {
   const [plaidData, setPlaidData] = useState(null);
@@ -121,6 +89,8 @@ export default function DealSheetPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [creditData, setCreditData] = useState(null);
   const [debtAccounts, setDebtAccounts] = useState([]);
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [availableAccounts, setAvailableAccounts] = useState([]);
   const [formData, setFormData] = useState({
     // Monthly Expenditure Details
     totalMonthlyIncome: '',
@@ -266,70 +236,101 @@ export default function DealSheetPage() {
           console.log('[DealSheet] Transactions array:', transactionsArray);
           console.log('[DealSheet] Accounts array:', accountsArray);
           
+          // Set available accounts for filtering
+          const accounts = accountsArray.map(account => ({
+            account_id: account.account_id,
+            name: account.name,
+            official_name: account.official_name,
+            type: account.type,
+            subtype: account.subtype
+          }));
+          
+          // Only update selected accounts if the available accounts have actually changed
+          setAvailableAccounts(prevAccounts => {
+            const newAccountIds = accounts.map(acc => acc.account_id).sort();
+            const prevAccountIds = prevAccounts.map(acc => acc.account_id).sort();
+            const accountsChanged = JSON.stringify(newAccountIds) !== JSON.stringify(prevAccountIds);
+            
+            if (accountsChanged) {
+              console.log('[DealSheet] Available accounts changed, resetting selection');
+              // Initialize all accounts as selected by default when accounts change
+              setSelectedAccounts(accounts.map(acc => acc.account_id));
+            } else {
+              console.log('[DealSheet] Available accounts unchanged, preserving selection');
+            }
+            
+            return accounts;
+          });
+          
           const mapped = mapPlaidToDealsSheet(transactionsArray, accountsArray);
           console.log('[DealSheet] Mapped data:', mapped);
           setMappedData(mapped);
           
-          // Update form data with mapped values
-          // Start with a fresh object, don't reference initial formData
-          const updatedFormData = {};
+          // Update form data with 3-period averages (delayed to allow mappedData state to update)
+          setTimeout(() => {
+            const updatedFormData = {};
+            
+            // Map income fields using 3-period averages
+            Object.keys(mapped.income).forEach(key => {
+              const average = getFieldAverage(key, false);
+              if (average > 0) {
+                updatedFormData[key] = average.toFixed(2);
+              }
+            });
+            
+            // Map expense fields using 3-period averages
+            const expenseFieldMapping = {
+              housingPayment: 'housingPayment',
+              homeOwnersInsurance: 'homeOwnersInsurance',
+              secondaryHousingPayment: 'secondaryHousingPayment',
+              healthLifeInsurance: 'healthLifeInsurance',
+              medicalCare: 'medicalCare',
+              prescriptionsMedicalExp: 'prescriptionsMedicalExp',
+              autoPayments: 'autoPayments',
+              autoInsurance: 'autoInsurance',
+              repairsMaintenance: 'repairsMaintenance',
+              gasoline: 'gasoline',
+              parking: 'parking',
+              commuting: 'commuting',
+              groceries: 'groceries',
+              eatingOut: 'eatingOut',
+              gasElectricOil: 'gasElectricOil',
+              phoneIncludeCell: 'phoneIncludeCell',
+              waterSewerGarbage: 'waterSewerGarbage',
+              cableSatelliteInternet: 'cableSatelliteInternet',
+              clothing: 'clothing',
+              householdItems: 'householdItems',
+              entertainment: 'entertainment',
+              petCare: 'petCare',
+              gifts: 'gifts',
+              toiletries: 'toiletries',
+              hairCare: 'hairCare',
+              laundry: 'laundry',
+              gym: 'gym',
+              personalCare: 'personalCare',
+              charityDonations: 'charityDonations',
+              daycareChildExpenses: 'daycareChildExpenses',
+              nursingCare: 'nursingCare',
+              misc: 'misc'
+            };
+            
+            Object.keys(mapped.expenses).forEach(key => {
+              if (expenseFieldMapping[key]) {
+                const average = getFieldAverage(key, true);
+                if (average > 0) {
+                  updatedFormData[expenseFieldMapping[key]] = average.toFixed(2);
+                }
+              }
+            });
           
-          // Map income fields
-          Object.keys(mapped.income).forEach(key => {
-            if (mapped.income[key] > 0) {
-              updatedFormData[key] = mapped.income[key].toFixed(2);
-            }
-          });
-          
-          // Map expense fields - need to convert field names
-          const expenseFieldMapping = {
-            housingPayment: 'housingPayment',
-            homeOwnersInsurance: 'homeOwnersInsurance',
-            secondaryHousingPayment: 'secondaryHousingPayment',
-            healthLifeInsurance: 'healthLifeInsurance',
-            medicalCare: 'medicalCare',
-            prescriptionsMedicalExp: 'prescriptionsMedicalExp',
-            autoPayments: 'autoPayments',
-            autoInsurance: 'autoInsurance',
-            repairsMaintenance: 'repairsMaintenance',
-            gasoline: 'gasoline',
-            parking: 'parking',
-            commuting: 'commuting',
-            groceries: 'groceries',
-            eatingOut: 'eatingOut',
-            gasElectricOil: 'gasElectricOil',
-            phoneIncludeCell: 'phoneIncludeCell',
-            waterSewerGarbage: 'waterSewerGarbage',
-            cableSatelliteInternet: 'cableSatelliteInternet',
-            clothing: 'clothing',
-            householdItems: 'householdItems',
-            entertainment: 'entertainment',
-            petCare: 'petCare',
-            gifts: 'gifts',
-            toiletries: 'toiletries',
-            hairCare: 'hairCare',
-            laundry: 'laundry',
-            gym: 'gym',
-            personalCare: 'personalCare',
-            charityDonations: 'charityDonations',
-            daycareChildExpenses: 'daycareChildExpenses',
-            nursingCare: 'nursingCare',
-            misc: 'misc'
-          };
-          
-          Object.keys(mapped.expenses).forEach(key => {
-            if (mapped.expenses[key] > 0 && expenseFieldMapping[key]) {
-              updatedFormData[expenseFieldMapping[key]] = mapped.expenses[key].toFixed(2);
-            }
-          });
-          
-          console.log('[DealSheet] Setting form data with:', updatedFormData);
-          
-          // Update the form data state with the new values
-          setFormData(prev => ({
-            ...prev,
-            ...updatedFormData
-          }));
+            console.log('[DealSheet] Setting form data with 3-period averages:', updatedFormData);
+            
+            // Update the form data state with the new values
+            setFormData(prev => ({
+              ...prev,
+              ...updatedFormData
+            }));
+          }, 100); // Small delay to ensure mappedData state has been set
         }
       }
     } catch (error) {
@@ -452,6 +453,205 @@ export default function DealSheetPage() {
     console.log('Canceling changes');
   };
 
+  // Function to get transactions for a specific date range
+  const getTransactionsForPeriod = (transactions, startDate, endDate) => {
+    return transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    });
+  };
+
+  // Function to calculate period date ranges
+  const getPeriodDateRanges = () => {
+    const now = new Date();
+    
+    // Period 1: Last 30 days (0-30 days ago)
+    const period1End = new Date(now);
+    const period1Start = new Date(now);
+    period1Start.setDate(period1Start.getDate() - 30);
+    
+    // Period 2: 31-60 days ago
+    const period2End = new Date(now);
+    period2End.setDate(period2End.getDate() - 31);
+    const period2Start = new Date(now);
+    period2Start.setDate(period2Start.getDate() - 60);
+    
+    // Period 3: 61-90 days ago
+    const period3End = new Date(now);
+    period3End.setDate(period3End.getDate() - 61);
+    const period3Start = new Date(now);
+    period3Start.setDate(period3Start.getDate() - 90);
+    
+    return {
+      period1: { start: period1Start, end: period1End },
+      period2: { start: period2Start, end: period2End },
+      period3: { start: period3Start, end: period3End }
+    };
+  };
+
+  // Function to filter mapped data based on selected accounts
+  const getFilteredMappedData = () => {
+    if (!mappedData) {
+      return null;
+    }
+
+    // If no accounts are selected, return empty structure (not null)
+    if (selectedAccounts.length === 0) {
+      const emptyData = {
+        income: {},
+        expenses: {},
+        unmapped: [],
+        transactionDetails: {}
+      };
+
+      // Initialize all fields to 0
+      Object.keys(mappedData.income).forEach(field => {
+        emptyData.income[field] = 0;
+        emptyData.transactionDetails[field] = [];
+      });
+      
+      Object.keys(mappedData.expenses).forEach(field => {
+        emptyData.expenses[field] = 0;
+        emptyData.transactionDetails[field] = [];
+      });
+
+      return emptyData;
+    }
+
+    const filteredData = {
+      income: {},
+      expenses: {},
+      unmapped: [],
+      transactionDetails: {}
+    };
+
+    // Initialize all fields to 0
+    Object.keys(mappedData.income).forEach(field => {
+      filteredData.income[field] = 0;
+      filteredData.transactionDetails[field] = [];
+    });
+    
+    Object.keys(mappedData.expenses).forEach(field => {
+      filteredData.expenses[field] = 0;
+      filteredData.transactionDetails[field] = [];
+    });
+
+    // Filter income transactions
+    Object.entries(mappedData.transactionDetails).forEach(([field, transactions]) => {
+      if (transactions) {
+        const filteredTransactions = transactions.filter(transaction => 
+          selectedAccounts.includes(transaction.account_id)
+        );
+        
+        if (filteredTransactions.length > 0) {
+          filteredData.transactionDetails[field] = filteredTransactions;
+          
+          // Recalculate totals for income fields
+          if (mappedData.income[field] !== undefined) {
+            filteredData.income[field] = filteredTransactions.reduce((sum, tx) => 
+              sum + Math.abs(tx.mappedAmount), 0
+            );
+          }
+          
+          // Recalculate totals for expense fields
+          if (mappedData.expenses[field] !== undefined) {
+            filteredData.expenses[field] = filteredTransactions.reduce((sum, tx) => 
+              sum + tx.mappedAmount, 0
+            );
+          }
+        }
+      }
+    });
+
+    // Filter unmapped transactions
+    if (mappedData.unmapped) {
+      filteredData.unmapped = mappedData.unmapped.filter(transaction => 
+        selectedAccounts.includes(transaction.account_id)
+      );
+    }
+
+    return filteredData;
+  };
+
+  // Function to calculate 3-period average for a specific field
+  const getFieldAverage = (fieldKey, isExpense = false) => {
+    const periodData = getPeriodData();
+    if (!periodData) return 0;
+    
+    const dataSource = isExpense ? 'expenses' : 'income';
+    const period1Value = periodData.period1[dataSource][fieldKey] || 0;
+    const period2Value = periodData.period2[dataSource][fieldKey] || 0;
+    const period3Value = periodData.period3[dataSource][fieldKey] || 0;
+    
+    return (period1Value + period2Value + period3Value) / 3;
+  };
+
+  // Function to get period-specific data with date filtering
+  const getPeriodData = () => {
+    if (!mappedData) return null;
+
+    const filteredData = getFilteredMappedData();
+    if (!filteredData) return null;
+    
+    // Check if we have any selected accounts - if not, we should still process the empty structure
+    const dataToUse = filteredData;
+    const periods = getPeriodDateRanges();
+
+    const periodData = {
+      period1: { income: {}, expenses: {}, transactionDetails: {} },
+      period2: { income: {}, expenses: {}, transactionDetails: {} },
+      period3: { income: {}, expenses: {}, transactionDetails: {} }
+    };
+
+    // Initialize all fields for each period
+    Object.keys(dataToUse.income).forEach(field => {
+      periodData.period1.income[field] = 0;
+      periodData.period2.income[field] = 0;
+      periodData.period3.income[field] = 0;
+      periodData.period1.transactionDetails[field] = [];
+      periodData.period2.transactionDetails[field] = [];
+      periodData.period3.transactionDetails[field] = [];
+    });
+
+    Object.keys(dataToUse.expenses).forEach(field => {
+      periodData.period1.expenses[field] = 0;
+      periodData.period2.expenses[field] = 0;
+      periodData.period3.expenses[field] = 0;
+      periodData.period1.transactionDetails[field] = [];
+      periodData.period2.transactionDetails[field] = [];
+      periodData.period3.transactionDetails[field] = [];
+    });
+
+    // Process each field's transactions and distribute by date
+    Object.entries(dataToUse.transactionDetails).forEach(([field, transactions]) => {
+      if (transactions && transactions.length > 0) {
+        // Filter transactions for each period
+        const period1Transactions = getTransactionsForPeriod(transactions, periods.period1.start, periods.period1.end);
+        const period2Transactions = getTransactionsForPeriod(transactions, periods.period2.start, periods.period2.end);
+        const period3Transactions = getTransactionsForPeriod(transactions, periods.period3.start, periods.period3.end);
+
+        // Calculate totals and store transactions for each period
+        if (dataToUse.income[field] !== undefined) {
+          // Income field
+          periodData.period1.income[field] = period1Transactions.reduce((sum, tx) => sum + Math.abs(tx.mappedAmount), 0);
+          periodData.period2.income[field] = period2Transactions.reduce((sum, tx) => sum + Math.abs(tx.mappedAmount), 0);
+          periodData.period3.income[field] = period3Transactions.reduce((sum, tx) => sum + Math.abs(tx.mappedAmount), 0);
+        } else if (dataToUse.expenses[field] !== undefined) {
+          // Expense field
+          periodData.period1.expenses[field] = period1Transactions.reduce((sum, tx) => sum + tx.mappedAmount, 0);
+          periodData.period2.expenses[field] = period2Transactions.reduce((sum, tx) => sum + tx.mappedAmount, 0);
+          periodData.period3.expenses[field] = period3Transactions.reduce((sum, tx) => sum + tx.mappedAmount, 0);
+        }
+
+        periodData.period1.transactionDetails[field] = period1Transactions;
+        periodData.period2.transactionDetails[field] = period2Transactions;
+        periodData.period3.transactionDetails[field] = period3Transactions;
+      }
+    });
+
+    return periodData;
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -501,6 +701,13 @@ export default function DealSheetPage() {
         </div>
 
         <div className="container mx-auto max-w-7xl px-4 py-12">
+          <Tabs defaultValue="deal-sheet" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="deal-sheet">Deal Sheet</TabsTrigger>
+              <TabsTrigger value="calculations">Calculations</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="deal-sheet" className="space-y-8">
           {/* Debt Portfolio Section */}
           <Card className="p-6 mb-8">
             <div className="flex items-center gap-2 mb-6">
@@ -774,12 +981,10 @@ export default function DealSheetPage() {
                         value={formData.netMonthlyEmploymentIncome ? formatCurrency(formData.netMonthlyEmploymentIncome) : ''}
                         onChange={(e) => handleInputChange('netMonthlyEmploymentIncome', e.target.value)}
                       />
-                      {mappedData && mappedData.income.netMonthlyEmploymentIncome > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.netMonthlyEmploymentIncome}
-                          totalAmount={mappedData.income.netMonthlyEmploymentIncome}
-                          fieldName="netMonthlyEmploymentIncome"
-                        />
+                      {mappedData && getFieldAverage('netMonthlyEmploymentIncome') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('netMonthlyEmploymentIncome'))}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -794,9 +999,9 @@ export default function DealSheetPage() {
                         value={formData.selfEmployment ? formatCurrency(formData.selfEmployment) : ''}
                         onChange={(e) => handleInputChange('selfEmployment', e.target.value)}
                       />
-                      {mappedData && mappedData.income.selfEmployment > 0 && (
-                        <p className="text-xs text-green-600">
-                          Auto-filled from Plaid: {formatCurrency(mappedData.income.selfEmployment)}
+                      {mappedData && getFieldAverage('selfEmployment') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('selfEmployment'))}
                         </p>
                       )}
                     </div>
@@ -815,12 +1020,10 @@ export default function DealSheetPage() {
                         value={formData.socialSecurity}
                         onChange={(e) => handleInputChange('socialSecurity', e.target.value)}
                       />
-                      {mappedData && mappedData.income.socialSecurity > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.socialSecurity}
-                          totalAmount={mappedData.income.socialSecurity}
-                          fieldName="socialSecurity"
-                        />
+                      {mappedData && getFieldAverage('socialSecurity') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('socialSecurity'))}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -835,12 +1038,10 @@ export default function DealSheetPage() {
                         value={formData.unemployment}
                         onChange={(e) => handleInputChange('unemployment', e.target.value)}
                       />
-                      {mappedData && mappedData.income.unemployment > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.unemployment}
-                          totalAmount={mappedData.income.unemployment}
-                          fieldName="unemployment"
-                        />
+                      {mappedData && getFieldAverage('unemployment') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('unemployment'))}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -858,12 +1059,10 @@ export default function DealSheetPage() {
                         value={formData.alimony}
                         onChange={(e) => handleInputChange('alimony', e.target.value)}
                       />
-                      {mappedData && mappedData.income.alimony > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.alimony}
-                          totalAmount={mappedData.income.alimony}
-                          fieldName="alimony"
-                        />
+                      {mappedData && getFieldAverage('alimony') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('alimony'))}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -878,12 +1077,10 @@ export default function DealSheetPage() {
                         value={formData.childSupport}
                         onChange={(e) => handleInputChange('childSupport', e.target.value)}
                       />
-                      {mappedData && mappedData.income.childSupport > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.childSupport}
-                          totalAmount={mappedData.income.childSupport}
-                          fieldName="childSupport"
-                        />
+                      {mappedData && getFieldAverage('childSupport') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('childSupport'))}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -920,12 +1117,10 @@ export default function DealSheetPage() {
                         value={formData.dividends}
                         onChange={(e) => handleInputChange('dividends', e.target.value)}
                       />
-                      {mappedData && mappedData.income.dividends > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.dividends}
-                          totalAmount={mappedData.income.dividends}
-                          fieldName="dividends"
-                        />
+                      {mappedData && getFieldAverage('dividends') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('dividends'))}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -940,12 +1135,10 @@ export default function DealSheetPage() {
                         value={formData.retirement}
                         onChange={(e) => handleInputChange('retirement', e.target.value)}
                       />
-                      {mappedData && mappedData.income.retirement > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.retirement}
-                          totalAmount={mappedData.income.retirement}
-                          fieldName="retirement"
-                        />
+                      {mappedData && getFieldAverage('retirement') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('retirement'))}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -963,12 +1156,10 @@ export default function DealSheetPage() {
                         value={formData.otherIncome}
                         onChange={(e) => handleInputChange('otherIncome', e.target.value)}
                       />
-                      {mappedData && mappedData.income.otherIncome > 0 && (
-                        <TransactionSummary 
-                          transactions={mappedData.transactionDetails.otherIncome}
-                          totalAmount={mappedData.income.otherIncome}
-                          fieldName="otherIncome"
-                        />
+                      {mappedData && getFieldAverage('otherIncome') > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {formatCurrency(getFieldAverage('otherIncome'))}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -1181,12 +1372,10 @@ export default function DealSheetPage() {
                           value={formData.housingPayment}
                           onChange={(e) => handleInputChange('housingPayment', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.housingPayment > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.housingPayment}
-                            totalAmount={mappedData.expenses.housingPayment}
-                            fieldName="housingPayment"
-                          />
+                        {mappedData && getFieldAverage('housingPayment', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('housingPayment', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1201,12 +1390,10 @@ export default function DealSheetPage() {
                           value={formData.homeOwnersInsurance}
                           onChange={(e) => handleInputChange('homeOwnersInsurance', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.homeOwnersInsurance > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.homeOwnersInsurance}
-                            totalAmount={mappedData.expenses.homeOwnersInsurance}
-                            fieldName="homeOwnersInsurance"
-                          />
+                        {mappedData && getFieldAverage('homeOwnersInsurance', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('homeOwnersInsurance', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1235,12 +1422,10 @@ export default function DealSheetPage() {
                           value={formData.healthLifeInsurance}
                           onChange={(e) => handleInputChange('healthLifeInsurance', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.healthLifeInsurance > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.healthLifeInsurance}
-                            totalAmount={mappedData.expenses.healthLifeInsurance}
-                            fieldName="healthLifeInsurance"
-                          />
+                        {mappedData && getFieldAverage('healthLifeInsurance', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('healthLifeInsurance', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1255,12 +1440,10 @@ export default function DealSheetPage() {
                           value={formData.medicalCare}
                           onChange={(e) => handleInputChange('medicalCare', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.medicalCare > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.medicalCare}
-                            totalAmount={mappedData.expenses.medicalCare}
-                            fieldName="medicalCare"
-                          />
+                        {mappedData && getFieldAverage('medicalCare', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('medicalCare', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1275,12 +1458,10 @@ export default function DealSheetPage() {
                           value={formData.prescriptionsMedicalExp}
                           onChange={(e) => handleInputChange('prescriptionsMedicalExp', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.prescriptionsMedicalExp > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.prescriptionsMedicalExp}
-                            totalAmount={mappedData.expenses.prescriptionsMedicalExp}
-                            fieldName="prescriptionsMedicalExp"
-                          />
+                        {mappedData && getFieldAverage('prescriptionsMedicalExp', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('prescriptionsMedicalExp', true))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1305,12 +1486,10 @@ export default function DealSheetPage() {
                           value={formData.autoPayments}
                           onChange={(e) => handleInputChange('autoPayments', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.autoPayments > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.autoPayments}
-                            totalAmount={mappedData.expenses.autoPayments}
-                            fieldName="autoPayments"
-                          />
+                        {mappedData && getFieldAverage('autoPayments', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('autoPayments', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1325,12 +1504,10 @@ export default function DealSheetPage() {
                           value={formData.autoInsurance}
                           onChange={(e) => handleInputChange('autoInsurance', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.autoInsurance > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.autoInsurance}
-                            totalAmount={mappedData.expenses.autoInsurance}
-                            fieldName="autoInsurance"
-                          />
+                        {mappedData && getFieldAverage('autoInsurance', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('autoInsurance', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1345,12 +1522,10 @@ export default function DealSheetPage() {
                           value={formData.repairsMaintenance}
                           onChange={(e) => handleInputChange('repairsMaintenance', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.repairsMaintenance > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.repairsMaintenance}
-                            totalAmount={mappedData.expenses.repairsMaintenance}
-                            fieldName="repairsMaintenance"
-                          />
+                        {mappedData && getFieldAverage('repairsMaintenance', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('repairsMaintenance', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1365,12 +1540,10 @@ export default function DealSheetPage() {
                           value={formData.gasoline}
                           onChange={(e) => handleInputChange('gasoline', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.gasoline > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.gasoline}
-                            totalAmount={mappedData.expenses.gasoline}
-                            fieldName="gasoline"
-                          />
+                        {mappedData && getFieldAverage('gasoline', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('gasoline', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1385,12 +1558,10 @@ export default function DealSheetPage() {
                           value={formData.parking}
                           onChange={(e) => handleInputChange('parking', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.parking > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.parking}
-                            totalAmount={mappedData.expenses.parking}
-                            fieldName="parking"
-                          />
+                        {mappedData && getFieldAverage('parking', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('parking', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1405,12 +1576,10 @@ export default function DealSheetPage() {
                           value={formData.commuting}
                           onChange={(e) => handleInputChange('commuting', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.commuting > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.commuting}
-                            totalAmount={mappedData.expenses.commuting}
-                            fieldName="commuting"
-                          />
+                        {mappedData && getFieldAverage('commuting', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('commuting', true))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1435,12 +1604,10 @@ export default function DealSheetPage() {
                           value={formData.groceries}
                           onChange={(e) => handleInputChange('groceries', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.groceries > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.groceries}
-                            totalAmount={mappedData.expenses.groceries}
-                            fieldName="groceries"
-                          />
+                        {mappedData && getFieldAverage('groceries', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('groceries', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1455,12 +1622,10 @@ export default function DealSheetPage() {
                           value={formData.eatingOut}
                           onChange={(e) => handleInputChange('eatingOut', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.eatingOut > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.eatingOut}
-                            totalAmount={mappedData.expenses.eatingOut}
-                            fieldName="eatingOut"
-                          />
+                        {mappedData && getFieldAverage('eatingOut', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('eatingOut', true))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1485,12 +1650,10 @@ export default function DealSheetPage() {
                           value={formData.gasElectricOil}
                           onChange={(e) => handleInputChange('gasElectricOil', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.gasElectricOil > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.gasElectricOil}
-                            totalAmount={mappedData.expenses.gasElectricOil}
-                            fieldName="gasElectricOil"
-                          />
+                        {mappedData && getFieldAverage('gasElectricOil', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('gasElectricOil', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1505,12 +1668,10 @@ export default function DealSheetPage() {
                           value={formData.phoneIncludeCell}
                           onChange={(e) => handleInputChange('phoneIncludeCell', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.phoneIncludeCell > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.phoneIncludeCell}
-                            totalAmount={mappedData.expenses.phoneIncludeCell}
-                            fieldName="phoneIncludeCell"
-                          />
+                        {mappedData && getFieldAverage('phoneIncludeCell', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('phoneIncludeCell', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1525,12 +1686,10 @@ export default function DealSheetPage() {
                           value={formData.waterSewerGarbage}
                           onChange={(e) => handleInputChange('waterSewerGarbage', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.waterSewerGarbage > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.waterSewerGarbage}
-                            totalAmount={mappedData.expenses.waterSewerGarbage}
-                            fieldName="waterSewerGarbage"
-                          />
+                        {mappedData && getFieldAverage('waterSewerGarbage', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('waterSewerGarbage', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1545,12 +1704,10 @@ export default function DealSheetPage() {
                           value={formData.cableSatelliteInternet}
                           onChange={(e) => handleInputChange('cableSatelliteInternet', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.cableSatelliteInternet > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.cableSatelliteInternet}
-                            totalAmount={mappedData.expenses.cableSatelliteInternet}
-                            fieldName="cableSatelliteInternet"
-                          />
+                        {mappedData && getFieldAverage('cableSatelliteInternet', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('cableSatelliteInternet', true))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1578,12 +1735,10 @@ export default function DealSheetPage() {
                           value={formData.debtOther}
                           onChange={(e) => handleInputChange('debtOther', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.debtOther > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.debtOther}
-                            totalAmount={mappedData.expenses.debtOther}
-                            fieldName="debtOther"
-                          />
+                        {mappedData && getFieldAverage('debtOther', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('debtOther', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1598,12 +1753,10 @@ export default function DealSheetPage() {
                           value={formData.govtStudentLoans}
                           onChange={(e) => handleInputChange('govtStudentLoans', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.govtStudentLoans > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.govtStudentLoans}
-                            totalAmount={mappedData.expenses.govtStudentLoans}
-                            fieldName="govtStudentLoans"
-                          />
+                        {mappedData && getFieldAverage('govtStudentLoans', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('govtStudentLoans', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1618,12 +1771,10 @@ export default function DealSheetPage() {
                           value={formData.privateStudentLoans}
                           onChange={(e) => handleInputChange('privateStudentLoans', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.privateStudentLoans > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.privateStudentLoans}
-                            totalAmount={mappedData.expenses.privateStudentLoans}
-                            fieldName="privateStudentLoans"
-                          />
+                        {mappedData && getFieldAverage('privateStudentLoans', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('privateStudentLoans', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1678,12 +1829,10 @@ export default function DealSheetPage() {
                           value={formData.clothing}
                           onChange={(e) => handleInputChange('clothing', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.clothing > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.clothing}
-                            totalAmount={mappedData.expenses.clothing}
-                            fieldName="clothing"
-                          />
+                        {mappedData && getFieldAverage('clothing', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('clothing', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1698,12 +1847,10 @@ export default function DealSheetPage() {
                           value={formData.householdItems}
                           onChange={(e) => handleInputChange('householdItems', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.householdItems > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.householdItems}
-                            totalAmount={mappedData.expenses.householdItems}
-                            fieldName="householdItems"
-                          />
+                        {mappedData && getFieldAverage('householdItems', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('householdItems', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1718,12 +1865,10 @@ export default function DealSheetPage() {
                           value={formData.entertainment}
                           onChange={(e) => handleInputChange('entertainment', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.entertainment > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.entertainment}
-                            totalAmount={mappedData.expenses.entertainment}
-                            fieldName="entertainment"
-                          />
+                        {mappedData && getFieldAverage('entertainment', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('entertainment', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1758,12 +1903,10 @@ export default function DealSheetPage() {
                           value={formData.gym}
                           onChange={(e) => handleInputChange('gym', e.target.value)}
                         />
-                        {mappedData && mappedData.expenses.gym > 0 && (
-                          <TransactionSummary 
-                            transactions={mappedData.transactionDetails.gym}
-                            totalAmount={mappedData.expenses.gym}
-                            fieldName="gym"
-                          />
+                        {mappedData && getFieldAverage('gym', true) > 0 && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {formatCurrency(getFieldAverage('gym', true))}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -1872,6 +2015,453 @@ export default function DealSheetPage() {
               </Button>
             </div>
           </div>
+            </TabsContent>
+
+            <TabsContent value="calculations">
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Transaction Analysis</h3>
+                <p className="text-muted-foreground mb-4">
+                  30-day period breakdown of your Plaid transaction data across all deal sheet fields.
+                </p>
+                
+                {/* Account Filter Section */}
+                {availableAccounts.length > 0 && (
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-semibold mb-3">Filter by Account</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {availableAccounts.map((account) => {
+                        const isSelected = selectedAccounts.includes(account.account_id);
+                        return (
+                          <div key={account.account_id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`account-${account.account_id}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked === true) {
+                                  setSelectedAccounts(prev => {
+                                    // Avoid duplicates
+                                    if (!prev.includes(account.account_id)) {
+                                      return [...prev, account.account_id];
+                                    }
+                                    return prev;
+                                  });
+                                } else if (checked === false) {
+                                  setSelectedAccounts(prev => prev.filter(id => id !== account.account_id));
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`account-${account.account_id}`}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              <div className="font-medium">
+                                {account.name || account.official_name || 'Unknown Account'}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {account.subtype} • {account.type}
+                              </div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedAccounts(availableAccounts.map(acc => acc.account_id))}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedAccounts([])}
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Show message when no accounts are selected */}
+                {availableAccounts.length > 0 && selectedAccounts.length === 0 && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>No accounts selected.</strong> Please select at least one account to view transaction data.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 p-3 text-left font-semibold">Field</th>
+                        <th className="border border-gray-300 p-3 text-center font-semibold">Current Period<br/><span className="text-xs font-normal text-gray-600">Last 30 days</span></th>
+                        <th className="border border-gray-300 p-3 text-center font-semibold">Period 2<br/><span className="text-xs font-normal text-gray-600">31-60 days ago</span></th>
+                        <th className="border border-gray-300 p-3 text-center font-semibold">Period 3<br/><span className="text-xs font-normal text-gray-600">61-90 days ago</span></th>
+                        <th className="border border-gray-300 p-3 text-center font-semibold bg-blue-50">Average</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Income Section */}
+                      <tr className="bg-green-50">
+                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-green-800">
+                          INCOME FIELDS
+                        </td>
+                      </tr>
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        // Get all income fields that have transactions in any period
+                        // If no accounts are selected, show all fields to demonstrate the filtering is working
+                        const shouldShowAllFields = selectedAccounts.length === 0;
+                        const incomeFields = new Set([
+                          ...Object.keys(periodData.period1.income).filter(field => 
+                            shouldShowAllFields || periodData.period1.income[field] > 0),
+                          ...Object.keys(periodData.period2.income).filter(field => 
+                            shouldShowAllFields || periodData.period2.income[field] > 0),
+                          ...Object.keys(periodData.period3.income).filter(field => 
+                            shouldShowAllFields || periodData.period3.income[field] > 0)
+                        ]);
+
+                        return Array.from(incomeFields).map(fieldKey => {
+                          const fieldName = getFieldDisplayName(fieldKey);
+                          const period1Value = periodData.period1.income[fieldKey] || 0;
+                          const period2Value = periodData.period2.income[fieldKey] || 0;
+                          const period3Value = periodData.period3.income[fieldKey] || 0;
+                          const average = (period1Value + period2Value + period3Value) / 3;
+
+                          const period1Transactions = periodData.period1.transactionDetails[fieldKey] || [];
+                          const period2Transactions = periodData.period2.transactionDetails[fieldKey] || [];
+                          const period3Transactions = periodData.period3.transactionDetails[fieldKey] || [];
+
+                          // Create rows for category header and all transactions from all periods
+                          const rows = [];
+                          
+                          // Category header row
+                          rows.push(
+                            <tr key={fieldKey}>
+                              <td className="border border-gray-300 p-3 font-semibold">{fieldName}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period1Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period2Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period3Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center bg-blue-50 font-semibold">{formatCurrency(average)}</td>
+                            </tr>
+                          );
+
+                          // Find the maximum number of transactions in any period for this field
+                          const maxTransactions = Math.max(
+                            period1Transactions.length,
+                            period2Transactions.length,
+                            period3Transactions.length
+                          );
+
+                          // Add transaction detail rows
+                          for (let i = 0; i < maxTransactions; i++) {
+                            const tx1 = period1Transactions[i];
+                            const tx2 = period2Transactions[i];
+                            const tx3 = period3Transactions[i];
+
+                            rows.push(
+                              <tr key={`${fieldKey}-tx-${i}`} className="bg-gray-50 text-sm">
+                                <td className="border border-gray-300 p-2 pl-6 text-gray-600">
+                                  {(tx1 || tx2 || tx3) ? '→ Transactions' : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx1 ? (
+                                    <div>
+                                      <div>
+                                        {tx1.name || tx1.merchant_name || 'Unknown'}
+                                        {tx1.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx1.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx1.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx1.mappedAmount))}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx2 ? (
+                                    <div>
+                                      <div>
+                                        {tx2.name || tx2.merchant_name || 'Unknown'}
+                                        {tx2.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx2.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx2.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx2.mappedAmount))}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx3 ? (
+                                    <div>
+                                      <div>
+                                        {tx3.name || tx3.merchant_name || 'Unknown'}
+                                        {tx3.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx3.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx3.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx3.mappedAmount))}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-400">--</td>
+                              </tr>
+                            );
+                          }
+
+                          return <React.Fragment key={fieldKey}>{rows}</React.Fragment>;
+                        });
+                      })()}
+                      
+                      {/* Expense Section */}
+                      <tr className="bg-red-50">
+                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-red-800">
+                          EXPENSE FIELDS
+                        </td>
+                      </tr>
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        // Get all expense fields that have transactions in any period
+                        // If no accounts are selected, show all fields to demonstrate the filtering is working
+                        const shouldShowAllFields = selectedAccounts.length === 0;
+                        const expenseFields = new Set([
+                          ...Object.keys(periodData.period1.expenses).filter(field => 
+                            shouldShowAllFields || periodData.period1.expenses[field] > 0),
+                          ...Object.keys(periodData.period2.expenses).filter(field => 
+                            shouldShowAllFields || periodData.period2.expenses[field] > 0),
+                          ...Object.keys(periodData.period3.expenses).filter(field => 
+                            shouldShowAllFields || periodData.period3.expenses[field] > 0)
+                        ]);
+
+                        return Array.from(expenseFields).map(fieldKey => {
+                          const fieldName = getFieldDisplayName(fieldKey);
+                          const period1Value = periodData.period1.expenses[fieldKey] || 0;
+                          const period2Value = periodData.period2.expenses[fieldKey] || 0;
+                          const period3Value = periodData.period3.expenses[fieldKey] || 0;
+                          const average = (period1Value + period2Value + period3Value) / 3;
+
+                          const period1Transactions = periodData.period1.transactionDetails[fieldKey] || [];
+                          const period2Transactions = periodData.period2.transactionDetails[fieldKey] || [];
+                          const period3Transactions = periodData.period3.transactionDetails[fieldKey] || [];
+
+                          // Create rows for category header and all transactions from all periods
+                          const rows = [];
+                          
+                          // Category header row
+                          rows.push(
+                            <tr key={fieldKey}>
+                              <td className="border border-gray-300 p-3 font-semibold">{fieldName}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period1Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period2Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period3Value)}</td>
+                              <td className="border border-gray-300 p-3 text-center bg-blue-50 font-semibold">{formatCurrency(average)}</td>
+                            </tr>
+                          );
+
+                          // Find the maximum number of transactions in any period for this field
+                          const maxTransactions = Math.max(
+                            period1Transactions.length,
+                            period2Transactions.length,
+                            period3Transactions.length
+                          );
+
+                          // Add transaction detail rows
+                          for (let i = 0; i < maxTransactions; i++) {
+                            const tx1 = period1Transactions[i];
+                            const tx2 = period2Transactions[i];
+                            const tx3 = period3Transactions[i];
+
+                            rows.push(
+                              <tr key={`${fieldKey}-tx-${i}`} className="bg-gray-50 text-sm">
+                                <td className="border border-gray-300 p-2 pl-6 text-gray-600">
+                                  {(tx1 || tx2 || tx3) ? '→ Transactions' : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx1 ? (
+                                    <div>
+                                      <div>
+                                        {tx1.name || tx1.merchant_name || 'Unknown'}
+                                        {tx1.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx1.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx1.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx1.mappedAmount)}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx2 ? (
+                                    <div>
+                                      <div>
+                                        {tx2.name || tx2.merchant_name || 'Unknown'}
+                                        {tx2.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx2.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx2.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx2.mappedAmount)}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                  {tx3 ? (
+                                    <div>
+                                      <div>
+                                        {tx3.name || tx3.merchant_name || 'Unknown'}
+                                        {tx3.personal_finance_category?.primary && (
+                                          <span className="text-xs text-gray-500"> ({tx3.personal_finance_category.primary})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(tx3.date).toLocaleDateString()}
+                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx3.mappedAmount)}</div>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                <td className="border border-gray-300 p-2 text-center text-gray-400">--</td>
+                              </tr>
+                            );
+                          }
+
+                          return <React.Fragment key={fieldKey}>{rows}</React.Fragment>;
+                        });
+                      })()}
+                      
+                      {/* Uncategorized Items Section */}
+                      {(() => {
+                        const filteredData = getFilteredMappedData();
+                        const dataToUse = filteredData || mappedData;
+                        return dataToUse && dataToUse.unmapped && dataToUse.unmapped.length > 0 && (
+                          <>
+                            <tr className="bg-yellow-50">
+                              <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-yellow-800">
+                                UNCATEGORIZED TRANSACTIONS ({dataToUse.unmapped.length})
+                              </td>
+                            </tr>
+                            {dataToUse.unmapped.map((transaction, idx) => (
+                            <tr key={`unmapped-${idx}`} className="bg-yellow-25 text-sm">
+                              <td className="border border-gray-300 p-2 pl-6 text-gray-600">
+                                → {transaction.name || transaction.merchant_name || 'Unknown Transaction'}
+                                <br />
+                                <span className="text-xs text-gray-500">
+                                  {new Date(transaction.date).toLocaleDateString()}
+                                  {transaction.personal_finance_category && (
+                                    <span className="ml-2">
+                                      {transaction.personal_finance_category.primary} → {transaction.personal_finance_category.detailed}
+                                    </span>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="border border-gray-300 p-2 text-center text-gray-600">
+                                {formatCurrency(Math.abs(transaction.amount))}
+                                <br />
+                                <span className="text-xs text-gray-500">
+                                  {transaction.amount > 0 ? 'Expense' : 'Income'}
+                                </span>
+                              </td>
+                              <td className="border border-gray-300 p-2 text-center text-gray-400">--</td>
+                              <td className="border border-gray-300 p-2 text-center text-gray-400">--</td>
+                              <td className="border border-gray-300 p-2 text-center text-gray-400">--</td>
+                            </tr>
+                            ))}
+                          </>
+                        );
+                      })()}
+                      
+                      {/* Totals Row */}
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        const period1Total = Object.values(periodData.period1.income).reduce((a, b) => a + b, 0) + 
+                                           Object.values(periodData.period1.expenses).reduce((a, b) => a + b, 0);
+                        const period2Total = Object.values(periodData.period2.income).reduce((a, b) => a + b, 0) + 
+                                           Object.values(periodData.period2.expenses).reduce((a, b) => a + b, 0);
+                        const period3Total = Object.values(periodData.period3.income).reduce((a, b) => a + b, 0) + 
+                                           Object.values(periodData.period3.expenses).reduce((a, b) => a + b, 0);
+                        const averageTotal = (period1Total + period2Total + period3Total) / 3;
+
+                        return (
+                          <tr className="bg-gray-100 font-semibold">
+                            <td className="border border-gray-300 p-3">TOTAL</td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {formatCurrency(period1Total)}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {formatCurrency(period2Total)}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {formatCurrency(period3Total)}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center bg-blue-100 font-bold">
+                              {formatCurrency(averageTotal)}
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {(() => {
+                  const filteredData = getFilteredMappedData();
+                  const dataToUse = filteredData || mappedData;
+                  return !mappedData && (
+                  <div className="text-center py-8">
+                    <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8">
+                      <div className="flex flex-col items-center">
+                        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                          <span className="text-2xl text-gray-400">📊</span>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Bank Data Available</h3>
+                        <p className="text-sm text-gray-600 mb-4 max-w-md">
+                          Connect your bank account to see detailed transaction analysis across multiple time periods.
+                        </p>
+                        <button
+                          onClick={() => window.location.href = '/your-plan'}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Connect Bank Account
+                        </button>
+                      </div>
+                    </div>
+                    </div>
+                  );
+                })()}
+                
+                <div className="mt-6 p-4 bg-gray-50 rounded">
+                  <h4 className="font-semibold mb-2">About This Analysis</h4>
+                  <p className="text-sm text-gray-600">
+                    This table shows your actual Plaid transaction data analyzed across three 30-day periods. 
+                    The data helps identify spending patterns and provides more accurate monthly averages for your deal sheet calculations.
+                    {!hasPlaidData && " Connect your bank account to see your actual transaction data here."}
+                  </p>
+                </div>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 

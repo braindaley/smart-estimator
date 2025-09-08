@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +17,7 @@ import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
 import { useEffect, useState } from 'react';
 
 export function Header() {
+  const router = useRouter();
   const smartEstimatorLink = useSmartEstimatorLink();
   const readinessToolLink = useReadinessToolLink();
   const [isClient, setIsClient] = useState(false);
@@ -25,8 +27,10 @@ export function Header() {
     setIsClient(true);
   }, []);
 
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
   const MobileNav = () => (
-    <Sheet>
+    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" size="icon">
           <Menu className="h-6 w-6" />
@@ -42,48 +46,69 @@ export function Header() {
           </SheetTitle>
         </SheetHeader>
         <nav className="grid gap-6 text-lg font-medium">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push('/'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Home
-          </Link>
-          <Link
-            href="/how-it-works"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push('/how-it-works'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             How it works
-          </Link>
-          <Link
-            href={smartEstimatorLink}
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push(smartEstimatorLink), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Smart Estimator
-          </Link>
-          <Link
-            href={readinessToolLink}
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push(readinessToolLink), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Readiness Tool
-          </Link>
-          <Link
-            href="/your-plan"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push('/your-plan'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Your Plan
-          </Link>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push('/login'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Sign in
-          </Link>
-          <Link
-            href="/admin"
-            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground"
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
+              setTimeout(() => router.push('/admin'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
           >
             Admin
-          </Link>
+          </button>
         </nav>
       </SheetContent>
     </Sheet>
