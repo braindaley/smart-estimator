@@ -9,14 +9,14 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
-    fname: '',
-    lname: '',
-    ssn: '',
-    dob: '',
-    address: '',
-    city: '',
-    state: '',
-    zip: ''
+    fname: 'ERNESTO',
+    lname: 'FERNANDEZ',
+    ssn: '666-32-1789',
+    dob: '1973-05-10',
+    address: '642 WILLOUGHBY',
+    city: 'BOWLING GREEN',
+    state: 'KY',
+    zip: '42101'
   });
 
   const states = [

@@ -29,15 +29,46 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
 
   // Bank connection handler
   const handleBankConnected = async (metadata) => {
-    console.log('[LoanQualification] Bank connected:', metadata);
+    console.log('🏦 [LoanQualification] Bank connected - STARTING DATA FETCH:', metadata);
     setIsProcessing({ ...isProcessing, bank_connection: true });
 
     try {
       // Get client token for API calls
-      const clientToken = getTokenClient(userId);
+      let clientToken = getTokenClient(userId);
+
+      // For sandbox testing with income users, create a real sandbox access token
+      if (metadata.access_token === 'mock_token_for_sandbox') {
+        console.log('[LoanQualification] Creating sandbox access token for income testing');
+
+        // Use Plaid's sandbox mode to create an access token directly
+        try {
+          const sandboxResponse = await fetch('/api/plaid/sandbox/create-test-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              institutionId: metadata.institution.institution_id,
+              testUsername: 'user_bank_income'
+            }),
+          });
+
+          if (sandboxResponse.ok) {
+            const sandboxData = await sandboxResponse.json();
+            clientToken = sandboxData.access_token;
+            console.log('[LoanQualification] Successfully created sandbox access token');
+          } else {
+            console.error('[LoanQualification] Failed to create sandbox token, using fallback');
+            // Use a known working token for Plaid sandbox
+            clientToken = 'access-sandbox-de3ce8ef-33f8-452c-a685-8671031fc0f6';
+          }
+        } catch (err) {
+          console.error('[LoanQualification] Error creating sandbox token:', err);
+          clientToken = 'access-sandbox-de3ce8ef-33f8-452c-a685-8671031fc0f6';
+        }
+      }
       
-      // Fetch accounts and transactions
-      const [accountsResponse, transactionsResponse] = await Promise.all([
+      // Fetch all Plaid data - accounts, transactions, identity, liabilities, and income
+      const [accountsResponse, transactionsResponse, identityResponse, liabilitiesResponse, incomeResponse] = await Promise.all([
         fetch('/api/plaid/accounts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -47,17 +78,85 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, clientToken }),
+        }),
+        fetch('/api/plaid/identity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, clientToken }),
+        }),
+        fetch('/api/plaid/liabilities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, clientToken }),
+        }),
+        fetch('/api/plaid/income', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, clientToken }),
         })
       ]);
 
       const accountsData = await accountsResponse.json();
       const transactionsData = await transactionsResponse.json();
 
+      // Handle optional data that may not be available for all accounts
+      let identityData = null;
+      let liabilitiesData = null;
+      let incomeData = null;
+
+      if (identityResponse.ok) {
+        identityData = await identityResponse.json();
+      } else {
+        console.log('[LoanQualification] Identity data not available');
+      }
+
+      if (liabilitiesResponse.ok) {
+        liabilitiesData = await liabilitiesResponse.json();
+      } else {
+        console.log('[LoanQualification] Liabilities data not available');
+      }
+
+      if (incomeResponse.ok) {
+        incomeData = await incomeResponse.json();
+        console.log('[LoanQualification] Income data fetched successfully');
+
+        // If income data is null/empty, try to simulate income data for sandbox testing
+        if (!incomeData || !incomeData.income_streams || incomeData.income_streams.length === 0) {
+          console.log('[LoanQualification] Income data is empty, trying sandbox simulation');
+
+          try {
+            const simulateResponse = await fetch('/api/plaid/sandbox/simulate-income', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                accessToken: clientToken,
+                itemId: metadata.item_id
+              }),
+            });
+
+            if (simulateResponse.ok) {
+              const simulateData = await simulateResponse.json();
+              if (simulateData.income) {
+                incomeData = simulateData;
+                console.log('[LoanQualification] Income data simulation successful');
+              }
+            }
+          } catch (err) {
+            console.error('[LoanQualification] Income simulation failed:', err);
+          }
+        }
+      } else {
+        console.log('[LoanQualification] Income data not available');
+      }
+
       // Store complete Plaid data in session
       const plaidData = {
         connectionMetadata: metadata,
         accounts: accountsData,
         transactions: transactionsData,
+        identity: identityData,
+        liabilities: liabilitiesData,
+        income: incomeData,
         fetchedAt: new Date().toISOString()
       };
 

@@ -1,0 +1,131 @@
+CPE Report API Documentation
+Overview
+This API endpoint retrieves consumer credit reports from Equifax and converts them to CPE (standardized) format.
+Endpoint
+Endpoint can take both GET or POST Requests. 
+https://sandbox.creditpullengine.com/pull
+
+Authorization
+Parameter: apikey
+https://sandbox.creditpullengine.com/apikey?(YOUR_API_KEY)&
+
+Request Parameters
+Required Fields
+All fields are required and must be provided in the POST request body:
+Parameter
+Type
+Format
+Description
+Example
+fname
+string
+-
+Consumer's first name
+"ERNESTO"
+lname
+string
+-
+Consumer's last name
+"FERNANDEZ"
+ssn
+string
+9 digits
+Social Security Number (no dashes)
+"666321789"
+dob
+string
+YYYY-MM-DD
+Date of birth
+"1973-05-10"
+address
+string
+-
+Street address
+"642 WILLOUGHBY"
+city
+string
+-
+City name
+"BOWLING GREEN"
+state
+string
+2 chars
+State abbreviation (case insensitive)
+"ky" or "KY"
+zip
+string
+5 digits
+ZIP code
+"42101"
+
+Request Example
+curl -X POST https://sandbox.creditpullengine.com/pull \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "fname=ERNESTO&lname=FERNANDEZ&ssn=666321789&dob=1973-05-10&address=642 WILLOUGHBY&city=BOWLING GREEN&state=ky&zip=42101"
+
+Response Format
+
+Success Response
+{
+  "consumer": {
+    "name": "ERNESTO FERNANDEZ",
+    "ssn": "666321789",
+    "dob": "1973-05-10",
+    "address": {
+      "street": "642 WILLOUGHBY",
+      "city": "BOWLING GREEN",
+      "state": "KY",
+      "zip": "42101"
+    }
+  },
+  "creditReport": {
+    // CPE standardized credit report data
+  }
+}
+
+
+Error Response
+{
+  "error": true,
+  "messages": [
+    "First name is required",
+    "Valid 9-digit SSN is required",
+    "Valid 5-digit ZIP is required"
+  ]
+}
+
+
+
+
+
+
+Validation Rules
+Field Requirements
+First Name (fname): Cannot be empty
+Last Name (lname): Cannot be empty
+SSN (ssn): Must be exactly 9 digits (no spaces, dashes, or letters)
+Date of Birth (dob): Must be provided (automatically converted from YYYY-MM-DD to MM/DD/YYYY for Equifax)
+Address (address): Cannot be empty
+City (city): Cannot be empty
+State (state): Cannot be empty (automatically converted to uppercase)
+ZIP (zip): Must be exactly 5 digits
+HTTP Status Codes
+Code
+Description
+200
+Success - Credit report retrieved and processed
+400
+Bad Request - Validation errors in input data
+401
+Unauthorized - Invalid API credentials
+500
+Internal Server Error - Equifax API error or processing failure
+
+
+Error Handling
+The API includes comprehensive validation before making the Equifax request. All validation errors are returned in a single response with specific error messages for each field that failed validation.
+Security Notes
+All consumer data should be transmitted over HTTPS
+SSN and other sensitive data are logged for debugging purposes
+Ensure proper authentication is in place before using this endpoint
+Files are stored locally - ensure proper file permissions and cleanup procedures

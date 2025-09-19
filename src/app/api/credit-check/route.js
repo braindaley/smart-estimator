@@ -3,6 +3,82 @@ import { NextResponse } from 'next/server';
 const SANDBOX_API_KEY = process.env.CPE_API_KEY;
 const CPE_SANDBOX_URL = process.env.CPE_SANDBOX_URL;
 
+// Transform CPE API response to match frontend expectations
+function transformCPEResponse(cpeData, originalRequest) {
+  // Start with the raw CPE data
+  const transformed = {
+    ...cpeData,
+    timestamp: new Date().toISOString(),
+    reportDate: new Date().toISOString().split('T')[0],
+    status: 'success',
+    isMockData: false,
+
+    // Preserve original request info
+    consumer: {
+      firstName: originalRequest.fname,
+      lastName: originalRequest.lname,
+      birthDate: originalRequest.dob,
+      socialSecurity: originalRequest.ssn,
+      ...cpeData.consumer
+    }
+  };
+
+  // Map CPE fields to our expected format if needed
+  // The CPE response structure should already match what we expect
+  // but we'll ensure consistency
+
+  // If CPE returns creditReport nested object, flatten relevant fields
+  if (cpeData.creditReport) {
+    transformed.trades = cpeData.creditReport.trades || cpeData.creditReport.tradeLines || [];
+    transformed.inquiries = cpeData.creditReport.inquiries || [];
+    transformed.addresses = cpeData.creditReport.addresses || [];
+    transformed.employments = cpeData.creditReport.employments || [];
+    transformed.bankruptcies = cpeData.creditReport.bankruptcies || cpeData.creditReport.publicRecords || [];
+    transformed.collections = cpeData.creditReport.collections || [];
+    transformed.creditScore = cpeData.creditReport.creditScore || cpeData.creditReport.score;
+    transformed.fraudIDScanAlertCodes = cpeData.creditReport.fraudIDScanAlertCodes || [];
+
+    // Calculate summary if not provided
+    if (!transformed.summary && transformed.trades) {
+      const openTrades = transformed.trades.filter(t =>
+        t.rate && t.rate.description &&
+        !t.rate.description.toLowerCase().includes('closed')
+      );
+
+      transformed.summary = {
+        totalAccounts: transformed.trades.length,
+        openAccounts: openTrades.length,
+        totalDebt: openTrades.reduce((sum, t) => sum + (t.balance || 0), 0),
+        monthlyPayments: openTrades.reduce((sum, t) => sum + (t.scheduledPaymentAmount || 0), 0)
+      };
+    }
+  }
+
+  // Ensure trades/accounts have consistent field names
+  if (transformed.trades && Array.isArray(transformed.trades)) {
+    transformed.trades = transformed.trades.map(trade => ({
+      ...trade,
+      // Ensure consistent field names
+      customerName: trade.customerName || trade.creditorName || trade.subscriber?.name,
+      accountNumber: trade.accountNumber || trade.account,
+      balance: trade.balance || trade.currentBalance,
+      scheduledPaymentAmount: trade.scheduledPaymentAmount || trade.paymentAmount || trade.monthlyPayment,
+      creditLimit: trade.creditLimit || trade.limit,
+      highCredit: trade.highCredit || trade.highBalance,
+      dateOpened: trade.dateOpened || trade.openDate,
+      dateReported: trade.dateReported || trade.reportedDate,
+      lastActivityDate: trade.lastActivityDate || trade.lastActive,
+      lastPaymentDate: trade.lastPaymentDate || trade.lastPaid,
+      actualPaymentAmount: trade.actualPaymentAmount || trade.lastPaymentAmount,
+      pastDueAmount: trade.pastDueAmount || trade.pastDue,
+      monthsReviewed: trade.monthsReviewed || trade.monthsHistory,
+      customerNumber: trade.customerNumber || trade.subscriberNumber
+    }));
+  }
+
+  return transformed;
+}
+
 // Create mock credit data for testing/fallback
 function createMockCreditData(body) {
   return {
@@ -122,68 +198,202 @@ function createMockCreditData(body) {
 
 export async function POST(request) {
   console.log('[Credit Check] Starting request');
-  console.log('[Credit Check] Using mock data for development/testing');
-  
+
   try {
-    // Parse request body for mock data generation
+    // Parse request body
     const body = await request.json();
     console.log('[Credit Check] Request body:', { ...body, ssn: body.ssn ? '***' : undefined });
-    
-    // Validate required fields for consistency
+
+    // Validate required fields
     const errors = [];
-    
+
     if (!body.fname || body.fname.trim() === '') {
       errors.push('First name is required');
     }
-    
+
     if (!body.lname || body.lname.trim() === '') {
       errors.push('Last name is required');
     }
-    
+
     if (!body.ssn || !/^\d{9}$/.test(body.ssn.replace(/\D/g, ''))) {
       errors.push('Valid 9-digit SSN is required');
     }
-    
+
     if (!body.dob) {
       errors.push('Date of birth is required');
     }
-    
+
     if (!body.address || body.address.trim() === '') {
       errors.push('Address is required');
     }
-    
+
     if (!body.city || body.city.trim() === '') {
       errors.push('City is required');
     }
-    
+
     if (!body.state || body.state.trim() === '') {
       errors.push('State is required');
     }
-    
+
     if (!body.zip || !/^\d{5}$/.test(body.zip)) {
       errors.push('Valid 5-digit ZIP is required');
     }
-    
+
     // Return validation errors if any
     if (errors.length > 0) {
       console.log('[Credit Check] Validation errors:', errors);
       return NextResponse.json(
-        { 
+        {
           error: true,
           messages: errors
         },
         { status: 400 }
       );
     }
-    
-    // Return mock data immediately
-    console.log('[Credit Check] Returning mock credit data');
-    return NextResponse.json(createMockCreditData(body));
-    
+
+    // Check if environment variables are configured
+    if (!SANDBOX_API_KEY || !CPE_SANDBOX_URL) {
+      console.log('[Credit Check] API credentials not configured, using mock data');
+      return NextResponse.json({
+        ...createMockCreditData(body),
+        isMockData: true,
+        mockReason: 'API credentials not configured'
+      });
+    }
+
+    // Prepare request data for CPE API (form-urlencoded format)
+    const formData = new URLSearchParams();
+    formData.append('apikey', SANDBOX_API_KEY);
+    formData.append('fname', body.fname.trim());
+    formData.append('lname', body.lname.trim());
+    formData.append('ssn', body.ssn.replace(/\D/g, '')); // Remove any non-digits
+    formData.append('dob', body.dob); // Already in YYYY-MM-DD format
+    formData.append('address', body.address.trim());
+    formData.append('city', body.city.trim());
+    formData.append('state', body.state.trim().toUpperCase()); // Convert to uppercase
+    formData.append('zip', body.zip.trim());
+
+    console.log('[Credit Check] Calling CPE API...');
+    console.log('[Credit Check] URL:', CPE_SANDBOX_URL);
+
+    try {
+      // Make request to CPE API
+      const cpeResponse = await fetch(CPE_SANDBOX_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString()
+      });
+
+      const responseText = await cpeResponse.text();
+      console.log('[Credit Check] CPE Response Status:', cpeResponse.status);
+      console.log('[Credit Check] CPE Response Headers:', Object.fromEntries(cpeResponse.headers.entries()));
+
+      // Try to parse as JSON
+      let cpeData;
+      try {
+        cpeData = JSON.parse(responseText);
+        console.log('[Credit Check] CPE Response parsed as JSON');
+      } catch (jsonError) {
+        console.log('[Credit Check] Response is not JSON, raw response:', responseText.substring(0, 500));
+
+        // If not JSON, might be HTML error page
+        if (responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
+          console.log('[Credit Check] Received HTML response, API may be down or credentials invalid');
+          return NextResponse.json({
+            ...createMockCreditData(body),
+            isMockData: true,
+            mockReason: 'CPE API returned HTML instead of JSON (API may be down)',
+            apiResponse: {
+              status: cpeResponse.status,
+              statusText: cpeResponse.statusText,
+              isHtml: true
+            }
+          });
+        }
+
+        // Return raw response for debugging
+        return NextResponse.json({
+          ...createMockCreditData(body),
+          isMockData: true,
+          mockReason: 'CPE API returned non-JSON response',
+          rawResponse: responseText.substring(0, 1000)
+        });
+      }
+
+      // Check for API errors
+      if (cpeData.error) {
+        console.log('[Credit Check] CPE API returned error:', cpeData);
+
+        // If it's a validation error, return it
+        if (cpeData.messages && Array.isArray(cpeData.messages)) {
+          return NextResponse.json(
+            {
+              error: true,
+              messages: cpeData.messages
+            },
+            { status: 400 }
+          );
+        }
+
+        // Otherwise use mock data with error info
+        return NextResponse.json({
+          ...createMockCreditData(body),
+          isMockData: true,
+          mockReason: 'CPE API returned error',
+          apiError: cpeData
+        });
+      }
+
+      // Handle different response statuses
+      if (!cpeResponse.ok) {
+        console.log('[Credit Check] CPE API request failed with status:', cpeResponse.status);
+
+        if (cpeResponse.status === 401) {
+          return NextResponse.json({
+            ...createMockCreditData(body),
+            isMockData: true,
+            mockReason: 'Invalid API credentials (401 Unauthorized)'
+          });
+        }
+
+        if (cpeResponse.status === 500) {
+          return NextResponse.json({
+            ...createMockCreditData(body),
+            isMockData: true,
+            mockReason: 'CPE API internal error (500)'
+          });
+        }
+
+        return NextResponse.json({
+          ...createMockCreditData(body),
+          isMockData: true,
+          mockReason: `CPE API error (Status: ${cpeResponse.status})`
+        });
+      }
+
+      // Successfully got data from CPE
+      console.log('[Credit Check] Successfully received CPE data');
+
+      // Transform CPE response to match our frontend expectations
+      const transformedData = transformCPEResponse(cpeData, body);
+
+      return NextResponse.json(transformedData);
+
+    } catch (fetchError) {
+      console.error('[Credit Check] Error calling CPE API:', fetchError);
+      return NextResponse.json({
+        ...createMockCreditData(body),
+        isMockData: true,
+        mockReason: `Network error: ${fetchError.message}`
+      });
+    }
+
   } catch (parseError) {
     console.error('[Credit Check] Failed to parse request body:', parseError);
     return NextResponse.json(
-      { 
+      {
         error: true,
         messages: ['Invalid request format'],
         details: 'Unable to parse request body'

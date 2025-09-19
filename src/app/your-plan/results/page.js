@@ -30,49 +30,91 @@ const getCreditData = () => {
   }
 };
 
-// Function to match account types with fuzzy logic (from deal-sheet)
+// Function to match account types with fuzzy logic (from deal-sheet) - enhanced for CPE
 const matchesAccountType = (account, targetTypes) => {
   const getDescription = (field) => {
     if (!field) return '';
     return field.description || field.code || field || '';
   };
-  
+
   const accountType = getDescription(account.portfolioTypeCode).toLowerCase();
   const accountTypeCode = getDescription(account.accountTypeCode).toLowerCase();
   const customerName = (account.customerName || '').toLowerCase();
-  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0] 
-    ? getDescription(account.narrativeCodes[0]).toLowerCase() 
+  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0]
+    ? getDescription(account.narrativeCodes[0]).toLowerCase()
     : '';
-  
+
   const searchText = `${accountType} ${accountTypeCode} ${customerName} ${narrativeDescription}`;
-  
+
+  // Check narrative codes from CPE if available
+  const accountNarrativeCodes = [];
+  if (account.narrativeCodes && Array.isArray(account.narrativeCodes)) {
+    account.narrativeCodes.forEach(nc => {
+      if (nc.code) accountNarrativeCodes.push(nc.code);
+      if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);
+    });
+  }
+
   for (const targetType of targetTypes) {
-    const keywords = targetType.keywords;
-    const hasMatch = keywords.some(keyword => searchText.includes(keyword));
-    if (hasMatch) {
+    // Check keywords in text
+    const keywords = targetType.keywords || [];
+    const hasKeywordMatch = keywords.some(keyword => searchText.includes(keyword));
+
+    // Check narrative codes if defined
+    let hasNarrativeMatch = false;
+    if (targetType.narrativeCodes && accountNarrativeCodes.length > 0) {
+      hasNarrativeMatch = targetType.narrativeCodes.some(code =>
+        accountNarrativeCodes.includes(code)
+      );
+    }
+
+    if (hasKeywordMatch || hasNarrativeMatch) {
       return targetType.type;
     }
   }
-  return null;
+
+  // Default fallback based on portfolio type
+  if (accountType.includes('revolving')) return 'Credit Card';
+  if (accountType.includes('installment')) return 'Personal Loan';
+
+  return 'Other Debt';
 };
 
-// Account type matching configuration
+// Account type matching configuration - updated for CPE response structure
 const DEBT_ACCOUNT_TYPES = [
   {
     type: 'Credit Card',
-    keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi']
+    keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi', 'bank of america', 'bankcard', 'cbna'],
+    narrativeCodes: ['002', 'FE'] // CPE narrative codes for credit cards
   },
   {
     type: 'Personal Loan',
-    keywords: ['personal loan', 'personal', 'loan', 'installment', 'lending', 'upstart', 'prosper', 'sofi', 'marcus']
+    keywords: ['personal loan', 'personal', 'lending', 'upstart', 'prosper', 'sofi', 'marcus', 'line of credit'],
+    narrativeCodes: ['073', 'CV', '238', 'EX'] // Line of credit, unsecured
   },
   {
     type: 'Medical',
-    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health']
+    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health', 'mercy']
   },
   {
     type: 'Retail Credit',
-    keywords: ['retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'sears', 'nordstrom']
+    keywords: ['retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'jc penney', 'sears', 'nordstrom', 'comenity', 'victoria'],
+    narrativeCodes: ['229', 'AV'] // Charge accounts
+  },
+  {
+    type: 'Auto Loan',
+    keywords: ['auto', 'gmac', 'car', 'vehicle'],
+    narrativeCodes: ['214', 'AO'] // Auto loans
+  },
+  {
+    type: 'Student Loan',
+    keywords: ['student', 'education'],
+    narrativeCodes: ['248', 'BU'] // Student loans
+  },
+  {
+    type: 'Mortgage',
+    keywords: ['mortgage', 'home loan', 'real estate'],
+    narrativeCodes: ['127', 'EF', '150', 'HP'] // Real estate, FHA mortgage
   }
 ];
 
@@ -92,19 +134,57 @@ export default function ResultsPage() {
         }
 
         // Filter and categorize debt accounts
+        // Include accounts that are open and have a balance (or scheduled payments)
+        console.log('Processing trades:', creditData.trades.length, 'accounts');
+
         const matchedAccounts = creditData.trades
-          .map(account => {
+          .map((account, index) => {
             const matchedType = matchesAccountType(account, DEBT_ACCOUNT_TYPES);
-            if (matchedType && account.balance && account.balance > 0) {
+
+            // Parse balance - handle "N/A" and other non-numeric values
+            let balance = 0;
+            if (account.balance && account.balance !== 'N/A') {
+              balance = typeof account.balance === 'number' ? account.balance : parseFloat(account.balance) || 0;
+            }
+
+            // Check if account is active (not closed/paid)
+            const isActive = account.rate &&
+              account.rate.description &&
+              !account.rate.description.toLowerCase().includes('closed') &&
+              !account.rate.description.toLowerCase().includes('paid');
+
+            // Check narrative codes for closed accounts
+            const isClosed = account.narrativeCodes && account.narrativeCodes.some(nc =>
+              nc.code === '158' || // CLOSED OR PAID ACCOUNT/ZERO BALANCE
+              nc.code === '066' || // ACCOUNT CLOSED BY CONSUMER
+              nc.code === '114'    // CLOSED ACCOUNT
+            );
+
+            console.log(`Account ${index + 1}:`, {
+              customerName: account.customerName,
+              matchedType,
+              balance,
+              scheduledPayment: account.scheduledPaymentAmount,
+              isActive,
+              isClosed,
+              rate: account.rate?.description,
+              portfolioType: account.portfolioTypeCode?.description
+            });
+
+            // Include account if it has balance and is not closed
+            // Or if it has scheduled payments (might be in settlement already)
+            if (matchedType && (balance > 0 || account.scheduledPaymentAmount > 0) && !isClosed) {
               return {
                 ...account,
                 matchedType,
-                balance: account.balance || 0
+                balance: balance
               };
             }
             return null;
           })
           .filter(account => account !== null);
+
+        console.log('Matched accounts for debt settlement:', matchedAccounts.length);
           
         setDebtAccounts(matchedAccounts);
 
@@ -205,6 +285,9 @@ export default function ResultsPage() {
   }
 
   if (debtAccounts.length === 0) {
+    const creditData = getCreditData();
+    const hasCredit = creditData && creditData.trades && creditData.trades.length > 0;
+
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
@@ -212,20 +295,50 @@ export default function ResultsPage() {
           <div className="container mx-auto max-w-7xl px-4 py-12">
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-4">Debt Portfolio Results</h1>
-              <div className="border-2 border-dashed rounded-lg p-8 max-w-2xl mx-auto">
+              <div className="border-2 border-dashed rounded-lg p-8 max-w-4xl mx-auto">
                 <div className="flex flex-col items-center">
                   <div className="w-16 h-16 border rounded-full flex items-center justify-center mb-4">
-                    <span className="text-2xl">Accounts</span>
+                    <span className="text-2xl">📊</span>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Credit Data Available</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    {hasCredit ? 'No Eligible Debt Accounts Found' : 'No Credit Data Available'}
+                  </h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    Complete your credit check first to see your debt portfolio analysis and program calculations.
+                    {hasCredit
+                      ? `Found ${creditData.trades.length} credit accounts, but none have active balances eligible for debt settlement.`
+                      : 'Complete your credit check first to see your debt portfolio analysis and program calculations.'}
                   </p>
+
+                  {hasCredit && (
+                    <div className="mt-4 w-full text-left">
+                      <details className="border rounded-lg p-4">
+                        <summary className="cursor-pointer font-medium">View All Credit Accounts ({creditData.trades.length})</summary>
+                        <div className="mt-4 space-y-2 max-h-96 overflow-y-auto">
+                          {creditData.trades.map((account, index) => (
+                            <div key={index} className="border-b pb-2 text-xs">
+                              <div className="font-medium">{account.customerName}</div>
+                              <div className="grid grid-cols-3 gap-2 text-gray-600">
+                                <div>Balance: {account.balance === 'N/A' ? 'N/A' : formatCurrency(account.balance)}</div>
+                                <div>Status: {account.rate?.description || 'Unknown'}</div>
+                                <div>Type: {account.portfolioTypeCode?.description || 'Unknown'}</div>
+                              </div>
+                              {account.narrativeCodes && (
+                                <div className="text-gray-500">
+                                  Notes: {account.narrativeCodes.map(nc => nc.description).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+
                   <Button
-                    onClick={() => window.location.href = '/your-plan'}
-                    className="border hover:bg-gray-100"
+                    onClick={() => window.location.href = hasCredit ? '/results/credit' : '/your-plan'}
+                    className="border hover:bg-gray-100 mt-4"
                   >
-                    Complete Credit Check
+                    {hasCredit ? 'View Full Credit Report' : 'Complete Credit Check'}
                   </Button>
                 </div>
               </div>
