@@ -9,6 +9,16 @@ interface ReadinessWhatsNextProps {
   readinessScore: number;
 }
 
+function calculateLetterGrade(score: number, maxScore: number = 35): string {
+  const percentage = Math.round((score / maxScore) * 100);
+
+  if (percentage >= 90) return 'A';
+  if (percentage >= 80) return 'B';
+  if (percentage >= 70) return 'C';
+  if (percentage >= 60) return 'D';
+  return 'F';
+}
+
 export default function ReadinessWhatsNext({
   readinessScore
 }: ReadinessWhatsNextProps) {
@@ -16,16 +26,19 @@ export default function ReadinessWhatsNext({
   const isModerateScore = readinessScore >= 18 && readinessScore <= 24;
   const isLowScore = readinessScore >= 0 && readinessScore <= 17;
 
+  // Calculate the letter grade
+  const letterGrade = calculateLetterGrade(readinessScore);
+
   return (
     <Card className="mt-8">
       <CardHeader className="pb-4 text-center">
         <CardTitle className="text-xl font-bold">What's next?</CardTitle>
         <CardDescription>
-          {isVeryHighScore 
+          Your current momentum score is a {letterGrade}. {isVeryHighScore
             ? "Let's verify debt settlement is right for you by verifying your financial situation."
-            : isModerateScore 
+            : isModerateScore
               ? "Improve your score by viewing the videos below. Once you have completed this task, you will be able to verify you financial situation."
-              : isLowScore 
+              : isLowScore
                 ? "Debt settlement is likely not a good fit for you but we have resources available for you to improve your situation."
                 : "Let's verify debt settlement is right for you by verifying your financial situation."
           }

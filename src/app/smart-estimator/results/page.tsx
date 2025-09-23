@@ -604,12 +604,6 @@ export default function Results() {
                               ))}
                           </div>
 
-                          <div className="font-medium mt-3">Fallback Logic (if no dynamic tiers):</div>
-                          <div className="ml-2 space-y-1">
-                            <div>• $15,000-$20,000: 20% fee, 30 months</div>
-                            <div>• $20,001-$24,000: 15% fee, 36 months</div>
-                            <div>• $24,001+: 15% fee, 42 months</div>
-                          </div>
                         </div>
                       </div>
 
@@ -742,6 +736,114 @@ export default function Results() {
                             <div>• 690-719 (Good): 1 point</div>
                             <div>• 580-689 (Fair): 2 points</div>
                             <div>• &lt;580 (Subprime): 1 point</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium text-orange-600">Plan Visibility Logic:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Status:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Has Steady Income: {allFormData.hasSteadyIncome ? 'Yes' : 'No'}</div>
+                            <div>• FICO Score: {allFormData.userFicoScoreEstimate}</div>
+                            <div>• Debt Amount: {formatCurrency(allFormData.debtAmountEstimate)}</div>
+                            <div>• Momentum Plan: Always shown (if has steady income)</div>
+                            <div>• Personal Loan: {qualification.hideColumns.includes('personalLoan') ? 'Hidden' : 'Shown'}</div>
+                            <div>• Current Path: Always shown</div>
+                            <div>• Comparison Table: {qualification.hideComparison ? 'Hidden' : 'Shown'}</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Hide Entire Comparison Table When:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Has steady income = false</div>
+                            <div>• Result: Shows "Unfortunately without steady income, we do not have a solutions for you."</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Hide Personal Loan Column When:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• FICO score &lt; 580 OR</div>
+                            <div>• Debt amount exceeds max loan amount for credit score OR</div>
+                            <div>• No steady income</div>
+                            <div>• Max loan amounts: 720+ = $50K, 690-719 = $40K, 660-689 = $30K, 620-659 = $20K, &lt;620 = $5K</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Always Show:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Momentum Plan (when has steady income)</div>
+                            <div>• Current Path (always visible as baseline comparison)</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Eligibility Check Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Personal Loan: isEligibleForPersonalLoan(debt, fico) = {isEligibleForPersonalLoan(allFormData.debtAmountEstimate, allFormData.userFicoScoreEstimate) ? 'true' : 'false'}</div>
+                            <div>• Formula: (fico ≥ 580) AND (debt ≤ maxLoanAmount[fico])</div>
+                            <div>• Momentum Plan: Always eligible if has steady income</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium text-green-600">What's Next Section Logic:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Status:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Has Steady Income: {allFormData.hasSteadyIncome ? 'Yes' : 'No'}</div>
+                            <div>• FICO Score: {allFormData.userFicoScoreEstimate}</div>
+                            <div>• Momentum Score: {momentumScore?.score || 0} / {momentumScore?.maxPossible || 35}</div>
+                            <div>• Letter Grade: {(() => {
+                              const percentage = Math.round(((momentumScore?.score || 0) / (momentumScore?.maxPossible || 35)) * 100);
+                              if (percentage >= 90) return 'A';
+                              if (percentage >= 80) return 'B';
+                              if (percentage >= 70) return 'C';
+                              if (percentage >= 60) return 'D';
+                              return 'F';
+                            })()}</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Decision Logic (3 Scenarios):</div>
+
+                          <div className="ml-2 space-y-2">
+                            <div className="border-l-2 border-red-400 pl-2">
+                              <div className="font-medium text-red-600">Scenario 1: Non-Payment Options</div>
+                              <div>• Condition: Has steady income = false</div>
+                              <div>• Message: "There are non-payment based relief options available."</div>
+                              <div>• Button: "Legal aid partner" → /resources/legal-aid-partners</div>
+                              <div>• Current User: {allFormData.hasSteadyIncome === false ? '✓ ACTIVE' : '✗ Not Active'}</div>
+                            </div>
+
+                            <div className="border-l-2 border-blue-400 pl-2">
+                              <div className="font-medium text-blue-600">Scenario 2: Readiness Quiz</div>
+                              <div>• Condition: Has steady income = true AND FICO &gt; 580 AND momentum score ≤ 29</div>
+                              <div>• Message: "Let's verify debt settlement is right for you by taking a quick quiz."</div>
+                              <div>• Button: "Test your readiness" → readiness tool link</div>
+                              <div>• Current User: {(allFormData.hasSteadyIncome === true && allFormData.userFicoScoreEstimate > 580 && (momentumScore?.score || 0) <= 29) ? '✓ ACTIVE' : '✗ Not Active'}</div>
+                            </div>
+
+                            <div className="border-l-2 border-green-400 pl-2">
+                              <div className="font-medium text-green-600">Scenario 3: Debt Settlement Plan</div>
+                              <div>• Condition: Has steady income = true AND FICO &gt; 580 AND momentum score &gt; 29</div>
+                              <div>• Message: "Let's verify debt settlement is right for you by verifying your financial situation."</div>
+                              <div>• Button: "See your plan" → /your-plan</div>
+                              <div>• Current User: {(allFormData.hasSteadyIncome === true && allFormData.userFicoScoreEstimate > 580 && (momentumScore?.score || 0) > 29) ? '✓ ACTIVE' : '✗ Not Active'}</div>
+                            </div>
+                          </div>
+
+                          <div className="font-medium mt-3">Letter Grade Calculation:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Percentage: (momentum score ÷ max possible) × 100</div>
+                            <div>• A: 90-100% (32-35 points)</div>
+                            <div>• B: 80-89% (28-31 points)</div>
+                            <div>• C: 70-79% (25-27 points)</div>
+                            <div>• D: 60-69% (21-24 points)</div>
+                            <div>• F: 0-59% (0-20 points)</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Component Props:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• hasSteadyIncome: {JSON.stringify(allFormData.hasSteadyIncome)}</div>
+                            <div>• userFicoScoreEstimate: {allFormData.userFicoScoreEstimate}</div>
+                            <div>• momentumScore: {momentumScore?.score || 0}</div>
                           </div>
                         </div>
                       </div>
