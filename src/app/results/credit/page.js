@@ -81,14 +81,28 @@ export default function CreditResultsPage() {
 
   // Determine credit score rating
   const getScoreRating = (score) => {
-    if (score >= 800) return { rating: 'Excellent', color: '', bgColor: '', borderColor: 'border-gray-200' };
-    if (score >= 740) return { rating: 'Very Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
-    if (score >= 670) return { rating: 'Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
-    if (score >= 580) return { rating: 'Fair', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    const numScore = typeof score === 'string' ? parseInt(score, 10) : score;
+    if (!numScore || isNaN(numScore)) return null;
+
+    if (numScore >= 800) return { rating: 'Excellent', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (numScore >= 740) return { rating: 'Very Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (numScore >= 670) return { rating: 'Good', color: '', bgColor: '', borderColor: 'border-gray-200' };
+    if (numScore >= 580) return { rating: 'Fair', color: '', bgColor: '', borderColor: 'border-gray-200' };
     return { rating: 'Poor', color: '', bgColor: '', borderColor: 'border-gray-200' };
   };
 
-  const scoreInfo = creditData.creditScore ? getScoreRating(creditData.creditScore.score) : null;
+  // Handle different creditScore structures
+  let scoreValue = null;
+  if (creditData.creditScore) {
+    if (typeof creditData.creditScore === 'number') {
+      scoreValue = creditData.creditScore;
+    } else if (creditData.creditScore.score !== undefined) {
+      scoreValue = creditData.creditScore.score;
+    } else if (creditData.creditScore.scoring !== undefined) {
+      scoreValue = creditData.creditScore.scoring;
+    }
+  }
+  const scoreInfo = scoreValue ? getScoreRating(scoreValue) : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -145,28 +159,30 @@ export default function CreditResultsPage() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Credit Score Card */}
             {creditData.creditScore && (
-              <div className={`rounded-xl p-6 border ${scoreInfo.borderColor} ${scoreInfo.bgColor}`}>
+              <div className={`rounded-xl p-6 border ${scoreInfo?.borderColor || 'border-gray-200'} ${scoreInfo?.bgColor || ''}`}>
                 <h2 className="text-lg font-semibold mb-4">Credit Score</h2>
                 <div className="text-center py-4">
                   <div className="text-5xl font-bold">
-                    {creditData.creditScore.score}
+                    {scoreValue || 'N/A'}
                   </div>
-                  <div className="text-lg font-medium mt-2">
-                    {scoreInfo.rating}
-                  </div>
+                  {scoreInfo && (
+                    <div className="text-lg font-medium mt-2">
+                      {scoreInfo.rating}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground mt-1">
-                    {creditData.creditScore.range}
+                    {creditData.creditScore.range || creditData.creditScore?.range || 'Credit Score'}
                   </div>
                 </div>
                 
-                {creditData.creditScore.factors && (
+                {creditData.creditScore.factors && Array.isArray(creditData.creditScore.factors) && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <h3 className="text-sm font-medium mb-2">Key Factors</h3>
                     <ul className="space-y-1">
                       {creditData.creditScore.factors.map((factor, index) => (
                         <li key={index} className="text-xs text-muted-foreground flex items-start">
                           <span className="mr-1">•</span>
-                          <span>{factor}</span>
+                          <span>{typeof factor === 'object' ? JSON.stringify(factor) : factor}</span>
                         </li>
                       ))}
                     </ul>
@@ -188,10 +204,28 @@ export default function CreditResultsPage() {
                     <span className="text-sm text-muted-foreground">Open Accounts</span>
                     <span className="font-semibold">{creditData.summary.openAccounts}</span>
                   </div>
+                  {creditData.summary.closedAccounts !== undefined && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Closed Accounts</span>
+                      <span className="font-semibold">{creditData.summary.closedAccounts}</span>
+                    </div>
+                  )}
+                  {creditData.summary.delinquentAccounts !== undefined && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Delinquent</span>
+                      <span className="font-semibold">{creditData.summary.delinquentAccounts}</span>
+                    </div>
+                  )}
+                  {creditData.summary.derogatoryAccounts !== undefined && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Derogatory</span>
+                      <span className="font-semibold">{creditData.summary.derogatoryAccounts}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Debt</span>
+                    <span className="text-sm text-muted-foreground">Total Balances</span>
                     <span className="font-semibold">
-                      ${creditData.summary.totalDebt?.toLocaleString() || '0'}
+                      ${creditData.summary.totalBalances?.toLocaleString() || creditData.summary.totalDebt?.toLocaleString() || '0'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -200,7 +234,79 @@ export default function CreditResultsPage() {
                       ${creditData.summary.monthlyPayments?.toLocaleString() || '0'}
                     </span>
                   </div>
+                  {creditData.summary.creditUtilization !== undefined && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Credit Utilization</span>
+                      <span className="font-semibold">{creditData.summary.creditUtilization}%</span>
+                    </div>
+                  )}
+                  {creditData.summary.oldestAccount && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Oldest Account</span>
+                      <span className="font-semibold">{creditData.summary.oldestAccount}</span>
+                    </div>
+                  )}
+                  {creditData.summary.averageAccountAge && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Avg Account Age</span>
+                      <span className="font-semibold">{creditData.summary.averageAccountAge}</span>
+                    </div>
+                  )}
+                  {creditData.summary.paymentPerformance && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Payment Performance</span>
+                      <span className="font-semibold">{creditData.summary.paymentPerformance}</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Account Type Breakdown */}
+                {(creditData.summary.revolvingAccounts !== undefined ||
+                  creditData.summary.installmentAccounts !== undefined ||
+                  creditData.summary.mortgageAccounts !== undefined) && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h3 className="text-sm font-medium mb-2">By Account Type</h3>
+                    <div className="space-y-2">
+                      {creditData.summary.revolvingAccounts !== undefined && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Revolving</span>
+                          <span className="text-sm">
+                            {creditData.summary.revolvingAccounts} accounts |
+                            ${creditData.summary.revolvingBalance?.toLocaleString() || 0} /
+                            ${creditData.summary.revolvingCreditLimit?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      )}
+                      {creditData.summary.installmentAccounts !== undefined && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Installment</span>
+                          <span className="text-sm">
+                            {creditData.summary.installmentAccounts} accounts |
+                            ${creditData.summary.installmentBalance?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      )}
+                      {creditData.summary.mortgageAccounts !== undefined && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Mortgage</span>
+                          <span className="text-sm">
+                            {creditData.summary.mortgageAccounts} accounts |
+                            ${creditData.summary.mortgageBalance?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      )}
+                      {creditData.summary.otherAccounts !== undefined && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Other</span>
+                          <span className="text-sm">
+                            {creditData.summary.otherAccounts} accounts |
+                            ${creditData.summary.otherBalance?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -216,7 +322,10 @@ export default function CreditResultsPage() {
                   <div>
                     <span className="text-sm text-muted-foreground">Full Name</span>
                     <p className="font-medium">
-                      {creditData.consumer.firstName} {creditData.consumer.lastName}
+                      {creditData.consumer.firstName}
+                      {creditData.consumer.middleName && `${creditData.consumer.middleName} `}
+                      {creditData.consumer.lastName}
+                      {creditData.consumer.suffix && ` ${creditData.consumer.suffix}`}
                     </p>
                   </div>
                 )}
@@ -238,10 +347,10 @@ export default function CreditResultsPage() {
                     <p className="font-medium">{creditData.consumer.birthDate}</p>
                   </div>
                 )}
-                {creditData.consumer.addressDiscrepancy && (
+                {creditData.consumer.addressDiscrepancy !== undefined && (
                   <div>
                     <span className="text-sm text-muted-foreground">Address Discrepancy</span>
-                    <p className="font-medium">{creditData.consumer.addressDiscrepancy}</p>
+                    <p className="font-medium">{creditData.consumer.addressDiscrepancy ? 'Yes' : 'No'}</p>
                   </div>
                 )}
                 {creditData.consumer.ECOAinquiryType && (
@@ -255,6 +364,82 @@ export default function CreditResultsPage() {
                         </span>
                       )}
                     </p>
+                  </div>
+                )}
+                {creditData.consumer.hitCode && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Hit Code</span>
+                    <p className="font-medium">
+                      {creditData.consumer.hitCode.code}
+                      {creditData.consumer.hitCode.description && (
+                        <span className="block text-xs text-gray-500">
+                          {creditData.consumer.hitCode.description}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+                {creditData.consumer.fileSinceDate && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">File Since Date</span>
+                    <p className="font-medium">{creditData.consumer.fileSinceDate}</p>
+                  </div>
+                )}
+                {creditData.consumer.lastActivityDate && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Last Activity Date</span>
+                    <p className="font-medium">{creditData.consumer.lastActivityDate}</p>
+                  </div>
+                )}
+                {creditData.consumer.numberOfMonthsHistory && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Months of History</span>
+                    <p className="font-medium">{creditData.consumer.numberOfMonthsHistory}</p>
+                  </div>
+                )}
+                {creditData.consumer.nameMatchFlags && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Name Match Flags</span>
+                    <p className="font-medium text-xs">
+                      First: {creditData.consumer.nameMatchFlags.firstName || 'N/A'} |
+                      Middle: {creditData.consumer.nameMatchFlags.middleName || 'N/A'} |
+                      Last: {creditData.consumer.nameMatchFlags.lastName || 'N/A'}
+                    </p>
+                  </div>
+                )}
+                {creditData.consumer.addressMatchFlags && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Address Match Flags</span>
+                    <p className="font-medium text-xs">
+                      Street: {creditData.consumer.addressMatchFlags.street || 'N/A'} |
+                      City: {creditData.consumer.addressMatchFlags.city || 'N/A'} |
+                      State: {creditData.consumer.addressMatchFlags.state || 'N/A'} |
+                      ZIP: {creditData.consumer.addressMatchFlags.zip || 'N/A'}
+                    </p>
+                  </div>
+                )}
+                {creditData.consumer.ssnMatchFlag && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">SSN Match</span>
+                    <p className="font-medium">{creditData.consumer.ssnMatchFlag}</p>
+                  </div>
+                )}
+                {creditData.consumer.dobMatchFlag && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">DOB Match</span>
+                    <p className="font-medium">{creditData.consumer.dobMatchFlag}</p>
+                  </div>
+                )}
+                {creditData.consumer.consumerStatementText && (
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <span className="text-sm text-muted-foreground">Consumer Statement</span>
+                    <p className="font-medium">{creditData.consumer.consumerStatementText}</p>
+                  </div>
+                )}
+                {creditData.consumer.consumerReferralCode && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Consumer Referral Code</span>
+                    <p className="font-medium">{creditData.consumer.consumerReferralCode}</p>
                   </div>
                 )}
               </div>
@@ -279,7 +464,7 @@ export default function CreditResultsPage() {
                           {account.portfolioTypeCode?.description || account.portfolioTypeCode?.code || 'N/A'}
                           {account.narrativeCodes && account.narrativeCodes[0] && (
                             <span className="block text-xs text-gray-500">
-                              {account.narrativeCodes[0].description}
+                              Code: {account.narrativeCodes[0].code} - {account.narrativeCodes[0].description}
                             </span>
                           )}
                         </p>
@@ -396,6 +581,54 @@ export default function CreditResultsPage() {
                             </p>
                           </div>
                         )}
+                        {account.paymentHistory && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Payment History</span>
+                            <p className="text-xs text-gray-600 font-mono">{account.paymentHistory}</p>
+                          </div>
+                        )}
+                        {account.ECOACode && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">ECOA Code</span>
+                            <p className="text-xs text-gray-600">{account.ECOACode}</p>
+                          </div>
+                        )}
+                        {account.specialComment && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Special Comment</span>
+                            <p className="text-xs text-gray-600">{account.specialComment}</p>
+                          </div>
+                        )}
+                        {account.complianceConditionCode && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Compliance Code</span>
+                            <p className="text-xs text-gray-600">{account.complianceConditionCode}</p>
+                          </div>
+                        )}
+                        {account.currentMOP && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Current MOP</span>
+                            <p className="text-xs text-gray-600">{account.currentMOP}</p>
+                          </div>
+                        )}
+                        {account.originalCreditor && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Original Creditor</span>
+                            <p className="text-xs text-gray-600">{account.originalCreditor}</p>
+                          </div>
+                        )}
+                        {account.soldToName && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Sold To</span>
+                            <p className="text-xs text-gray-600">{account.soldToName}</p>
+                          </div>
+                        )}
+                        {account.paymentRating !== undefined && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-700">Payment Rating</span>
+                            <p className="text-xs text-gray-600">{account.paymentRating}</p>
+                          </div>
+                        )}
                       </div>
                       
                       {account.narrativeCodes && account.narrativeCodes.length > 1 && (
@@ -421,18 +654,49 @@ export default function CreditResultsPage() {
               <h2 className="text-lg font-semibold mb-4">Recent Credit Inquiries ({creditData.inquiries.length})</h2>
               <div className="space-y-3">
                 {creditData.inquiries.map((inquiry, index) => (
-                  <div key={index} className="flex justify-between items-center border-b pb-2">
-                    <div>
-                      <p className="font-medium">{inquiry.customerName}</p>
-                      <p className="text-sm text-gray-600">
-                        {inquiry.industryName} ({inquiry.type})
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Industry Code: {inquiry.industryCode}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{inquiry.inquiryDate}</p>
+                  <div key={index} className="border rounded-lg p-3">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="md:col-span-2 lg:col-span-1">
+                        <p className="font-medium">{inquiry.customerName}</p>
+                        {inquiry.customerNumber && (
+                          <p className="text-xs text-gray-500">ID: {inquiry.customerNumber}</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Industry</span>
+                        <p className="text-sm">
+                          {inquiry.industryName || 'N/A'}
+                          {inquiry.industryCode && (
+                            <span className="text-xs text-gray-500"> (Code: {inquiry.industryCode})</span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Date</span>
+                        <p className="text-sm">{inquiry.inquiryDate}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Type</span>
+                        <p className="text-sm">{inquiry.type || inquiry.inquiryType || 'N/A'}</p>
+                        {inquiry.ECOAInquiryType && (
+                          <p className="text-xs text-gray-500">ECOA: {inquiry.ECOAInquiryType}</p>
+                        )}
+                      </div>
+                      {inquiry.creditBureauCode && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Bureau</span>
+                          <p className="text-sm">{inquiry.creditBureauCode}</p>
+                        </div>
+                      )}
+                      {(inquiry.addressLine1 || inquiry.city) && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Location</span>
+                          <p className="text-xs text-gray-600">
+                            {inquiry.addressLine1 && <>{inquiry.addressLine1}<br /></>}
+                            {inquiry.city}, {inquiry.state} {inquiry.zipCode}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -451,18 +715,26 @@ export default function CreditResultsPage() {
                       <div className="md:col-span-2">
                         <span className="text-sm font-medium text-gray-700">Address</span>
                         <p className="text-sm">
-                          {address.addressLine1}<br />
+                          {address.houseNumber} {address.streetPrefix} {address.streetName} {address.streetSuffix || address.streetType}<br />
+                          {address.addressLine2 && (<>{address.addressLine2}<br /></>)}
+                          {address.apartmentNumber && (<>Apt {address.apartmentNumber}<br /></>)}
                           {address.city}, {address.state} {address.zipCode}
                         </p>
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-700">Type</span>
-                        <p className="text-sm capitalize">{address.type}</p>
+                        <p className="text-sm capitalize">{address.type || 'N/A'}</p>
+                        {address.addressType && (
+                          <p className="text-xs text-gray-600">{address.addressType}</p>
+                        )}
+                        {address.dwellingType && (
+                          <p className="text-xs text-gray-600">Dwelling: {address.dwellingType}</p>
+                        )}
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-700">Date Range</span>
                         <p className="text-sm">
-                          {address.dateFirstReported} to {address.dateLastReported}
+                          {address.dateFirstReported} to {address.dateLastReported || 'Present'}
                         </p>
                       </div>
                     </div>
@@ -479,15 +751,51 @@ export default function CreditResultsPage() {
               <div className="space-y-3">
                 {creditData.employments.map((employment, index) => (
                   <div key={index} className="border rounded-lg p-3">
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Employer</span>
                         <p className="text-sm">{employment.employer}</p>
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-700">Occupation</span>
-                        <p className="text-sm">{employment.occupation}</p>
+                        <p className="text-sm">{employment.occupation || 'N/A'}</p>
                       </div>
+                      {employment.dateHired && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Date Hired</span>
+                          <p className="text-sm">{employment.dateHired}</p>
+                        </div>
+                      )}
+                      {employment.dateFirstReported && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">First Reported</span>
+                          <p className="text-sm">{employment.dateFirstReported}</p>
+                        </div>
+                      )}
+                      {employment.dateLastReported && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Last Reported</span>
+                          <p className="text-sm">{employment.dateLastReported}</p>
+                        </div>
+                      )}
+                      {employment.employmentType && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Employment Type</span>
+                          <p className="text-sm">{employment.employmentType}</p>
+                        </div>
+                      )}
+                      {employment.income && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Income</span>
+                          <p className="text-sm">${employment.income.toLocaleString()}</p>
+                        </div>
+                      )}
+                      {employment.verificationDate && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Verification Date</span>
+                          <p className="text-sm">{employment.verificationDate}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -571,6 +879,171 @@ export default function CreditResultsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Credit Score Models */}
+          {creditData.models && creditData.models.length > 0 && (
+            <div className="mt-6 rounded-xl p-6 border border-border bg-white">
+              <h2 className="text-lg font-semibold mb-4">Credit Score Models</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {creditData.models.map((model, index) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <h3 className="font-semibold text-sm mb-2">{model.type}</h3>
+                    <p className="text-2xl font-bold">{model.score}</p>
+                    {model.reasons && Array.isArray(model.reasons) && model.reasons.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-xs text-gray-600">Reason Codes: {model.reasons.map(r => typeof r === 'object' ? JSON.stringify(r) : r).join(', ')}</span>
+                      </div>
+                    )}
+                    {model.rejects && Array.isArray(model.rejects) && model.rejects.length > 0 && (
+                      <div className="mt-1">
+                        <span className="text-xs text-red-600">Rejects: {model.rejects.map(r => typeof r === 'object' ? JSON.stringify(r) : r).join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Public Records / Liens / Judgments */}
+          {((creditData.publicRecords && creditData.publicRecords.length > 0) ||
+            (creditData.lienJudgments && creditData.lienJudgments.length > 0)) && (
+            <div className="mt-6 rounded-xl p-6 border border-border bg-white">
+              <h2 className="text-lg font-semibold mb-4">Public Records & Judgments</h2>
+              <div className="space-y-3">
+                {creditData.publicRecords && creditData.publicRecords.map((record, index) => (
+                  <div key={`pr-${index}`} className="border rounded-lg p-3">
+                    <div className="grid md:grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Type</span>
+                        <p className="text-sm">{record.type || 'Public Record'}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Date Filed</span>
+                        <p className="text-sm">{record.dateFiled || record.date}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Amount</span>
+                        <p className="text-sm">{record.amount ? `$${record.amount.toLocaleString()}` : 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {creditData.lienJudgments && creditData.lienJudgments.map((lien, index) => (
+                  <div key={`lj-${index}`} className="border rounded-lg p-3">
+                    <div className="grid md:grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Type</span>
+                        <p className="text-sm">{lien.type || 'Lien/Judgment'}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Date Filed</span>
+                        <p className="text-sm">{lien.dateFiled || lien.date}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Amount</span>
+                        <p className="text-sm">{lien.amount ? `$${lien.amount.toLocaleString()}` : 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Consumer Statements */}
+          {creditData.consumerStatements && creditData.consumerStatements.length > 0 && (
+            <div className="mt-6 rounded-xl p-6 border border-border bg-white">
+              <h2 className="text-lg font-semibold mb-4">Consumer Statements</h2>
+              <div className="space-y-3">
+                {creditData.consumerStatements.map((statement, index) => (
+                  <div key={index} className="border rounded-lg p-3">
+                    <p className="text-sm">{statement.text || statement}</p>
+                    {statement.date && (
+                      <p className="text-xs text-gray-600 mt-1">Date: {statement.date}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Report Metadata */}
+          {(creditData.reportIdentifier || creditData.reportType || creditData.subjectID ||
+            creditData.customerReferenceNumber || creditData.permissiblePurpose) && (
+            <div className="mt-6 rounded-xl p-6 border border-border bg-white">
+              <h2 className="text-lg font-semibold mb-4">Report Information</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {creditData.reportIdentifier && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Report ID</span>
+                    <p className="font-medium">{creditData.reportIdentifier}</p>
+                  </div>
+                )}
+                {creditData.reportType && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Report Type</span>
+                    <p className="font-medium">{creditData.reportType}</p>
+                  </div>
+                )}
+                {creditData.reportTime && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Report Time</span>
+                    <p className="font-medium">{creditData.reportTime}</p>
+                  </div>
+                )}
+                {creditData.subjectID && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Subject ID</span>
+                    <p className="font-medium">{creditData.subjectID}</p>
+                  </div>
+                )}
+                {creditData.customerReferenceNumber && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Customer Reference</span>
+                    <p className="font-medium">{creditData.customerReferenceNumber}</p>
+                  </div>
+                )}
+                {creditData.permissiblePurpose && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Permissible Purpose</span>
+                    <p className="font-medium">{creditData.permissiblePurpose}</p>
+                  </div>
+                )}
+                {creditData.resellerEndUserCompanyName && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">End User Company</span>
+                    <p className="font-medium">{creditData.resellerEndUserCompanyName}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Freeze Options */}
+          {creditData.freezeOptions && (
+            <div className="mt-6 rounded-xl p-6 border border-border bg-white">
+              <h2 className="text-lg font-semibold mb-4">Security Freeze Status</h2>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <span className="text-sm text-muted-foreground">Freeze Status</span>
+                  <p className="font-medium">{creditData.freezeOptions.freezeStatus || 'Not Frozen'}</p>
+                </div>
+                {creditData.freezeOptions.freezeDate && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Freeze Date</span>
+                    <p className="font-medium">{creditData.freezeOptions.freezeDate}</p>
+                  </div>
+                )}
+                {creditData.freezeOptions.freezePIN && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Freeze PIN</span>
+                    <p className="font-medium">****{creditData.freezeOptions.freezePIN.slice(-4)}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

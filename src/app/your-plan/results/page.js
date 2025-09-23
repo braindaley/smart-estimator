@@ -30,6 +30,87 @@ const getCreditData = () => {
   }
 };
 
+// Function to get Equifax narrative codes configuration
+const getEquifaxNarrativeCodes = () => {
+  if (typeof window === 'undefined') return [];
+  const savedConfig = localStorage.getItem('equifax-narrative-codes');
+  if (!savedConfig) return [];
+  try {
+    return JSON.parse(savedConfig);
+  } catch {
+    return [];
+  }
+};
+
+// Function to get debt portfolio filtering configuration
+const getDebtPortfolioFilters = () => {
+  if (typeof window === 'undefined') return {
+    requireActiveAccounts: true,
+    excludeClosedByNarrativeCodes: true,
+    requirePositiveBalance: true,
+    allowScheduledPayments: true,
+    minimumBalance: 0,
+    allowRevolvingAccounts: true,
+    allowInstallmentAccounts: true
+  };
+  const savedFilters = localStorage.getItem('debt-portfolio-filters');
+  if (!savedFilters) return {
+    requireActiveAccounts: true,
+    excludeClosedByNarrativeCodes: true,
+    requirePositiveBalance: true,
+    allowScheduledPayments: true,
+    minimumBalance: 0,
+    allowRevolvingAccounts: true,
+    allowInstallmentAccounts: true
+  };
+  try {
+    return JSON.parse(savedFilters);
+  } catch {
+    return {
+      requireActiveAccounts: true,
+      excludeClosedByNarrativeCodes: true,
+      requirePositiveBalance: true,
+      allowScheduledPayments: true,
+      minimumBalance: 0,
+      allowRevolvingAccounts: true,
+      allowInstallmentAccounts: true
+    };
+  }
+};
+
+// Function to check if an account's narrative codes are included in settlement
+const isNarrativeCodeIncludedInSettlement = (account) => {
+  const narrativeCodes = getEquifaxNarrativeCodes();
+  if (narrativeCodes.length === 0) {
+    // If no configuration is set, default to false (exclude all accounts for safety)
+    return false;
+  }
+
+  // Get narrative codes from the account
+  const accountNarrativeCodes = [];
+  if (account.narrativeCodes && Array.isArray(account.narrativeCodes)) {
+    account.narrativeCodes.forEach(nc => {
+      // Use codeabv first as it matches our narrative codes (like AO, FE, etc.)
+      if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);
+      // Also include the numeric code as fallback
+      if (nc.code) accountNarrativeCodes.push(nc.code);
+    });
+  }
+
+  if (accountNarrativeCodes.length === 0) {
+    // If account has no narrative codes, default to false for safety
+    return false;
+  }
+
+  // Check if any of the account's narrative codes are marked for inclusion in settlement
+  const hasIncludedCode = accountNarrativeCodes.some(accountCode => {
+    const narrativeConfig = narrativeCodes.find(config => config.code === accountCode);
+    return narrativeConfig && narrativeConfig.includeInSettlement;
+  });
+
+  return hasIncludedCode;
+};
+
 // Function to match account types with fuzzy logic (from deal-sheet) - enhanced for CPE
 const matchesAccountType = (account, targetTypes) => {
   const getDescription = (field) => {
@@ -50,25 +131,30 @@ const matchesAccountType = (account, targetTypes) => {
   const accountNarrativeCodes = [];
   if (account.narrativeCodes && Array.isArray(account.narrativeCodes)) {
     account.narrativeCodes.forEach(nc => {
-      if (nc.code) accountNarrativeCodes.push(nc.code);
+      // Use codeabv first as it matches our narrative codes (like AO, FE, etc.)
       if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);
+      // Also include the numeric code as fallback
+      if (nc.code) accountNarrativeCodes.push(nc.code);
     });
   }
 
+  // First pass: Check narrative codes only (more specific)
   for (const targetType of targetTypes) {
-    // Check keywords in text
-    const keywords = targetType.keywords || [];
-    const hasKeywordMatch = keywords.some(keyword => searchText.includes(keyword));
-
-    // Check narrative codes if defined
-    let hasNarrativeMatch = false;
     if (targetType.narrativeCodes && accountNarrativeCodes.length > 0) {
-      hasNarrativeMatch = targetType.narrativeCodes.some(code =>
+      const hasNarrativeMatch = targetType.narrativeCodes.some(code =>
         accountNarrativeCodes.includes(code)
       );
+      if (hasNarrativeMatch) {
+        return targetType.type;
+      }
     }
+  }
 
-    if (hasKeywordMatch || hasNarrativeMatch) {
+  // Second pass: Check keywords if no narrative code match
+  for (const targetType of targetTypes) {
+    const keywords = targetType.keywords || [];
+    const hasKeywordMatch = keywords.some(keyword => searchText.includes(keyword));
+    if (hasKeywordMatch) {
       return targetType.type;
     }
   }
@@ -80,41 +166,62 @@ const matchesAccountType = (account, targetTypes) => {
   return 'Other Debt';
 };
 
-// Account type matching configuration - updated for CPE response structure
+// Account type matching configuration - using actual narrative codes from credit data
 const DEBT_ACCOUNT_TYPES = [
   {
     type: 'Credit Card',
     keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi', 'bank of america', 'bankcard', 'cbna'],
-    narrativeCodes: ['002', 'FE'] // CPE narrative codes for credit cards
+    narrativeCodes: ['FE'] // Credit card narrative code from our settlement list
+  },
+  {
+    type: 'Charge Account',
+    keywords: ['charge', 'retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'jc penney', 'sears', 'nordstrom', 'comenity', 'victoria'],
+    narrativeCodes: ['AV'] // Charge narrative code from our settlement list
+  },
+  {
+    type: 'Line of Credit',
+    keywords: ['line of credit', 'credit line', 'loc'],
+    narrativeCodes: ['CV'] // Line of credit narrative code from our settlement list
+  },
+  {
+    type: 'Unsecured Debt',
+    keywords: ['unsecured', 'personal loan', 'personal', 'lending', 'upstart', 'prosper', 'sofi', 'marcus'],
+    narrativeCodes: ['EX'] // Unsecured narrative code from our settlement list
   },
   {
     type: 'Personal Loan',
-    keywords: ['personal loan', 'personal', 'lending', 'upstart', 'prosper', 'sofi', 'marcus', 'line of credit'],
-    narrativeCodes: ['073', 'CV', '238', 'EX'] // Line of credit, unsecured
+    keywords: ['personal loan', 'personal', 'installment', 'signature loan'],
+    narrativeCodes: ['AU'] // Personal loan narrative code from our settlement list
+  },
+  {
+    type: 'Collection Account',
+    keywords: ['collection', 'recovery', 'debt collector'],
+    narrativeCodes: ['CZ'] // Collection account narrative code from our settlement list
+  },
+  {
+    type: 'Business Account',
+    keywords: ['business', 'commercial', 'corporate'],
+    narrativeCodes: ['EY'] // Business account narrative code from our settlement list
   },
   {
     type: 'Medical',
-    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health', 'mercy']
-  },
-  {
-    type: 'Retail Credit',
-    keywords: ['retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'jc penney', 'sears', 'nordstrom', 'comenity', 'victoria'],
-    narrativeCodes: ['229', 'AV'] // Charge accounts
+    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health', 'mercy'],
+    narrativeCodes: ['GS'] // Medical narrative code from our settlement list
   },
   {
     type: 'Auto Loan',
     keywords: ['auto', 'gmac', 'car', 'vehicle'],
-    narrativeCodes: ['214', 'AO'] // Auto loans
+    narrativeCodes: ['AO'] // Auto narrative code (not in our settlement list)
   },
   {
     type: 'Student Loan',
     keywords: ['student', 'education'],
-    narrativeCodes: ['248', 'BU'] // Student loans
+    narrativeCodes: ['BU'] // Student loan narrative code (not in our settlement list)
   },
   {
     type: 'Mortgage',
     keywords: ['mortgage', 'home loan', 'real estate'],
-    narrativeCodes: ['127', 'EF', '150', 'HP'] // Real estate, FHA mortgage
+    narrativeCodes: ['EF', 'HP', 'AR'] // Real estate, mortgage narrative codes (not in our settlement list)
   }
 ];
 
@@ -137,6 +244,9 @@ export default function ResultsPage() {
         // Include accounts that are open and have a balance (or scheduled payments)
         console.log('Processing trades:', creditData.trades.length, 'accounts');
 
+        // Get portfolio filtering configuration
+        const portfolioFilters = getDebtPortfolioFilters();
+
         const matchedAccounts = creditData.trades
           .map((account, index) => {
             const matchedType = matchesAccountType(account, DEBT_ACCOUNT_TYPES);
@@ -147,18 +257,42 @@ export default function ResultsPage() {
               balance = typeof account.balance === 'number' ? account.balance : parseFloat(account.balance) || 0;
             }
 
-            // Check if account is active (not closed/paid)
-            const isActive = account.rate &&
+            // Check if account is active (not closed/paid) - use filter setting
+            const isActive = !portfolioFilters.requireActiveAccounts || (
+              account.rate &&
               account.rate.description &&
               !account.rate.description.toLowerCase().includes('closed') &&
-              !account.rate.description.toLowerCase().includes('paid');
+              !account.rate.description.toLowerCase().includes('paid')
+            );
 
-            // Check narrative codes for closed accounts
-            const isClosed = account.narrativeCodes && account.narrativeCodes.some(nc =>
+            // Check narrative codes for closed accounts - use filter setting
+            const isClosed = portfolioFilters.excludeClosedByNarrativeCodes && account.narrativeCodes && account.narrativeCodes.some(nc =>
               nc.code === '158' || // CLOSED OR PAID ACCOUNT/ZERO BALANCE
               nc.code === '066' || // ACCOUNT CLOSED BY CONSUMER
               nc.code === '114'    // CLOSED ACCOUNT
             );
+
+            // Check balance requirements - use filter settings
+            const meetsBalanceRequirement = !portfolioFilters.requirePositiveBalance ||
+              balance >= portfolioFilters.minimumBalance ||
+              (portfolioFilters.allowScheduledPayments && account.scheduledPaymentAmount > 0);
+
+            // Check portfolio type requirements - use filter settings
+            const portfolioTypeCode = account.portfolioTypeCode?.code || account.portfolioTypeCode?.description || '';
+            const isRevolvingAccount = portfolioTypeCode.toLowerCase().includes('r') ||
+                                     portfolioTypeCode.toLowerCase().includes('revolving') ||
+                                     portfolioTypeCode.toLowerCase().includes('credit card');
+            const isInstallmentAccount = portfolioTypeCode.toLowerCase().includes('i') ||
+                                        portfolioTypeCode.toLowerCase().includes('installment') ||
+                                        portfolioTypeCode.toLowerCase().includes('personal');
+
+            const meetsPortfolioTypeRequirement =
+              (isRevolvingAccount && portfolioFilters.allowRevolvingAccounts) ||
+              (isInstallmentAccount && portfolioFilters.allowInstallmentAccounts) ||
+              (!isRevolvingAccount && !isInstallmentAccount); // Allow other types (like medical, open accounts)
+
+            // Check if the account's narrative codes are included in settlement
+            const isNarrativeIncluded = isNarrativeCodeIncludedInSettlement(account);
 
             console.log(`Account ${index + 1}:`, {
               customerName: account.customerName,
@@ -167,17 +301,32 @@ export default function ResultsPage() {
               scheduledPayment: account.scheduledPaymentAmount,
               isActive,
               isClosed,
+              meetsBalanceRequirement,
+              portfolioTypeCode: portfolioTypeCode,
+              isRevolvingAccount,
+              isInstallmentAccount,
+              meetsPortfolioTypeRequirement,
+              narrativeCodes: account.narrativeCodes?.map(nc => nc.codeabv || nc.code).join(', '),
+              isNarrativeIncluded,
               rate: account.rate?.description,
-              portfolioType: account.portfolioTypeCode?.description
+              portfolioType: account.portfolioTypeCode?.description,
+              appliedFilters: {
+                requireActiveAccounts: portfolioFilters.requireActiveAccounts,
+                excludeClosedByNarrativeCodes: portfolioFilters.excludeClosedByNarrativeCodes,
+                requirePositiveBalance: portfolioFilters.requirePositiveBalance,
+                minimumBalance: portfolioFilters.minimumBalance,
+                allowRevolvingAccounts: portfolioFilters.allowRevolvingAccounts,
+                allowInstallmentAccounts: portfolioFilters.allowInstallmentAccounts
+              }
             });
 
-            // Include account if it has balance and is not closed
-            // Or if it has scheduled payments (might be in settlement already)
-            if (matchedType && (balance > 0 || account.scheduledPaymentAmount > 0) && !isClosed) {
+            // Include account based on all filter criteria
+            if (matchedType && isActive && !isClosed && meetsBalanceRequirement && meetsPortfolioTypeRequirement && isNarrativeIncluded) {
               return {
                 ...account,
                 matchedType,
-                balance: balance
+                balance: balance,
+                isNarrativeIncluded
               };
             }
             return null;
@@ -185,7 +334,22 @@ export default function ResultsPage() {
           .filter(account => account !== null);
 
         console.log('Matched accounts for debt settlement:', matchedAccounts.length);
-          
+
+        // Log narrative code filtering results
+        const totalAccountsWithBalance = creditData.trades.filter(account => {
+          let balance = 0;
+          if (account.balance && account.balance !== 'N/A') {
+            balance = typeof account.balance === 'number' ? account.balance : parseFloat(account.balance) || 0;
+          }
+          const isClosed = account.narrativeCodes && account.narrativeCodes.some(nc =>
+            nc.code === '158' || nc.code === '066' || nc.code === '114'
+          );
+          return (balance > 0 || account.scheduledPaymentAmount > 0) && !isClosed;
+        }).length;
+
+        const filteredByNarrativeCode = totalAccountsWithBalance - matchedAccounts.length;
+        console.log(`Narrative code filtering: ${filteredByNarrativeCode} accounts filtered out of ${totalAccountsWithBalance} eligible accounts`);
+
         setDebtAccounts(matchedAccounts);
 
         if (matchedAccounts.length > 0) {
@@ -211,9 +375,22 @@ export default function ResultsPage() {
     const debtTier = defaultCalculatorSettings.debtTiers
       .filter(tier => tier.programType === 'standard')
       .find(tier => totalDebt >= tier.minAmount && totalDebt <= tier.maxAmount);
-    
+
     if (!debtTier) {
-      console.error('No appropriate debt tier found for total debt:', totalDebt);
+      console.warn('Total debt of $' + totalDebt + ' is below minimum program threshold. Minimum debt required is $1,000.');
+      // Set empty results when debt is too low
+      setCalculations({
+        programName: 'Standard Program',
+        totalDebt: totalDebt,
+        monthlyPayment: 0,
+        termMonths: 0,
+        totalProgramCost: 0,
+        averageSettlement: 0,
+        settlementAmount: 0,
+        totalSavings: 0,
+        message: 'Total debt of $' + totalDebt.toFixed(2) + ' is below the minimum program threshold of $1,000. Please add more debts to qualify for the program.',
+        qualificationStatus: 'below-minimum'
+      });
       return;
     }
 
@@ -361,12 +538,40 @@ export default function ResultsPage() {
             </p>
             {(() => {
               const creditData = getCreditData();
-              return creditData?.isMockData && (
-                <div className="mt-4 inline-block px-4 py-2 border rounded-lg">
-                  <span className="font-semibold">⚠️ Mock Data</span>
-                  <span className="text-sm ml-2">
-                    {creditData.mockReason || 'API temporarily unavailable'}
-                  </span>
+              const narrativeConfig = getEquifaxNarrativeCodes();
+              const hasNarrativeConfig = narrativeConfig.length > 0;
+
+              const portfolioFilters = getDebtPortfolioFilters();
+              const hasPortfolioFilters = Object.values(portfolioFilters).some(value =>
+                typeof value === 'boolean' ? value : value > 0
+              );
+
+              return (
+                <div className="mt-4 space-y-2">
+                  {creditData?.isMockData && (
+                    <div className="inline-block px-4 py-2 border rounded-lg">
+                      <span className="font-semibold">⚠️ Mock Data</span>
+                      <span className="text-sm ml-2">
+                        {creditData.mockReason || 'API temporarily unavailable'}
+                      </span>
+                    </div>
+                  )}
+                  {hasNarrativeConfig && (
+                    <div className="inline-block px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg ml-2">
+                      <span className="font-semibold text-blue-700">✓ Narrative Code Filtering Active</span>
+                      <span className="text-sm text-blue-600 ml-2">
+                        Only accounts with approved narrative codes are included
+                      </span>
+                    </div>
+                  )}
+                  {hasPortfolioFilters && (
+                    <div className="inline-block px-4 py-2 bg-green-50 border border-green-200 rounded-lg ml-2">
+                      <span className="font-semibold text-green-700">✓ Portfolio Filters Active</span>
+                      <span className="text-sm text-green-600 ml-2">
+                        Advanced filtering rules for debt settlement eligibility
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -391,9 +596,21 @@ export default function ResultsPage() {
                           {account.matchedType}
                         </span>
                         <span className="text-xs text-gray-500">
-                          ...{(account.accountNumber || '').slice(-4)}
+                          {(() => {
+                            const accountNum = account.accountNumber;
+                            return accountNum ? `...${accountNum.slice(-4)}` : 'N/A';
+                          })()}
                         </span>
                       </div>
+
+                      {account.narrativeCodes && account.narrativeCodes.length > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-600">Narrative Codes</span>
+                          <span className="text-xs font-mono bg-green-50 px-1 py-0.5 rounded border border-green-200">
+                            {account.narrativeCodes.map(nc => nc.codeabv || nc.code).join(', ')}
+                          </span>
+                        </div>
+                      )}
                       
                       <div>
                         <h3 className="font-semibold text-sm text-gray-900 truncate">
@@ -451,7 +668,23 @@ export default function ResultsPage() {
               </div>
             </Card>
 
-            {calculations && (
+            {calculations && calculations.qualificationStatus === 'below-minimum' && (
+              <Card className="p-6 bg-amber-50 border-amber-200">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-amber-900">Minimum Debt Requirement Not Met</h3>
+                    <p className="mt-1 text-amber-700">{calculations.message}</p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {calculations && calculations.qualificationStatus !== 'below-minimum' && (
               <>
                 {/* 2. Debt Tier Configuration */}
                 <Card className="p-6">
@@ -603,19 +836,25 @@ export default function ResultsPage() {
 
             {/* Action Buttons */}
             <div className="flex justify-center gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => window.location.href = '/results/credit'}
               >
                 View Credit Report
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => window.location.href = '/your-plan/deal-sheet'}
               >
                 View Deal Sheet
               </Button>
-              <Button 
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/admin/equifax-codes'}
+              >
+                Manage Narrative Codes
+              </Button>
+              <Button
                 variant="outline"
                 onClick={() => alert('Program enrollment would be implemented here')}
               >

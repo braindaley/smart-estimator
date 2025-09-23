@@ -24,7 +24,7 @@ export async function POST(request) {
     // Create sandbox public token first
     const sandboxResponse = await client.sandboxPublicTokenCreate({
       institution_id: institutionId,
-      initial_products: ['transactions', 'assets', 'identity', 'liabilities', 'income'],
+      initial_products: ['assets', 'identity', 'liabilities'], // Core debt settlement products only
       options: {
         webhook: null,
       }

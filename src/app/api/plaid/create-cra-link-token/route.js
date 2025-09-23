@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 
 export async function POST(request) {
-  console.log('[Create Link Token] Starting request');
-  
+  console.log('[Create CRA Link Token] Starting request');
+
   try {
     // Check environment variables
     const requiredEnvVars = {
@@ -12,7 +12,7 @@ export async function POST(request) {
       PLAID_ENV: process.env.PLAID_ENV
     };
 
-    console.log('[Create Link Token] Environment check:', {
+    console.log('[Create CRA Link Token] Environment check:', {
       hasClientId: !!requiredEnvVars.PLAID_CLIENT_ID,
       hasSecret: !!requiredEnvVars.PLAID_SECRET,
       environment: requiredEnvVars.PLAID_ENV,
@@ -29,10 +29,10 @@ export async function POST(request) {
     }
 
     if (missingVars.length > 0) {
-      console.error('[Create Link Token] Missing environment variables:', missingVars);
+      console.error('[Create CRA Link Token] Missing environment variables:', missingVars);
       return NextResponse.json(
-        { 
-          error: 'Server configuration error', 
+        {
+          error: 'Server configuration error',
           details: `Missing environment variables: ${missingVars.join(', ')}`,
           message: 'Please configure Plaid credentials in .env.local file'
         },
@@ -41,8 +41,8 @@ export async function POST(request) {
     }
 
     // Parse request body
-    const { userId } = await request.json();
-    console.log('[Create Link Token] Request userId:', userId);
+    const { userId, userToken } = await request.json();
+    console.log('[Create CRA Link Token] Request:', { userId, hasUserToken: !!userToken });
 
     if (!userId) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(request) {
 
     // Configure Plaid client
     const plaidEnv = requiredEnvVars.PLAID_ENV.toLowerCase();
-    console.log('[Create Link Token] Using Plaid environment:', plaidEnv);
+    console.log('[Create CRA Link Token] Using Plaid environment:', plaidEnv);
 
     const configuration = new Configuration({
       basePath: PlaidEnvironments[plaidEnv] || PlaidEnvironments.sandbox,
@@ -67,38 +67,42 @@ export async function POST(request) {
 
     const client = new PlaidApi(configuration);
 
-    // Create link token request using string literals instead of constants
+    // Create CRA link token request
+    // IMPORTANT: Only include 'cra_base_report' in products array for income verification
     const linkTokenRequest = {
       user: {
         client_user_id: userId,
       },
       client_name: 'Smart Estimator',
-      products: ['assets', 'identity', 'liabilities'], // Core products for debt settlement - NO income products
-      country_codes: ['US'], // Use string literal instead of CountryCode.Us
+      products: ['cra_base_report'], // ONLY CRA product for income verification
+      country_codes: ['US'],
       language: 'en',
+      consumer_report_permissible_purpose: 'ACCOUNT_REVIEW_CREDIT', // Required for CRA
+      // If we have a user token from previous session, include it
+      ...(userToken && { user_token: userToken })
     };
 
-    console.log('[Create Link Token] Request configuration:', linkTokenRequest);
+    console.log('[Create CRA Link Token] Request configuration:', linkTokenRequest);
 
     // Create link token
     const response = await client.linkTokenCreate(linkTokenRequest);
-    
-    console.log('[Create Link Token] Success! Link token created');
-    console.log('[Create Link Token] Expiration:', response.data.expiration);
+
+    console.log('[Create CRA Link Token] Success! Link token created');
+    console.log('[Create CRA Link Token] Expiration:', response.data.expiration);
 
     return NextResponse.json({
       link_token: response.data.link_token,
       expiration: response.data.expiration,
       request_id: response.data.request_id,
     });
-    
+
   } catch (error) {
-    console.error('[Create Link Token] Error occurred:', error);
-    console.error('[Create Link Token] Error stack:', error.stack);
-    
+    console.error('[Create CRA Link Token] Error occurred:', error);
+    console.error('[Create CRA Link Token] Error stack:', error.stack);
+
     // Handle Plaid-specific errors
     if (error.response) {
-      console.error('[Create Link Token] Plaid API error:', {
+      console.error('[Create CRA Link Token] Plaid API error:', {
         status: error.response.status,
         data: error.response.data,
         error_code: error.response.data?.error_code,
@@ -116,13 +120,14 @@ export async function POST(request) {
         'INVALID_HEADERS': 'Invalid or missing headers. Check API credentials.',
         'UNAUTHORIZED': 'Authentication failed. Check your Plaid credentials.',
         'ITEM_LOGIN_REQUIRED': 'Additional authentication required.',
+        'PRODUCTS_NOT_SUPPORTED': 'CRA product not supported in this environment. Please contact support.',
       };
 
       const errorCode = error.response.data?.error_code;
-      const userMessage = errorMessages[errorCode] || error.response.data?.error_message || 'Failed to create link token';
+      const userMessage = errorMessages[errorCode] || error.response.data?.error_message || 'Failed to create CRA link token';
 
       return NextResponse.json(
-        { 
+        {
           error: userMessage,
           error_code: errorCode,
           error_type: error.response.data?.error_type,
@@ -134,34 +139,9 @@ export async function POST(request) {
       );
     }
 
-    // Handle import/module errors
-    if (error.message.includes('Cannot read properties') || error.message.includes('is not a function')) {
-      console.error('[Create Link Token] Module/Import error - likely Plaid library issue');
-      return NextResponse.json(
-        { 
-          error: 'Server configuration error',
-          details: 'Plaid library configuration issue. Please check dependencies.',
-          message: 'The server encountered a configuration problem. Please contact support.'
-        },
-        { status: 500 }
-      );
-    }
-
-    // Handle network errors
-    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-      console.error('[Create Link Token] Network error:', error.code);
-      return NextResponse.json(
-        { 
-          error: 'Unable to connect to Plaid servers',
-          details: 'Please check your internet connection and try again.'
-        },
-        { status: 503 }
-      );
-    }
-
     // Handle other errors
     return NextResponse.json(
-      { 
+      {
         error: 'Our servers are experiencing issues. Please try again later.',
         details: error.message || 'An unexpected error occurred',
         type: 'INTERNAL_ERROR',

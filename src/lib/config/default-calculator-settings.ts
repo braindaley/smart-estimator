@@ -32,6 +32,15 @@ export const defaultCalculatorSettings: CalculatorSettings = {
     },
     // Standard Program Tiers
     {
+      id: 'standard-tier-0',
+      minAmount: 1000,
+      maxAmount: 10000,
+      feePercentage: 30,
+      maxTerm: 18,
+      legalProcessingFee: 50,
+      programType: 'standard'
+    },
+    {
       id: 'standard-tier-1',
       minAmount: 10000,
       maxAmount: 15000,

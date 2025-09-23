@@ -20,7 +20,7 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
   const [editingTier, setEditingTier] = useState<DebtTier | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newTier, setNewTier] = useState<Partial<DebtTier>>({
-    programType: 'standard',
+    programType: 'momentum',
     minAmount: 0,
     maxAmount: 0,
     feePercentage: 0,
@@ -92,13 +92,13 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
       feePercentage: newTier.feePercentage!,
       maxTerm: newTier.maxTerm!,
       legalProcessingFee: newTier.legalProcessingFee || 0,
-      programType: newTier.programType as 'momentum' | 'standard'
+      programType: 'momentum'
     };
 
     onChange([...debtTiers, tier]);
     setIsAddingNew(false);
     setNewTier({
-      programType: 'standard',
+      programType: 'momentum',
       minAmount: 0,
       maxAmount: 0,
       feePercentage: 0,
@@ -108,7 +108,6 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
   };
 
   const momentumTiers = debtTiers.filter(t => t.programType === 'momentum');
-  const standardTiers = debtTiers.filter(t => t.programType === 'standard');
 
   return (
     <Card className="p-6">
@@ -117,7 +116,7 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
           <div>
             <h2 className="text-2xl font-semibold">Debt Tier Configuration</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Configure debt tiers for both Momentum and Standard programs
+              Configure debt tiers for the Momentum program
             </p>
           </div>
           {!isAddingNew && (
@@ -136,14 +135,13 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                 <Label>Program Type</Label>
                 <Select
                   value={newTier.programType}
-                  onValueChange={(value) => setNewTier({ ...newTier, programType: value as 'momentum' | 'standard' })}
+                  onValueChange={(value) => setNewTier({ ...newTier, programType: value as 'momentum' })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="momentum">Momentum</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -204,9 +202,8 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
           </Card>
         )}
 
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-3">Momentum Program Tiers</h3>
+        <div>
+          <h3 className="text-lg font-medium mb-3">Momentum Program Tiers</h3>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -299,103 +296,6 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                 ))}
               </TableBody>
             </Table>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3">Standard Program Tiers</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Min Amount</TableHead>
-                  <TableHead>Max Amount</TableHead>
-                  <TableHead>Fee %</TableHead>
-                  <TableHead>Max Term</TableHead>
-                  <TableHead>Legal Fee</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {standardTiers.map((tier) => (
-                  <TableRow key={tier.id}>
-                    {editingId === tier.id ? (
-                      <>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={editingTier?.minAmount}
-                            onChange={(e) => setEditingTier({ ...editingTier!, minAmount: parseFloat(e.target.value) })}
-                            className="w-24"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={editingTier?.maxAmount}
-                            onChange={(e) => setEditingTier({ ...editingTier!, maxAmount: parseFloat(e.target.value) })}
-                            className="w-24"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={editingTier?.feePercentage}
-                            onChange={(e) => setEditingTier({ ...editingTier!, feePercentage: parseFloat(e.target.value) })}
-                            className="w-20"
-                            min="0"
-                            max="100"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={editingTier?.maxTerm}
-                            onChange={(e) => setEditingTier({ ...editingTier!, maxTerm: parseInt(e.target.value) })}
-                            className="w-20"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={editingTier?.legalProcessingFee}
-                            onChange={(e) => setEditingTier({ ...editingTier!, legalProcessingFee: parseFloat(e.target.value) })}
-                            className="w-20"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button onClick={handleSaveEdit} size="sm" variant="ghost">
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button onClick={handleCancelEdit} size="sm" variant="ghost">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </>
-                    ) : (
-                      <>
-                        <TableCell>${tier.minAmount.toLocaleString()}</TableCell>
-                        <TableCell>${tier.maxAmount.toLocaleString()}</TableCell>
-                        <TableCell>{tier.feePercentage}%</TableCell>
-                        <TableCell>{tier.maxTerm} mo</TableCell>
-                        <TableCell>${tier.legalProcessingFee}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button onClick={() => handleEdit(tier)} size="sm" variant="ghost">
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button onClick={() => handleDelete(tier.id)} size="sm" variant="ghost">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
         </div>
 
         <div className="bg-blue-50 p-4 rounded-lg">

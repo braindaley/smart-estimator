@@ -37,18 +37,31 @@ const getCreditData = () => {
 const matchesAccountType = (account, targetTypes) => {
   const getDescription = (field) => {
     if (!field) return '';
+    // Check for codeabv field (API response field)
+    if (field.codeabv) return field.codeabv + ' ' + (field.description || '');
     return field.description || field.code || field || '';
   };
-  
+
   const accountType = getDescription(account.portfolioTypeCode).toLowerCase();
   const accountTypeCode = getDescription(account.accountTypeCode).toLowerCase();
   const customerName = (account.customerName || '').toLowerCase();
-  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0] 
-    ? getDescription(account.narrativeCodes[0]).toLowerCase() 
+  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0]
+    ? getDescription(account.narrativeCodes[0]).toLowerCase()
     : '';
-  
-  const searchText = `${accountType} ${accountTypeCode} ${customerName} ${narrativeDescription}`;
-  
+
+  // Also check industryCode if available
+  const industryCode = account.industryCode ? getDescription(account.industryCode).toLowerCase() : '';
+
+  const searchText = `${accountType} ${accountTypeCode} ${customerName} ${narrativeDescription} ${industryCode}`;
+
+  // Check for specific AO code for auto loans
+  if (account.portfolioTypeCode?.codeabv === 'AO' ||
+      account.accountTypeCode?.codeabv === 'AO' ||
+      accountType.includes('ao ') ||
+      accountTypeCode.includes('ao ')) {
+    return 'Auto Loan';
+  }
+
   for (const targetType of targetTypes) {
     const keywords = targetType.keywords;
     const hasMatch = keywords.some(keyword => searchText.includes(keyword));
@@ -64,6 +77,10 @@ const DEBT_ACCOUNT_TYPES = [
   {
     type: 'Credit Card',
     keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi']
+  },
+  {
+    type: 'Auto Loan',
+    keywords: ['auto', 'automobile', 'vehicle', 'car', 'gmac', 'toyota', 'honda', 'ford', 'chrysler', 'nissan', 'hyundai', 'mazda', 'subaru', 'volkswagen', 'bmw', 'mercedes', 'audi', 'lexus', 'acura', 'infiniti', 'kia', 'mitsubishi', 'motor', 'motors', 'automotive', 'finance']
   },
   {
     type: 'Personal Loan',
