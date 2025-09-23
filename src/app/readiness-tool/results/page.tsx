@@ -347,6 +347,74 @@ export default function Results() {
                         </div>
 
                         <div>
+                          <h5 className="font-medium">Strengths & Concerns Logic:</h5>
+                          <div className="ml-4 space-y-2 text-xs">
+                            <div className="font-medium">Your Strengths Section:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Shows when step score ≥ 3 points</div>
+                              <div>• Step 1 (≥3): "Clear understanding of financial hardship"</div>
+                              <div>• Step 2 (≥3): "Strong personal motivation for debt freedom"</div>
+                              <div>• Step 3 (≥3): "Thoroughly explored alternative solutions"</div>
+                              <div>• Step 4 (≥3): "Realistic expectations about credit impact"</div>
+                              <div>• Step 5 (≥3): "Full household support for decision"</div>
+                              <div>• Step 6 (≥3): "High confidence in payment ability"</div>
+                              <div>• Step 7 (≥3): "Good emergency expense management"</div>
+                              <div>• Step 8 (≥3): "Prepared for collection call challenges"</div>
+                              <div>• Step 9 (≥3): "Proactive stress management approach"</div>
+                            </div>
+
+                            <div className="font-medium mt-3">Areas of Concern Section:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Shows when step score ≤ 1 point</div>
+                              <div>• Step 1 (≤1): "May need to address underlying financial causes"</div>
+                              <div>• Step 2 (≤1): "Motivation level may affect commitment"</div>
+                              <div>• Step 3 (≤1): "Should explore more alternatives before proceeding"</div>
+                              <div>• Step 4 (≤1): "Credit score concerns may cause stress during process"</div>
+                              <div>• Step 5 (≤1): "Lack of household support could create challenges"</div>
+                              <div>• Step 6 (≤1): "Payment confidence needs improvement"</div>
+                              <div>• Step 7 (≤1): "Emergency planning needs strengthening"</div>
+                              <div>• Step 8 (≤1): "Need better preparation for collection calls"</div>
+                              <div>• Step 9 (≤1): "Stress management skills need development"</div>
+                            </div>
+
+                            <div className="font-medium mt-3">Critical Concern Recommendations:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Step 4 (≤1): "Consider waiting if credit score is critically important short-term"</div>
+                              <div>• Step 5 (≤1): "Get household alignment before proceeding"</div>
+                              <div>• Step 6 (≤1): "Stabilize income/expenses before starting program"</div>
+                              <div>• Step 7 (≤1): "Build $500+ emergency fund first"</div>
+                              <div>• Step 8 (≤1): "Prepare mentally for increased collection activity"</div>
+                            </div>
+
+                            <div className="font-medium mt-3">Moderate Concern Recommendations:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Step 3 (=2): "Ensure you've fully explored debt consolidation options"</div>
+                              <div>• Step 4 (=2): "Understand credit will be impacted but recovers after completion"</div>
+                              <div>• Step 6 (=2): "Create detailed monthly budget to increase payment confidence"</div>
+                              <div>• Step 8 (=2): "Develop a plan for handling collection calls"</div>
+                            </div>
+
+                            <div className="font-medium mt-3">Your Current Strengths & Concerns:</div>
+                            <div className="ml-2 space-y-1">
+                              {Object.keys(formData).filter(key => key.startsWith('step')).map(stepKey => {
+                                const stepData = formData[stepKey];
+                                if (!stepData || stepData.points === undefined) return null;
+                                const stepNumber = stepKey.replace('step', '');
+                                const isStrength = stepData.points >= 3;
+                                const isConcern = stepData.points <= 1;
+                                const isModerateConcern = stepData.points === 2;
+
+                                return (
+                                  <div key={stepKey}>
+                                    • Step {stepNumber} ({stepData.points} pts): {isStrength ? 'STRENGTH' : isConcern ? 'CONCERN' : isModerateConcern ? 'MODERATE CONCERN' : 'NEUTRAL'}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
                           <h5 className="font-medium">Readiness What's Next Section Logic:</h5>
                           <div className="ml-4 space-y-2 text-xs">
                             <div className="font-medium">Letter Grade Calculation:</div>
