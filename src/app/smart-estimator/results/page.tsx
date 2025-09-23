@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useEstimatorStore } from '@/lib/estimator-store';
 import { useReadinessStore } from '@/lib/readiness-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ChartContainer, ChartConfig } from "@/components/ui/chart";
@@ -12,15 +13,16 @@ import {
   calculateMonthlyMomentumPayment,
   calculatePersonalLoanPayment,
   getMomentumTermLength,
+  getMomentumFeePercentage,
   getPersonalLoanApr,
   getMaximumPersonalLoanAmount,
+  isEligibleForPersonalLoan,
   calculateMomentumScore
 } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import MomentumScoreSection from '@/components/MomentumScoreSection';
 import WhatsNext from '@/components/WhatsNext';
 
 // Calculate current path (doing nothing - minimum payments)
@@ -59,19 +61,19 @@ function getPersonalLoanApprovalLikelihood(userFicoScoreEstimate: number): strin
 }
 
 function getQualificationStatus(formData: any): Qualification {
-  const { hasSteadyIncome, userFicoScoreEstimate } = formData;
+  const { hasSteadyIncome, userFicoScoreEstimate, debtAmountEstimate } = formData;
 
   // Initialize column hiding array and comparison hiding flag
   const hideColumns: string[] = [];
-  
+
   // Do not show comparison table or Graph section for:
   // - No steady income
   if (hasSteadyIncome === false) {
     return { hideColumns, hideComparison: true };
   }
 
-  // Hide Personal Loan column when credit score < 580
-  if (userFicoScoreEstimate < 580) {
+  // Hide Personal Loan column when credit score < 580 or debt exceeds FICO-based limits
+  if (userFicoScoreEstimate < 580 || !isEligibleForPersonalLoan(debtAmountEstimate, userFicoScoreEstimate)) {
     hideColumns.push('personalLoan');
   }
 
@@ -91,10 +93,28 @@ export default function Results() {
   const [momentumScore, setMomentumScore] = React.useState<any>(null);
   const [readinessScore, setReadinessScore] = React.useState(0);
   const [totalPossibleScore, setTotalPossibleScore] = React.useState(70); // 35 + 35 = 70
+  const [calculatorSettings, setCalculatorSettings] = React.useState<any>(null);
+
+  // Load calculator settings on mount
+  React.useEffect(() => {
+    const loadCalculatorSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/calculator-settings');
+        if (response.ok) {
+          const settings = await response.json();
+          setCalculatorSettings(settings);
+        }
+      } catch (error) {
+        console.error('Error loading calculator settings:', error);
+      }
+    };
+
+    loadCalculatorSettings();
+  }, []);
 
   React.useEffect(() => {
-    // Wait for the store to be hydrated before doing anything.
-    if (!store._hasHydrated) {
+    // Wait for the store to be hydrated and calculator settings to be loaded
+    if (!store._hasHydrated || !calculatorSettings) {
       return;
     }
 
@@ -177,15 +197,15 @@ export default function Results() {
       const qualificationStatus = getQualificationStatus(collectedData);
       setQualification(qualificationStatus);
       
-      // Calculate Momentum payments
-      const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate);
-      const momentumTerm = getMomentumTermLength(debtAmountEstimate);
+      // Calculate Momentum payments using dynamic settings
+      const momentumMonthlyPayment = calculateMonthlyMomentumPayment(debtAmountEstimate, calculatorSettings.debtTiers);
+      const momentumTerm = getMomentumTermLength(debtAmountEstimate, calculatorSettings.debtTiers);
 
       // Calculate Personal Loan with FIXED LOGIC
       const personalLoanApr = getPersonalLoanApr(userFicoScoreEstimate);
       const maxLoanAmount = getMaximumPersonalLoanAmount(userFicoScoreEstimate);
       const actualLoanAmount = Math.min(debtAmountEstimate, maxLoanAmount);
-      const canGetLoan = actualLoanAmount >= 1000 && userFicoScoreEstimate >= 580 && hasSteadyIncome !== false;
+      const canGetLoan = userFicoScoreEstimate >= 580 && hasSteadyIncome !== false && isEligibleForPersonalLoan(debtAmountEstimate, userFicoScoreEstimate);
       const personalLoanMonthlyPayment = canGetLoan ? calculatePersonalLoanPayment(actualLoanAmount, personalLoanApr) : 0;
       
       // Calculate Current Path (doing nothing)
@@ -196,7 +216,7 @@ export default function Results() {
         momentum: {
           monthlyPayment: momentumMonthlyPayment,
           term: momentumTerm,
-          isEligible: debtAmountEstimate >= 15000,
+          isEligible: true,
           totalCost: momentumMonthlyPayment * momentumTerm,
         },
         personalLoan: {
@@ -224,7 +244,7 @@ export default function Results() {
     } finally {
       setIsLoading(false);
     }
-  }, [store._hasHydrated, store.formData, readinessStore._hasHydrated, readinessStore.formData, router]);
+  }, [store._hasHydrated, store.formData, readinessStore._hasHydrated, readinessStore.formData, router, calculatorSettings]);
 
   // Separate effect to store the momentum score only when it's calculated and not already stored
   React.useEffect(() => {
@@ -251,7 +271,7 @@ export default function Results() {
     router.push('/smart-estimator/step-1');
   };
   
-  if (isLoading || !qualification || !results || !momentumScore) {
+  if (isLoading || !qualification || !results || !momentumScore || !calculatorSettings) {
     return (
       <Card>
         <CardHeader>
@@ -279,68 +299,6 @@ export default function Results() {
           </div>
         ) : null}
         
-        {/* Mini Smart Estimator Graph */}
-        <div className="flex justify-center mt-6">
-          <div className="w-[150px] h-[80px]">
-            <ChartContainer
-              config={{
-                score: { label: "Score", color: "hsl(221, 83%, 53%)" },
-                remaining: { label: "Remaining", color: "hsl(210, 40%, 90%)" }
-              } satisfies ChartConfig}
-              className="w-full h-full"
-            >
-              <RadialBarChart
-                width={150}
-                height={80}
-                data={[{ score: momentumScore.score, remaining: Math.max(0, 35 - momentumScore.score) }]}
-                endAngle={180}
-                innerRadius={35}
-                outerRadius={55}
-              >
-                <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                  <Label
-                    content={({ viewBox }: any) => {
-                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                        return (
-                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) - 8}
-                              className="fill-foreground text-xl font-bold"
-                            >
-                              {momentumScore.score}
-                            </tspan>
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) + 8}
-                              className="fill-muted-foreground text-xs"
-                            >
-                              of 35
-                            </tspan>
-                          </text>
-                        )
-                      }
-                    }}
-                  />
-                </PolarRadiusAxis>
-                <RadialBar
-                  dataKey="score"
-                  stackId="a"
-                  cornerRadius={4}
-                  fill="var(--color-score)"
-                  className="stroke-transparent stroke-1"
-                />
-                <RadialBar
-                  dataKey="remaining"
-                  fill="var(--color-remaining)"
-                  stackId="a"
-                  cornerRadius={4}
-                  className="stroke-transparent stroke-1"
-                />
-              </RadialBarChart>
-            </ChartContainer>
-          </div>
-        </div>
       </div>
 
       {!qualification.hideComparison && (
@@ -376,7 +334,7 @@ export default function Results() {
                             Do nothing
                           </div>
                           <p className="text-base font-semibold">Current Path</p>
-                          <p className="text-xs text-muted-foreground">Keep making minimum payments at 24% APR.</p>
+                          <p className="text-xs text-muted-foreground">Keep making minimum payments.</p>
                         </div>
                     </TableHead>
                   </TableRow>
@@ -392,7 +350,7 @@ export default function Results() {
                             <div className="text-sm space-y-1">
                               <div className="text-lg font-bold">{formatCurrency(results.momentum.monthlyPayment)}/mo</div>
                               <div>{results.momentum.term} months</div>
-                              <div>{formatCurrency(results.debtAmountEstimate)} debt covered</div>
+                              <div>Total cost {formatCurrency(results.momentum.totalCost)}</div>
                             </div>
                           ) : (
                             <p>Not Eligible</p>
@@ -406,7 +364,7 @@ export default function Results() {
                             <div className="text-sm space-y-1">
                               <div className="text-lg font-bold">{formatCurrency(results.personalLoan.monthlyPayment)}/mo</div>
                               <div>{results.personalLoan.term} months</div>
-                              <div>{formatCurrency(results.personalLoan.actualLoanAmount)} debt covered</div>
+                              <div>Total cost {formatCurrency(results.personalLoan.totalCost)}</div>
                               {results.personalLoan.actualLoanAmount < results.debtAmountEstimate && (
                                 <div className="text-xs">
                                   Only {Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}% of total debt
@@ -423,7 +381,7 @@ export default function Results() {
                       <div className="text-sm space-y-1">
                         <div className="text-lg font-bold">{formatCurrency(results.currentPath.monthlyPayment)}/mo</div>
                         <div>{results.currentPath.term} months</div>
-                        <div>{formatCurrency(results.debtAmountEstimate)} debt</div>
+                        <div>Total cost {formatCurrency(results.currentPath.totalCost)}</div>
                         <div className="text-xs">Payment decreases over time</div>
                       </div>
                     </TableCell>
@@ -498,7 +456,7 @@ export default function Results() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <div><span className="font-bold">Program length:</span> {results.momentum.isEligible ? `${results.momentum.term} months` : '-'}</div>
-                  <div><span className="font-bold">Debt covered:</span> {results.momentum.isEligible ? formatCurrency(results.debtAmountEstimate) : '-'}</div>
+                  <div><span className="font-bold">Total cost:</span> {results.momentum.isEligible ? formatCurrency(results.momentum.totalCost) : '-'}</div>
                 </div>
                 <div className="text-xs space-y-1 pt-2 border-t">
                   <div><span className="font-bold">Approval:</span> Yes, no minimum credit required</div>
@@ -526,23 +484,7 @@ export default function Results() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <div><span className="font-bold">Program length:</span> {results.personalLoan.isEligible ? `${results.personalLoan.term} months` : '-'}</div>
-                  <div>
-                    <span className="font-bold">Debt covered:</span> 
-                    {results.personalLoan.isEligible ? (
-                      results.personalLoan.actualLoanAmount < results.debtAmountEstimate ? (
-                        <div className="mt-1">
-                          <div>{formatCurrency(results.personalLoan.actualLoanAmount)}</div>
-                          <div className="text-xs text-amber-600">
-                            Covers only {formatCurrency(results.personalLoan.actualLoanAmount)} ({Math.round((results.personalLoan.actualLoanAmount / results.debtAmountEstimate) * 100)}%) of your total debt
-                          </div>
-                        </div>
-                      ) : (
-                        formatCurrency(results.debtAmountEstimate)
-                      )
-                    ) : (
-                      ' -'
-                    )}
-                  </div>
+                  <div><span className="font-bold">Total cost:</span> {results.personalLoan.isEligible ? formatCurrency(results.personalLoan.totalCost) : '-'}</div>
                 </div>
                 <div className="text-xs space-y-1 pt-2 border-t">
                   {results.personalLoan.isEligible ? (
@@ -574,7 +516,7 @@ export default function Results() {
               </div>
               <div className="space-y-2 text-sm">
                 <div><span className="font-bold">Program length:</span> {results.currentPath.term} months ({Math.round(results.currentPath.term / 12)} years)</div>
-                <div><span className="font-bold">Debt covered:</span> {formatCurrency(results.debtAmountEstimate)}</div>
+                <div><span className="font-bold">Total cost:</span> {formatCurrency(results.currentPath.totalCost)}</div>
               </div>
               <div className="text-xs space-y-1 pt-2 border-t">
                 <div><span className="font-bold">Pros:</span> No monthly payment</div>
@@ -593,21 +535,7 @@ export default function Results() {
         momentumScore={momentumScore?.score}
       />
 
-      {/* Momentum Score Section */}
-      <MomentumScoreSection
-        smartEstimatorScore={momentumScore.score}
-        readinessScore={readinessScore}
-        totalPossibleScore={totalPossibleScore}
-        hasSmartEstimatorData={true}
-        showScore={true}
-      />
 
-      <div className="mt-8 text-center">
-        <Button asChild onClick={handleRestart} variant="link">
-          <Link href="/smart-estimator/step-1">Start Over</Link>
-        </Button>
-      </div>
-      
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
@@ -635,260 +563,198 @@ export default function Results() {
         </Card>
       </div>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <h3 className="text-base font-semibold">Testing &amp; Debugging Information</h3>
-          <CardDescription>This section is for testing purposes only.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-semibold">Collected Form Data</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(allFormData, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Calculation Results</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(results, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Qualification Rules Applied</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(qualification, null, 2)}</code>
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold">Momentum Score Details</h4>
-            <pre className="mt-2 rounded-md bg-slate-100 p-4 text-sm">
-              <code>{JSON.stringify(momentumScore, null, 2)}</code>
-            </pre>
-          </div>
-        </CardContent>
-      </Card>
+      <Accordion type="single" collapsible className="mt-8">
+        <AccordionItem value="debug-info" className="border-0">
+          <AccordionTrigger className="text-xs text-muted-foreground hover:text-muted-foreground py-2 px-0">Calculations</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6">
+              <div className="text-center">
+                <Button asChild onClick={handleRestart} variant="link">
+                  <Link href="/smart-estimator/step-1">Start Over</Link>
+                </Button>
+              </div>
 
-      {/* Time to Freedom Visual Bar Graph */}
-      <Card className="mt-8">
-        <CardHeader className="pb-4">
-          <h2 className="text-xl font-bold text-center">Time to Freedom Comparison</h2>
-          <CardDescription className="text-center">
-            Visual comparison of debt payoff timeline and total costs
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row md:justify-center gap-3">
-            {/* Calculate max values for scaling */}
-            {(() => {
-              const maxTerm = Math.max(
-                results.momentum.isEligible ? results.momentum.term : 0,
-                results.personalLoan.isEligible ? results.personalLoan.term : 0,
-                results.currentPath.term
-              );
-              const maxCost = Math.max(
-                results.momentum.isEligible ? results.momentum.totalCost : 0,
-                results.personalLoan.isEligible ? results.personalLoan.totalCost : 0,
-                results.currentPath.totalCost
-              );
-              const maxPayment = Math.max(
-                results.momentum.isEligible ? results.momentum.monthlyPayment : 0,
-                results.personalLoan.isEligible ? results.personalLoan.monthlyPayment : 0,
-                results.currentPath.monthlyPayment
-              );
-              const currentDate = new Date();
 
-              return (
-                <>
-                  {/* Momentum Option */}
-                  {!qualification.hideColumns.includes('momentum') && results.momentum.isEligible && (() => {
-                    const freedomDate = new Date(currentDate);
-                    freedomDate.setMonth(freedomDate.getMonth() + results.momentum.term);
-                    const savingsVsDoNothing = results.currentPath.totalCost - results.momentum.totalCost;
-                    const timeSaved = results.currentPath.term - results.momentum.term;
-                    
-                    return (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full md:max-w-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <div className="font-semibold text-blue-700 text-sm">Momentum Plan</div>
+              <Card>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold">Calculations</h4>
+                    <div className="mt-2 rounded-md bg-slate-100 p-4 text-sm space-y-4">
+                      <div>
+                        <h5 className="font-medium text-blue-600">Momentum Plan Calculations:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Values:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Your Debt: {formatCurrency(allFormData.debtAmountEstimate)}</div>
+                            <div>• Your Fee Percentage: {getMomentumFeePercentage(allFormData.debtAmountEstimate, calculatorSettings.debtTiers) * 100}%</div>
+                            <div>• Your Term Length: {getMomentumTermLength(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)} months</div>
+                            <div>• Formula: ((debt × fee%) + (debt × 0.60)) ÷ term</div>
+                            <div>• Calculation: (({formatCurrency(allFormData.debtAmountEstimate)} × {getMomentumFeePercentage(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)}) + ({formatCurrency(allFormData.debtAmountEstimate)} × 0.60)) ÷ {getMomentumTermLength(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)} = {formatCurrency(results.momentum.monthlyPayment)}/mo</div>
+                            <div>• Total Cost: {formatCurrency(results.momentum.monthlyPayment)} × {results.momentum.term} = {formatCurrency(results.momentum.totalCost)}</div>
                           </div>
-                        </div>
-                        <div className="space-y-1 mb-2">
-                          {/* Monthly Payment Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-blue-600 mb-1">Monthly Payment:</div>
-                            <div 
-                              className="h-5 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${Math.max((results.momentum.monthlyPayment / maxPayment) * 33, 10)}%`,
-                                minWidth: '80px'
-                              }}
-                            >
-                              {formatCurrency(results.momentum.monthlyPayment)}/mo
-                            </div>
+
+                          <div className="font-medium mt-3">All Momentum Tiers & Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            {calculatorSettings.debtTiers
+                              .filter(tier => tier.programType === 'momentum')
+                              .map((tier, index) => (
+                                <div key={index}>
+                                  • {formatCurrency(tier.minAmount)}-{formatCurrency(tier.maxAmount)}: {tier.feePercentage}% fee, {tier.maxTerm} months
+                                </div>
+                              ))}
                           </div>
-                          {/* Time Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-blue-600 mb-1">Time to Freedom:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-blue-400 to-blue-500 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${(results.momentum.term / maxTerm) * 100}%`,
-                                minWidth: '60px'
-                              }}
-                            >
-                              {Math.round(results.momentum.term / 12)} years
-                            </div>
-                          </div>
-                          {/* Cost Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-blue-600 mb-1">Total Program Cost:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-blue-300 to-blue-400 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${(results.momentum.totalCost / maxCost) * 100}%`,
-                                minWidth: '60px'
-                              }}
-                            >
-                              {formatCurrency(results.momentum.totalCost)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-blue-600 font-medium text-xs">
-                            Save {formatCurrency(savingsVsDoNothing)} vs doing nothing
+
+                          <div className="font-medium mt-3">Fallback Logic (if no dynamic tiers):</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• $15,000-$20,000: 20% fee, 30 months</div>
+                            <div>• $20,001-$24,000: 15% fee, 36 months</div>
+                            <div>• $24,001+: 15% fee, 42 months</div>
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
 
-                  {/* Personal Loan Option */}
-                  {!qualification.hideColumns.includes('personalLoan') && results.personalLoan.isEligible && (() => {
-                    const freedomDate = new Date(currentDate);
-                    freedomDate.setMonth(freedomDate.getMonth() + results.personalLoan.term);
-                    const savingsVsDoNothing = results.currentPath.totalCost - results.personalLoan.totalCost;
-                    const timeSaved = results.currentPath.term - results.personalLoan.term;
-                    
-                    return (
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 w-full md:max-w-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-800 text-sm">Personal Loan</div>
+                      <div>
+                        <h5 className="font-medium text-gray-600">Personal Loan Calculations:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Values:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Your FICO Score: {allFormData.userFicoScoreEstimate}</div>
+                            <div>• Your APR: {(getPersonalLoanApr(allFormData.userFicoScoreEstimate) * 100).toFixed(2)}%</div>
+                            <div>• Term: 36 months (fixed)</div>
+                            <div>• Your Max Loan Amount: {formatCurrency(getMaximumPersonalLoanAmount(allFormData.userFicoScoreEstimate))}</div>
+                            <div>• Actual Loan Amount: {formatCurrency(results.personalLoan.actualLoanAmount)}</div>
+                            <div>• Monthly Rate: {((getPersonalLoanApr(allFormData.userFicoScoreEstimate) / 12) * 100).toFixed(4)}%</div>
+                            <div>• Formula: PMT(rate, nper, pv) where rate = monthly APR, nper = 36, pv = loan amount</div>
+                            <div>• Calculation: PMT({((getPersonalLoanApr(allFormData.userFicoScoreEstimate) / 12) * 100).toFixed(4)}%, 36, {formatCurrency(results.personalLoan.actualLoanAmount)}) = {formatCurrency(results.personalLoan.monthlyPayment)}/mo</div>
+                            <div>• Total Cost: {formatCurrency(results.personalLoan.monthlyPayment)} × 36 = {formatCurrency(results.personalLoan.totalCost)}</div>
+                            <div>• Eligible: {isEligibleForPersonalLoan(allFormData.debtAmountEstimate, allFormData.userFicoScoreEstimate) ? 'Yes' : 'No'}</div>
                           </div>
-                        </div>
-                        <div className="space-y-1 mb-2">
-                          {/* Monthly Payment Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-600 mb-1">Monthly Payment:</div>
-                            <div 
-                              className="h-5 bg-gradient-to-r from-gray-500 to-gray-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${Math.max((results.personalLoan.monthlyPayment / maxPayment) * 33, 10)}%`,
-                                minWidth: '80px'
-                              }}
-                            >
-                              {formatCurrency(results.personalLoan.monthlyPayment)}/mo
-                            </div>
+
+                          <div className="font-medium mt-3">APR by Credit Score Ranges:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• 720+: 10.25% APR</div>
+                            <div>• 690-719: 13.25% APR</div>
+                            <div>• 660-689: 18.00% APR</div>
+                            <div>• 620-659: 25.00% APR</div>
+                            <div>• &lt;620: 150.00% APR (very high risk)</div>
                           </div>
-                          {/* Time Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-600 mb-1">Time to Freedom:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-gray-400 to-gray-500 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${(results.personalLoan.term / maxTerm) * 100}%`,
-                                minWidth: '60px'
-                              }}
-                            >
-                              {Math.round(results.personalLoan.term / 12)} years
-                            </div>
+
+                          <div className="font-medium mt-3">Max Loan Amount by Credit Score:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• 720+: {formatCurrency(50000)} max</div>
+                            <div>• 690-719: {formatCurrency(40000)} max</div>
+                            <div>• 660-689: {formatCurrency(30000)} max</div>
+                            <div>• 620-659: {formatCurrency(20000)} max</div>
+                            <div>• &lt;620: {formatCurrency(5000)} max</div>
                           </div>
-                          {/* Cost Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-600 mb-1">Total Program Cost:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-gray-300 to-gray-400 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${(results.personalLoan.totalCost / maxCost) * 100}%`,
-                                minWidth: '60px'
-                              }}
-                            >
-                              {formatCurrency(results.personalLoan.totalCost)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-gray-600 font-medium text-xs">
-                            {savingsVsDoNothing > 0 ? `Save ${formatCurrency(savingsVsDoNothing)} vs doing nothing` : `Costs ${formatCurrency(Math.abs(savingsVsDoNothing))} more vs doing nothing`}
+
+                          <div className="font-medium mt-3">Eligibility Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Must have steady income</div>
+                            <div>• FICO score ≥ 580</div>
+                            <div>• Debt amount ≤ max loan amount for score</div>
+                            <div>• Fixed 36-month term</div>
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
 
-                  {/* Do Nothing Option */}
-                  {(() => {
-                    const neverFreeDate = "Never (debt keeps growing)";
-                    
-                    return (
-                      <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full md:max-w-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900 text-sm">Current Path</div>
+                      <div>
+                        <h5 className="font-medium text-red-600">Current Path Calculations:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Values:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Your Debt: {formatCurrency(allFormData.debtAmountEstimate)}</div>
+                            <div>• Initial Monthly Payment: ({formatCurrency(allFormData.debtAmountEstimate)} × 0.025) = {formatCurrency(Math.round(allFormData.debtAmountEstimate * 0.025))}/mo (then decreasing)</div>
+                            <div>• Term Formula: (11 years × APR adjustment × 12) = (11 × {(24/22).toFixed(2)} × 12) = {Math.round(11 * (24/22) * 12)} months</div>
+                            <div>• Total Cost Formula: (base cost × scaling factor × APR adjustment)</div>
+                            <div>• Total Cost Calculation: (4300 × {(allFormData.debtAmountEstimate / 2000).toFixed(2)} × {(24/22).toFixed(2)}) = {formatCurrency(Math.round(4300 * (allFormData.debtAmountEstimate / 2000) * (24/22)))}</div>
                           </div>
-                        </div>
-                        <div className="space-y-1 mb-2">
-                          {/* Monthly Payment Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-700 mb-1">Monthly Payment:</div>
-                            <div 
-                              className="h-5 bg-gradient-to-r from-gray-500 to-gray-600 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm"
-                              style={{ 
-                                width: `${Math.max((results.currentPath.monthlyPayment / maxPayment) * 33, 10)}%`,
-                                minWidth: '80px'
-                              }}
-                            >
-                              {formatCurrency(results.currentPath.monthlyPayment)}/mo
-                            </div>
+
+                          <div className="font-medium mt-3">Calculation Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Based on real credit card data: $2K at 22% APR = $4.3K total over 11 years</div>
+                            <div>• Assumes 24% APR (typical credit card rate)</div>
+                            <div>• Scaling Factor: debt ÷ $2,000 = {(allFormData.debtAmountEstimate / 2000).toFixed(2)}</div>
+                            <div>• APR Adjustment: 24% ÷ 22% = {(24/22).toFixed(2)} (higher rate = longer payoff)</div>
+                            <div>• Base Years: 11 × {(24/22).toFixed(2)} = {Math.round(11 * (24/22))} years</div>
+                            <div>• Initial Payment: 2.5% of balance (decreases as balance reduces)</div>
+                            <div>• Total multiplier: (4300 × scaling × APR adjustment) = (4300 × {(allFormData.debtAmountEstimate / 2000).toFixed(2)} × {(24/22).toFixed(2)})</div>
                           </div>
-                          {/* Time Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-700 mb-1">Time to Freedom:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-gray-600 to-gray-700 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm relative overflow-hidden"
-                              style={{ width: '100%' }}
-                            >
-                              <div className="absolute inset-0 bg-gray-800 opacity-30 animate-pulse"></div>
-                              <span className="relative z-10">{Math.round(results.currentPath.term / 12)}+ years (debt grows)</span>
-                            </div>
-                          </div>
-                          {/* Cost Bar */}
-                          <div className="relative">
-                            <div className="text-xs text-gray-700 mb-1">Total Program Cost:</div>
-                            <div 
-                              className="h-4 bg-gradient-to-r from-gray-600 to-gray-700 rounded flex items-center justify-center text-white font-medium text-xs shadow-sm relative overflow-hidden"
-                              style={{ width: '100%' }}
-                            >
-                              <div className="absolute inset-0 bg-gray-800 opacity-30 animate-pulse"></div>
-                              <span className="relative z-10">{formatCurrency(results.currentPath.totalCost)}+ (keeps growing)</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-gray-700 font-medium text-xs">
-                            Costliest option
+
+                          <div className="font-medium mt-3">Assumptions:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• 24% average credit card APR</div>
+                            <div>• Minimum payments start at ~2.5% of balance</div>
+                            <div>• Payment amount decreases as balance reduces</div>
+                            <div>• No additional charges or fees</div>
+                            <div>• No missed payments</div>
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
-                </>
-              );
-            })()}
-          </div>
-        </CardContent>
-      </Card>
+
+                      <div>
+                        <h5 className="font-medium text-purple-600">Momentum Score Calculations:</h5>
+                        <div className="ml-4 space-y-2 text-xs">
+                          <div className="font-medium">Current User Score:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Debt Amount ({formatCurrency(allFormData.debtAmountEstimate)}): {momentumScore.breakdown.debtAmount} points</div>
+                            <div>• Creditor Count ({allFormData.creditorCountEstimate}): {momentumScore.breakdown.creditors} points</div>
+                            <div>• Payment Status ({allFormData.debtPaymentStatus}): {momentumScore.breakdown.paymentStatus} points</div>
+                            <div>• Steady Income ({allFormData.hasSteadyIncome ? 'Yes' : 'No'}): {momentumScore.breakdown.income} points</div>
+                            <div>• Credit Score ({allFormData.userFicoScoreEstimate}): {momentumScore.breakdown.creditScore} points</div>
+                            <div>• <strong>Total Score: {momentumScore.score} / {momentumScore.maxPossible}</strong></div>
+                          </div>
+
+                          <div className="font-medium mt-3">Debt Amount Points Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• $15,000-$24,999: 3 points</div>
+                            <div>• $25,000-$34,999: 11 points</div>
+                            <div>• $35,000-$49,999: 8 points</div>
+                            <div>• $50,000-$74,999: 6 points</div>
+                            <div>• $75,000+: 2 points</div>
+                            <div>• Below $15,000: 0 points</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Creditor Count Points Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• 1-2 creditors: 1 point</div>
+                            <div>• 3-5 creditors: 8 points</div>
+                            <div>• 6-10 creditors: 6 points</div>
+                            <div>• 10+ creditors: 4 points</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Payment Status Points Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Current: 2 points</div>
+                            <div>• Late: 8 points</div>
+                            <div>• Collections: 6 points</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Income Status Points Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• Has steady income: 6 points</div>
+                            <div>• No steady income: 0 points</div>
+                          </div>
+
+                          <div className="font-medium mt-3">Credit Score Points Logic:</div>
+                          <div className="ml-2 space-y-1">
+                            <div>• 720+ (Prime): 1 point</div>
+                            <div>• 690-719 (Good): 1 point</div>
+                            <div>• 580-689 (Fair): 2 points</div>
+                            <div>• &lt;580 (Subprime): 1 point</div>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
     </div>
   );
 }

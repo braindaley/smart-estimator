@@ -11,7 +11,7 @@
     },
     {
       "id": "momentum-tier-2",
-      "minAmount": 20000,
+      "minAmount": 20001,
       "maxAmount": 24000,
       "feePercentage": 15,
       "maxTerm": 36,
@@ -20,7 +20,7 @@
     },
     {
       "id": "momentum-tier-3",
-      "minAmount": 24000,
+      "minAmount": 24001,
       "maxAmount": 100000,
       "feePercentage": 15,
       "maxTerm": 42,

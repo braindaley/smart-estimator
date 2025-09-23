@@ -1,4 +1,6 @@
 
+import { DebtTier } from '@/lib/types/calculator-settings';
+
 // Basic Calculations
 export const calculateDtiEstimate = (monthlyPaymentEstimate: number, monthlyIncomeEstimate: number): number => {
   if (monthlyIncomeEstimate === 0) return 0;
@@ -9,68 +11,79 @@ export const calculateMonthlySurplusEstimate = (monthlyIncomeEstimate: number, m
   return monthlyIncomeEstimate - monthlyPaymentEstimate;
 };
 
-// Fee Percentage Calculations
-export const getMomentumFeePercentage = (debtAmountEstimate: number): number => {
-  if (debtAmountEstimate >= 15000 && debtAmountEstimate < 20000) {
-    return 0.25;
+// Helper function to find the appropriate debt tier
+function findDebtTier(debtAmount: number, tiers: DebtTier[], programType: 'momentum' | 'standard'): DebtTier | null {
+  const programTiers = tiers.filter(tier => tier.programType === programType);
+  return programTiers.find(tier =>
+    debtAmount >= tier.minAmount && debtAmount <= tier.maxAmount
+  ) || null;
+}
+
+// Fee Percentage Calculations with dynamic tiers
+export const getMomentumFeePercentage = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded values if no tiers provided
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 20000) return 0.20;
+    if (debtAmountEstimate >= 20001 && debtAmountEstimate <= 24000) return 0.15;
+    if (debtAmountEstimate >= 24001) return 0.15;
+    return 0;
   }
-  if (debtAmountEstimate >= 20000) {
-    return 0.19;
-  }
-  return 0; // Should not happen based on program qualification
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'momentum');
+  return tier ? tier.feePercentage / 100 : 0;
 };
 
-export const getStandardFeePercentage = (debtAmountEstimate: number): number => {
-  if (debtAmountEstimate >= 10000 && debtAmountEstimate < 18000) {
-    return 0.28;
+export const getStandardFeePercentage = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded values if no tiers provided
+    if (debtAmountEstimate >= 10000 && debtAmountEstimate < 18000) return 0.28;
+    if (debtAmountEstimate >= 18000) return 0.25;
+    return 0;
   }
-  if (debtAmountEstimate >= 18000) {
-    return 0.25;
-  }
-  return 0; // Should not happen based on program qualification
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'standard');
+  return tier ? tier.feePercentage / 100 : 0;
 };
 
-// Term Length Calculations
-export const getMomentumTermLength = (debtAmountEstimate: number): number => {
-  if (debtAmountEstimate >= 15000 && debtAmountEstimate < 20000) {
-    return 25;
+// Term Length Calculations with dynamic tiers
+export const getMomentumTermLength = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded values if no tiers provided
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 20000) return 30;
+    if (debtAmountEstimate >= 20001 && debtAmountEstimate <= 24000) return 36;
+    if (debtAmountEstimate >= 24001) return 42;
+    return 0;
   }
-  if (debtAmountEstimate >= 20000 && debtAmountEstimate < 24000) {
-    return 38;
-  }
-  if (debtAmountEstimate >= 24000) {
-    return 42;
-  }
-  return 0;
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'momentum');
+  return tier ? tier.maxTerm : 0;
 };
 
-export const getStandardTermLength = (debtAmountEstimate: number): number => {
-  if (debtAmountEstimate >= 10000 && debtAmountEstimate < 15000) {
-    return 24;
+export const getStandardTermLength = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded values if no tiers provided
+    if (debtAmountEstimate >= 10000 && debtAmountEstimate < 15000) return 24;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate < 20000) return 36;
+    if (debtAmountEstimate >= 20000 && debtAmountEstimate < 24000) return 42;
+    if (debtAmountEstimate >= 24000) return 48;
+    return 0;
   }
-  if (debtAmountEstimate >= 15000 && debtAmountEstimate < 20000) {
-    return 36;
-  }
-  if (debtAmountEstimate >= 20000 && debtAmountEstimate < 24000) {
-    return 42;
-  }
-  if (debtAmountEstimate >= 24000) {
-    return 48;
-  }
-  return 0;
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'standard');
+  return tier ? tier.maxTerm : 0;
 };
 
 // Monthly Payment Calculations
-export const calculateMonthlyMomentumPayment = (debtAmountEstimate: number): number => {
-  const feePercentage = getMomentumFeePercentage(debtAmountEstimate);
-  const termLength = getMomentumTermLength(debtAmountEstimate);
+export const calculateMonthlyMomentumPayment = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  const feePercentage = getMomentumFeePercentage(debtAmountEstimate, debtTiers);
+  const termLength = getMomentumTermLength(debtAmountEstimate, debtTiers);
   if (termLength === 0) return 0;
   return (debtAmountEstimate * feePercentage + debtAmountEstimate * 0.60) / termLength;
 };
 
-export const calculateMonthlyStandardPayment = (debtAmountEstimate: number): number => {
-  const feePercentage = getStandardFeePercentage(debtAmountEstimate);
-  const termLength = getStandardTermLength(debtAmountEstimate);
+export const calculateMonthlyStandardPayment = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  const feePercentage = getStandardFeePercentage(debtAmountEstimate, debtTiers);
+  const termLength = getStandardTermLength(debtAmountEstimate, debtTiers);
   if (termLength === 0) return 0;
   return (debtAmountEstimate * feePercentage + debtAmountEstimate * 0.60) / termLength;
 };
@@ -103,6 +116,11 @@ export const getMaximumPersonalLoanAmount = (ficoScore: number): number => {
     if (ficoScore >= 660) return 30000;
     if (ficoScore >= 620) return 20000;
     return 5000;
+};
+
+export const isEligibleForPersonalLoan = (debtAmount: number, ficoScore: number): boolean => {
+    const maxLoanAmount = getMaximumPersonalLoanAmount(ficoScore);
+    return debtAmount <= maxLoanAmount;
 };
 
 // Momentum Score Calculations
