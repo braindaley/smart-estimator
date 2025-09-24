@@ -279,74 +279,290 @@ export default function ResultsPage() {
                 </CardContent>
               </Card>
 
-              {/* Calculations Accordion */}
+              {/* Technical Documentation */}
               <Accordion type="single" collapsible className="mt-8">
                 <AccordionItem value="calculations" className="border-0">
-                  <AccordionTrigger className="text-xs text-muted-foreground hover:text-muted-foreground py-2 px-0">
-                    Calculations
+                  <AccordionTrigger className="text-sm font-medium hover:text-muted-foreground py-3 px-0">
+                    Technical Implementation Documentation
                   </AccordionTrigger>
                   <AccordionContent>
                     <Card>
-                      <CardContent className="space-y-4">
-                        <div className="rounded-md bg-slate-100 p-4 text-sm space-y-4">
+                      <CardContent className="p-6">
+                        <div className="space-y-8 text-sm font-mono">
+
                           <div>
-                            <h5 className="font-medium text-blue-600">Momentum Plan Calculations:</h5>
-                            <div className="ml-4 space-y-2 text-xs">
-                              <div>• Your Debt: {formatCurrency(momentumResults.totalDebt)}</div>
-                              <div>• Fee: {(getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers) * 100).toFixed(0)}%</div>
-                              <div>• Term: {momentumResults.term} months</div>
-                              <div>• Monthly Payment: {formatCurrency(momentumResults.monthlyPayment)}</div>
-                              <div>• Settlement Rate: 60%</div>
-                              <div>• Accounts included: {momentumResults.accountCount}</div>
+                            <h3 className="font-bold text-lg mb-4">MOMENTUM PLAN CALCULATION ENGINE</h3>
+
+                            <h4 className="font-semibold mb-2">Core Formula Implementation:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                Monthly Payment = (Settlement Amount + Program Fee) ÷ Term Length<br/>
+                                Settlement Amount = Total Eligible Debt × 0.60<br/>
+                                Program Fee = Total Eligible Debt × Fee Percentage (tier-based)<br/>
+                                Total Program Cost = Settlement Amount + Program Fee
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Current Calculation Results:</h4>
+                            <div className="space-y-1">
+                              <div>Total Eligible Debt: {formatCurrency(momentumResults.totalDebt)}</div>
+                              <div>Settlement Amount: {formatCurrency(momentumResults.totalDebt * 0.60)} (60% of debt)</div>
+                              <div>Fee Percentage: {(getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers) * 100).toFixed(0)}% (tier: {momentumResults.totalDebt >= 24001 ? '$24k+' : momentumResults.totalDebt >= 20001 ? '$20k-24k' : '$15k-20k'})</div>
+                              <div>Program Fee: {formatCurrency(momentumResults.totalDebt * getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers))}</div>
+                              <div>Term Length: {momentumResults.term} months (tier-based)</div>
+                              <div>Monthly Payment: {formatCurrency(momentumResults.monthlyPayment)}</div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Fee Tier Logic (from /src/lib/calculations.ts):</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                function getMomentumFeePercentage(debtAmount, debtTiers) {`{`}<br/>
+                                &nbsp;&nbsp;if (!debtTiers) {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (debtAmount {`>=`} 15000 && debtAmount {`<=`} 20000) return 0.20;<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (debtAmount {`>=`} 20001 && debtAmount {`<=`} 24000) return 0.15;<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (debtAmount {`>=`} 24001) return 0.15;<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;return 0;<br/>
+                                &nbsp;&nbsp;{`}`}<br/>
+                                &nbsp;&nbsp;const tier = findDebtTier(debtAmount, debtTiers, 'momentum');<br/>
+                                &nbsp;&nbsp;return tier ? tier.feePercentage / 100 : 0;<br/>
+                                {`}`}
+                              </code>
                             </div>
                           </div>
 
                           <div>
-                            <h5 className="font-medium text-red-600">Current Path Calculations:</h5>
-                            <div className="ml-4 space-y-2 text-xs">
-                              <div>• Based on 24% APR typical credit card rate</div>
-                              <div>• Initial payment: 2.5% of balance</div>
-                              <div>• Payment decreases as balance reduces</div>
-                              <div>• Total interest over {Math.round(currentPathResults.term / 12)} years</div>
+                            <h3 className="font-bold text-lg mb-4">CURRENT PATH CALCULATION ENGINE</h3>
+
+                            <h4 className="font-semibold mb-2">Mathematical Model:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                function calculateCurrentPath(debtAmount) {`{`}<br/>
+                                &nbsp;&nbsp;const scalingFactor = debtAmount / 2000;<br/>
+                                &nbsp;&nbsp;const aprAdjustment = 24 / 22;  // Adjust from 22% baseline to 24%<br/>
+                                &nbsp;&nbsp;const baseYears = 11 * aprAdjustment;<br/>
+                                &nbsp;&nbsp;const baseTotalCost = 4300 * scalingFactor * aprAdjustment;<br/>
+                                &nbsp;&nbsp;const initialMonthlyPayment = Math.round(debtAmount * 0.025);<br/>
+                                &nbsp;&nbsp;return {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;monthlyPayment: initialMonthlyPayment,<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;term: Math.round(baseYears * 12),<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;totalCost: Math.round(baseTotalCost)<br/>
+                                &nbsp;&nbsp;{`}`};<br/>
+                                {`}`}
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Current Calculation Results:</h4>
+                            <div className="space-y-1">
+                              <div>Debt Amount: {formatCurrency(momentumResults.totalDebt)}</div>
+                              <div>Scaling Factor: {(momentumResults.totalDebt / 2000).toFixed(2)} (debt / $2000 baseline)</div>
+                              <div>APR Adjustment: {(24 / 22).toFixed(3)} (24% APR vs 22% baseline)</div>
+                              <div>Base Years: {(11 * (24 / 22)).toFixed(1)} years</div>
+                              <div>Initial Monthly Payment: {formatCurrency(currentPathResults.monthlyPayment)} (2.5% of balance)</div>
+                              <div>Term: {currentPathResults.term} months</div>
+                              <div>Total Cost: {formatCurrency(currentPathResults.totalCost)}</div>
+                              <div>Total Interest: {formatCurrency(currentPathResults.totalCost - momentumResults.totalDebt)}</div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Baseline Data Source:</h4>
+                            <div className="bg-gray-100 p-4">
+                              Real credit card data: $2,000 at 22% APR = $4,300 total over 11 years with minimum payments
                             </div>
                           </div>
 
-                          <div className="border-t pt-4">
-                            <h5 className="font-medium text-gray-700 mb-3">Data Sources & Configuration:</h5>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <div className="text-xs font-medium text-gray-600 mb-2">View Data</div>
-                                <div className="space-y-1">
-                                  <a href={`/results/bank?session=${Date.now()}`} className="block text-xs text-blue-600 hover:underline">
-                                    → Plaid Bank Data
-                                  </a>
-                                  <a href={`/results/credit?session=${Date.now()}`} className="block text-xs text-blue-600 hover:underline">
-                                    → Credit Report Details
-                                  </a>
-                                  <a href="/your-plan/deal-sheet" className="block text-xs text-blue-600 hover:underline">
-                                    → Full Deal Sheet
-                                  </a>
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-xs font-medium text-gray-600 mb-2">Configuration</div>
-                                <div className="space-y-1">
-                                  <a href="/admin/plaid" className="block text-xs text-blue-600 hover:underline">
-                                    → Plaid Account Mapping
-                                  </a>
-                                  <a href="/admin/program-calculator" className="block text-xs text-blue-600 hover:underline">
-                                    → Calculator & Creditor Data
-                                  </a>
-                                  <a href="/admin/equifax-codes" className="block text-xs text-blue-600 hover:underline">
-                                    → Narrative Code Selection
-                                  </a>
-                                </div>
-                              </div>
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">DATA INTEGRATION ARCHITECTURE</h3>
+
+                            <h4 className="font-semibold mb-2">Credit Data Processing (src/app/your-plan/results/page.js lines 126-193):</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                1. getCreditData() - Retrieves from localStorage['credit_data_{`userId`}']<br/>
+                                2. getEquifaxNarrativeCodes() - Gets narrative code config from localStorage<br/>
+                                3. Filter accounts: data.trades.filter(account {`=>`} balance &gt; 0)<br/>
+                                4. Filter eligible: accounts.filter(isNarrativeCodeIncludedInSettlement)<br/>
+                                5. Calculate total debt: eligible.reduce((sum, account) {`=>`} sum + balance, 0)<br/>
+                                6. Apply minimum threshold: totalDebt {`>=`} 15000 for Momentum Plan
+                              </code>
                             </div>
-                            <div className="mt-3 p-2 bg-yellow-50 rounded text-xs text-yellow-800">
-                              <strong>Note:</strong> Only {eligibleAccounts.length} of {creditData?.trades?.length || 0} accounts qualify based on narrative codes and balance requirements.
+
+                            <h4 className="font-semibold mb-2">Narrative Code Eligibility Logic:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                function isNarrativeCodeIncludedInSettlement(account, narrativeCodes) {`{`}<br/>
+                                &nbsp;&nbsp;const accountNarrativeCodes = [];<br/>
+                                &nbsp;&nbsp;account.narrativeCodes.forEach(nc {`=>`} {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.code) accountNarrativeCodes.push(nc.code);<br/>
+                                &nbsp;&nbsp;{`}`});<br/>
+                                &nbsp;&nbsp;return accountNarrativeCodes.some(accountCode {`=>`} {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;const config = narrativeCodes.find(c {`=>`} c.code {`===`} accountCode);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;return config && config.includeInSettlement;<br/>
+                                &nbsp;&nbsp;{`}`});<br/>
+                                {`}`}
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Calculator Settings Integration:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                API: /api/admin/calculator-settings<br/>
+                                Structure: {`{`} debtTiers: [tier1, tier2, ...] {`}`}<br/>
+                                Tier Properties: minAmount, maxAmount, feePercentage, maxTerm, programType<br/>
+                                Used by: getMomentumFeePercentage(), getMomentumTermLength()
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Current Session State:</h4>
+                            <div className="space-y-1">
+                              <div>Total Credit Accounts: {creditData?.trades?.length || 0}</div>
+                              <div>Accounts with Balance &gt; 0: {creditData?.trades?.filter(a => (typeof a.balance === 'number' ? a.balance : parseFloat(a.balance) || 0) > 0).length || 0}</div>
+                              <div>Eligible for Settlement: {eligibleAccounts.length}</div>
+                              <div>Total Eligible Debt: {formatCurrency(momentumResults?.totalDebt || 0)}</div>
+                              <div>Narrative Codes Configured: {narrativeCodes.length}</div>
+                              <div>Minimum Threshold Met: {momentumResults?.totalDebt >= 15000 ? 'Yes' : 'No'}</div>
                             </div>
                           </div>
+
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">DATA INTEGRATION ARCHITECTURE</h3>
+
+                            <h4 className="font-semibold mb-2">Credit Data Processing (src/app/your-plan/results/page.js lines 126-193):</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                1. getCreditData() - Retrieves from localStorage['credit_data_{`userId`}']<br/>
+                                2. getEquifaxNarrativeCodes() - Gets narrative code config from localStorage<br/>
+                                3. Filter accounts: data.trades.filter(account {`=>`} balance &gt; 0)<br/>
+                                4. Filter eligible: accounts.filter(isNarrativeCodeIncludedInSettlement)<br/>
+                                5. Calculate total debt: eligible.reduce((sum, account) {`=>`} sum + balance, 0)<br/>
+                                6. Apply minimum threshold: totalDebt {`>=`} 15000 for Momentum Plan
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Narrative Code Eligibility Logic:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                function isNarrativeCodeIncludedInSettlement(account, narrativeCodes) {`{`}<br/>
+                                &nbsp;&nbsp;const accountNarrativeCodes = [];<br/>
+                                &nbsp;&nbsp;account.narrativeCodes.forEach(nc {`=>`} {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.code) accountNarrativeCodes.push(nc.code);<br/>
+                                &nbsp;&nbsp;{`}`});<br/>
+                                &nbsp;&nbsp;return accountNarrativeCodes.some(accountCode {`=>`} {`{`}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;const config = narrativeCodes.find(c {`=>`} c.code {`===`} accountCode);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;return config && config.includeInSettlement;<br/>
+                                &nbsp;&nbsp;{`}`});<br/>
+                                {`}`}
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Calculator Settings Integration:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                API: /api/admin/calculator-settings<br/>
+                                Structure: {`{`} debtTiers: [tier1, tier2, ...] {`}`}<br/>
+                                Tier Properties: minAmount, maxAmount, feePercentage, maxTerm, programType<br/>
+                                Used by: getMomentumFeePercentage(), getMomentumTermLength()
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Current Session State:</h4>
+                            <div className="space-y-1">
+                              <div>Total Credit Accounts: {creditData?.trades?.length || 0}</div>
+                              <div>Accounts with Balance &gt; 0: {creditData?.trades?.filter(a => (typeof a.balance === 'number' ? a.balance : parseFloat(a.balance) || 0) > 0).length || 0}</div>
+                              <div>Eligible for Settlement: {eligibleAccounts.length}</div>
+                              <div>Total Eligible Debt: {formatCurrency(momentumResults?.totalDebt || 0)}</div>
+                              <div>Narrative Codes Configured: {narrativeCodes.length}</div>
+                              <div>Minimum Threshold Met: {momentumResults?.totalDebt >= 15000 ? 'Yes' : 'No'}</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">DATA SOURCES & CONFIGURATION ACCESS</h3>
+
+                            <h4 className="font-semibold mb-2">View Data Sources:</h4>
+                            <div className="space-y-1">
+                              <div>
+                                <a href={`/results/bank?session=${Date.now()}`} className="text-blue-600 hover:underline">
+                                  /results/bank - Plaid Bank Data
+                                </a>
+                                <span className="text-gray-600 ml-2">Income verification and transaction analysis</span>
+                              </div>
+                              <div>
+                                <a href={`/results/credit?session=${Date.now()}`} className="text-blue-600 hover:underline">
+                                  /results/credit - Credit Report Details
+                                </a>
+                                <span className="text-gray-600 ml-2">Account balances and narrative codes</span>
+                              </div>
+                              <div>
+                                <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">
+                                  /your-plan/deal-sheet - Complete Deal Sheet
+                                </a>
+                                <span className="text-gray-600 ml-2">Full financial analysis</span>
+                              </div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Configuration & Admin Settings:</h4>
+                            <div className="space-y-1">
+                              <div>
+                                <a href="/admin/plaid" className="text-blue-600 hover:underline">
+                                  /admin/plaid - Plaid Account Mapping
+                                </a>
+                                <span className="text-gray-600 ml-2">Configure income sources</span>
+                              </div>
+                              <div>
+                                <a href="/admin/program-calculator" className="text-blue-600 hover:underline">
+                                  /admin/program-calculator - Calculator Settings
+                                </a>
+                                <span className="text-gray-600 ml-2">Fee tiers and terms</span>
+                              </div>
+                              <div>
+                                <a href="/admin/equifax-codes" className="text-blue-600 hover:underline">
+                                  /admin/equifax-codes - Narrative Code Selection
+                                </a>
+                                <span className="text-gray-600 ml-2">Debt eligibility criteria</span>
+                              </div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Current Session Status:</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                Total Credit Accounts: {creditData?.trades?.length || 0}<br/>
+                                Eligible for Settlement: {eligibleAccounts.length}<br/>
+                                Total Eligible Debt: {formatCurrency(momentumResults?.totalDebt || 0)}<br/>
+                                Narrative Codes Configured: {narrativeCodes.length}<br/>
+                                Qualification Status: {eligibleAccounts.length} of {creditData?.trades?.length || 0} accounts qualify
+                              </code>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">COMPONENT INTEGRATION MAP</h3>
+
+                            <h4 className="font-semibold mb-2">File Dependencies:</h4>
+                            <div className="space-y-1">
+                              <div>/src/lib/calculations.ts - Core calculation functions</div>
+                              <div>/src/app/your-plan/results/ResultsTable.js - Display component</div>
+                              <div>/src/app/your-plan/results/page.js - Main orchestration</div>
+                              <div>/api/admin/calculator-settings - Dynamic tier configuration</div>
+                              <div>localStorage['credit_data_userId'] - Equifax credit report data</div>
+                              <div>localStorage['equifax-narrative-codes'] - Admin eligibility configuration</div>
+                              <div>sessionStorage['momentumResults'] - Cross-page result sharing</div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Data Flow Sequence:</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                1. User completes credit check (stores to localStorage)<br/>
+                                2. Admin configures narrative codes (/admin/equifax-codes)<br/>
+                                3. Admin sets calculator tiers (/admin/program-calculator)<br/>
+                                4. Results page loads credit data and applies filters<br/>
+                                5. Eligible debt calculated using narrative code matching<br/>
+                                6. Calculator functions determine fees and terms<br/>
+                                7. Results displayed with comparison to current path<br/>
+                                8. Results saved to sessionStorage for other pages
+                              </code>
+                            </div>
+                          </div>
+
                         </div>
                       </CardContent>
                     </Card>
