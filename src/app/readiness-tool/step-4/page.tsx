@@ -8,8 +8,8 @@ import { ReadinessStepNavigation } from '@/components/readiness-step-navigation'
 
 const options = [
   { label: "Very important, cannot afford drop", value: "very_important", points: 1 },
-  { label: "Somewhat important, debt is priority", value: "somewhat_important", points: 2 },
-  { label: "Not important, understand it may get worse", value: "not_important", points: 3 },
+  { label: "Somewhat important, debt is priority", value: "somewhat_important", points: 3 },
+  { label: "Not important, understand it may get worse", value: "not_important", points: 5 },
 ];
 
 export default function Step4() {

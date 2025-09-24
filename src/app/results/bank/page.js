@@ -9,14 +9,20 @@ const getPlaidData = typeof window !== 'undefined'
   ? require('@/lib/session-store').getPlaidData 
   : () => null;
 
-const clearSessionData = typeof window !== 'undefined'
-  ? require('@/lib/session-store').clearSessionData
+const clearPlaidData = typeof window !== 'undefined'
+  ? require('@/lib/session-store').clearPlaidData
   : () => {};
 
 // Dynamically import PlaidDataDisplay to avoid SSR issues
 const PlaidDataDisplay = dynamic(() => import('@/components/PlaidDataDisplay'), {
   ssr: false,
   loading: () => <div>Loading...</div>
+});
+
+// Dynamically import PersonaSelector to avoid SSR issues
+const PersonaSelector = dynamic(() => import('@/components/PersonaSelector'), {
+  ssr: false,
+  loading: () => <div>Loading personas...</div>
 });
 
 /**
@@ -26,8 +32,19 @@ function BankResultsContent() {
   const [plaidData, setPlaidData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session');
+
+  useEffect(() => {
+    // Get user ID
+    if (typeof window !== 'undefined') {
+      const existingUserId = localStorage.getItem('loan_user_id');
+      if (existingUserId) {
+        setUserId(existingUserId);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     // Load Plaid data from session storage
@@ -51,10 +68,15 @@ function BankResultsContent() {
   }, []);
 
   const handleClearData = () => {
-    if (confirm('Are you sure you want to clear all your data? This cannot be undone.')) {
-      clearSessionData();
+    if (confirm('Are you sure you want to clear your Plaid bank data? This cannot be undone.')) {
+      clearPlaidData();
       window.location.href = '/';
     }
+  };
+
+  const handlePersonaChange = (persona) => {
+    // Reload the page to show new persona data
+    window.location.reload();
   };
 
   if (loading) {
@@ -100,26 +122,14 @@ function BankResultsContent() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Bank Account Results</h1>
-              <p className="text-gray-600">Data retrieved on {new Date(plaidData.storedAt).toLocaleDateString()}</p>
+              <p className="text-gray-600">Data retrieved on {plaidData?.storedAt ? new Date(plaidData.storedAt).toLocaleDateString() : 'Unknown'}</p>
             </div>
             <div className="flex space-x-3">
-              <button
-                onClick={() => window.location.href = '/admin/plaid'}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                View Mapping Table
-              </button>
-              <button
-                onClick={() => window.location.href = '/'}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Back to Home
-              </button>
               <button
                 onClick={handleClearData}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
-                Clear Data
+                Clear Plaid Data
               </button>
             </div>
           </div>
@@ -128,11 +138,22 @@ function BankResultsContent() {
 
       {/* Main Content */}
       <div className="py-8">
-        <PlaidDataDisplay 
-          userId={plaidData.userId} 
-          connectionMetadata={plaidData.data.connectionMetadata}
-          isResultsPage={true}
-        />
+        <div className="max-w-6xl mx-auto px-6 mb-8">
+          {userId && (
+            <PersonaSelector
+              userId={userId}
+              onPersonaChange={handlePersonaChange}
+            />
+          )}
+        </div>
+
+        {plaidData && (
+          <PlaidDataDisplay
+            userId={plaidData.userId}
+            connectionMetadata={plaidData.data?.connectionMetadata}
+            isResultsPage={true}
+          />
+        )}
       </div>
     </div>
   );

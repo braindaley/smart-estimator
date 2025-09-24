@@ -16,6 +16,7 @@ import ReadinessAssessmentResult from '@/components/ReadinessAssessmentResult';
 import ReadinessWhatsNext from '@/components/ReadinessWhatsNext';
 import { ChartContainer, ChartConfig } from "@/components/ui/chart";
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
+import { getPersonalizedVideoRecommendations, getVideoRecommendationExplanation } from '@/lib/readiness-video-recommendations';
 
 type VideoRecommendation = {
   title: string;
@@ -23,12 +24,7 @@ type VideoRecommendation = {
   watched: boolean;
 };
 
-const defaultVideos = [
-  "Debt Settlement vs. Consolidation",
-  "Dealing with Debt Collectors", 
-  "Debt Relief Checklist",
-  "What Is a Debt Settlement Plan"
-];
+// Default videos removed - now using personalized recommendation system
 
 export default function Results() {
   const router = useRouter();
@@ -40,6 +36,8 @@ export default function Results() {
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [smartEstimatorScore, setSmartEstimatorScore] = useState(0);
   const [hasSmartEstimatorData, setHasSmartEstimatorData] = useState(false);
+  const [personalizedVideos, setPersonalizedVideos] = useState<string[]>([]);
+  const [videoRecommendationText, setVideoRecommendationText] = useState<string>('');
 
   useEffect(() => {
     // Wait for the store to be hydrated before doing anything
@@ -59,26 +57,38 @@ export default function Results() {
     setBaseScore(score);
     updateTotalScore(score, bonusPoints);
 
-    // Check Smart Estimator completion and calculate score
+    // Check Smart Estimator completion and get stored score
     const hasResultsData = estimatorFormData ? Object.keys(estimatorFormData).filter(k => k.startsWith('step')).length >= 5 : false;
     setHasSmartEstimatorData(hasResultsData);
 
     if (hasResultsData && estimatorFormData) {
-      try {
-        const momentumScore = calculateMomentumScore({
-          debtAmountEstimate: estimatorFormData.step1?.debtAmountEstimate || 0,
-          creditorCountEstimate: estimatorFormData.step2?.creditorCountEstimate || 0,
-          debtPaymentStatus: estimatorFormData.step3?.debtPaymentStatus || 'current',
-          hasSteadyIncome: estimatorFormData.step4?.hasSteadyIncome || false,
-          userFicoScoreEstimate: estimatorFormData.step5?.userFicoScoreEstimate || 550
-        });
-        setSmartEstimatorScore(momentumScore.score);
-      } catch (error) {
-        console.error('Error calculating momentum score:', error);
-        setSmartEstimatorScore(0);
+      // Use stored momentum score if available, otherwise calculate it
+      if (estimatorFormData.momentumScore?.score) {
+        setSmartEstimatorScore(estimatorFormData.momentumScore.score);
+      } else {
+        try {
+          const momentumScore = calculateMomentumScore({
+            debtAmountEstimate: estimatorFormData.step1?.debtAmountEstimate || 0,
+            creditorCountEstimate: estimatorFormData.step2?.creditorCountEstimate || 0,
+            debtPaymentStatus: estimatorFormData.step3?.debtPaymentStatus || 'current',
+            hasSteadyIncome: estimatorFormData.step4?.hasSteadyIncome || false,
+            userFicoScoreEstimate: estimatorFormData.step5?.userFicoScoreEstimate || 550
+          });
+          setSmartEstimatorScore(momentumScore.score);
+        } catch (error) {
+          console.error('Error calculating momentum score:', error);
+          setSmartEstimatorScore(0);
+        }
       }
     } else {
       setSmartEstimatorScore(0);
+    }
+
+    // Get personalized video recommendations
+    if (Object.keys(formData).length > 0) {
+      const videoRec = getPersonalizedVideoRecommendations(formData);
+      setPersonalizedVideos(videoRec.recommendedVideos);
+      setVideoRecommendationText(getVideoRecommendationExplanation(videoRec.recommendations));
     }
   }, [_hasHydrated, formData, estimatorFormData, bonusPoints]);
 
@@ -128,8 +138,8 @@ export default function Results() {
   }
 
   const getScoreColor = () => {
-    if (totalScore >= 25) return "text-green-600";
-    if (totalScore >= 18) return "text-yellow-600";
+    if (totalScore >= 37) return "text-green-600";
+    if (totalScore >= 26) return "text-yellow-600";
     return "text-red-600";
   };
 
@@ -144,18 +154,19 @@ export default function Results() {
       {/* Readiness Assessment Results */}
       <div className="max-w-3xl mx-auto">
         
-        <ReadinessAssessmentResult 
-          totalScore={totalScore} 
+        <ReadinessAssessmentResult
+          totalScore={totalScore}
           questionScores={Object.keys(formData).reduce((acc, key) => {
             if (key.startsWith('step') && formData[key]?.points !== undefined) {
               acc[key] = formData[key].points;
             }
             return acc;
           }, {} as { [key: string]: number })}
+          formData={formData}
         />
         
         {/* What's Next Section */}
-        <ReadinessWhatsNext readinessScore={totalScore} />
+        <ReadinessWhatsNext readinessScore={totalScore} momentumScore={hasSmartEstimatorData ? smartEstimatorScore : undefined} formData={formData} />
       </div>
 
       {/* Video Recommendations - Full Width Section */}
@@ -164,13 +175,13 @@ export default function Results() {
         <CardHeader className="px-0">
           <CardTitle>Recommended Videos</CardTitle>
           <CardDescription>
-            Watch these videos to learn more and earn up to 5 bonus points!
+            {videoRecommendationText || 'Watch these videos to learn more and earn up to 5 bonus points!'}
             {bonusPoints > 0 && ` (${bonusPoints}/5 earned)`}
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {defaultVideos.map((videoTitle) => {
+            {personalizedVideos.map((videoTitle) => {
               const isWatched = watchedVideos.has(videoTitle);
               return (
                 <Card key={videoTitle} className={`border-0 shadow-none ${isWatched ? "opacity-75" : ""}`}>
@@ -207,11 +218,52 @@ export default function Results() {
             <AccordionTrigger className="text-xs text-muted-foreground hover:text-muted-foreground py-2 px-0">Calculations</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-6">
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      setFormData('step1', {});
+                      setFormData('step2', {});
+                      setFormData('step3', {});
+                      setFormData('step4', {});
+                      setFormData('step5', {});
+                      setFormData('step6', {});
+                      setFormData('step7', {});
+                      setFormData('step8', {});
+                      setFormData('step9', {});
+                      setFormData('videos', {});
+                      setFormData('readinessScore', {});
+                      router.push('/readiness-tool/step-1');
+                    }}
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Start Over
+                  </button>
+                </div>
                 <Card>
                   <CardContent className="space-y-4">
                     <div>
                       <h4 className="font-semibold">Readiness Assessment Calculations</h4>
                       <div className="mt-2 rounded-md bg-slate-100 p-4 text-sm space-y-4">
+
+                        <div>
+                          <h5 className="font-medium">Automatic Disqualification Rules:</h5>
+                          <div className="ml-4 space-y-2 text-xs">
+                            <div className="font-medium">The following responses result in immediate disqualification ("Not Eligible") regardless of total score:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Q4: "Very important, cannot afford drop" (Credit score is critically important)</div>
+                              <div>• Q6: "Not Confident" (Lack of payment confidence)</div>
+                              <div>• Q8: "Not prepared for increase" (Not prepared for collection calls)</div>
+                              <div>• Q7: "Put on credit card" AND Q6 ≤ 2 points (Emergency plan relies on credit with low confidence)</div>
+                            </div>
+                            <div className="font-medium mt-3">Disqualification Impact:</div>
+                            <div className="ml-2 space-y-1">
+                              <div>• Overrides all other scoring</div>
+                              <div>• Results in "Not Eligible" classification</div>
+                              <div>• Redirects to resources instead of plan</div>
+                              <div>• Shows specific disqualification reasons</div>
+                            </div>
+                          </div>
+                        </div>
 
                         <div>
                           <h5 className="font-medium">Readiness Score Breakdown:</h5>
@@ -235,12 +287,21 @@ export default function Results() {
                               })}
                             </div>
 
-                            <div className="font-medium mt-3">Video Bonus System:</div>
+                            <div className="font-medium mt-3">Personalized Video Recommendation System:</div>
                             <div className="ml-2 space-y-1">
+                              <div>• Videos are personalized based on your responses</div>
                               <div>• Each video watched: +1 point</div>
                               <div>• Maximum video bonus: 5 points</div>
-                              <div>• Videos watched: {watchedVideos.size} / {Math.min(defaultVideos.length, 5)}</div>
-                              <div>• Available videos: {defaultVideos.join(', ')}</div>
+                              <div>• Videos watched: {watchedVideos.size} / {Math.min(personalizedVideos.length, 5)}</div>
+                              <div>• Your recommended videos: {personalizedVideos.join(', ')}</div>
+                              <div className="font-medium mt-2">Recommendation Logic:</div>
+                              <div className="ml-2 space-y-1 text-xs">
+                                <div>• Q6 Payment confidence = "Somewhat Confident": Shows 'What is Settlement? How Does It Really Work?' and 'Intro to Plaid'</div>
+                                <div>• Q7 Emergency plan = "Ask for flexibility": Shows 'Why Some Debt Plans Fail' and 'Dealing with Debt Collectors: Know Your Rights'</div>
+                                <div>• Q8 Collection calls = "Nervous but can manage": Shows 'Dealing with Debt Collectors: Know Your Rights'</div>
+                                <div>• Q9 Stress management = "Tend to avoid": Shows 'The Secret Shame of Debt'</div>
+                                <div>• Remaining slots filled with general debt settlement education videos</div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -250,16 +311,16 @@ export default function Results() {
                           <div className="ml-4 space-y-2 text-xs">
                             <div className="font-medium">Score Ranges & Classifications:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• <span className="font-medium">High Readiness:</span> 25-35 points</div>
-                              <div>• <span className="font-medium">Moderate Readiness:</span> 18-24 points</div>
-                              <div>• <span className="font-medium">Low Readiness:</span> 0-17 points</div>
+                              <div>• <span className="font-medium">High Readiness:</span> 37-52 points</div>
+                              <div>• <span className="font-medium">Moderate Readiness:</span> 26-36 points</div>
+                              <div>• <span className="font-medium">Low Readiness:</span> 0-25 points</div>
                             </div>
 
                             <div className="font-medium mt-3">Your Classification:</div>
                             <div className="ml-2 space-y-1">
                               <div>• Your Score: {totalScore} points</div>
                               <div>• Classification: <span className="font-medium">
-                                {totalScore >= 25 ? 'High Readiness' : totalScore >= 18 ? 'Moderate Readiness' : 'Low Readiness'}
+                                {totalScore >= 37 ? 'High Readiness' : totalScore >= 26 ? 'Moderate Readiness' : 'Low Readiness'}
                               </span></div>
                             </div>
                           </div>
@@ -270,78 +331,78 @@ export default function Results() {
                           <div className="ml-4 space-y-2 text-xs">
                             <div className="font-medium">Step 1 - Primary Financial Challenge:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Job loss (laid-off, temporary loss, pay cut): 3 points</div>
-                              <div>• Medical/disability (illness, injury, disability): 3 points</div>
-                              <div>• Life changes (divorce, loss of provider): 2 points</div>
+                              <div>• Job loss (laid-off, temporary loss, pay cut): 5 points</div>
+                              <div>• Medical/disability (illness, injury, disability): 4 points</div>
+                              <div>• Life changes (divorce, loss of provider): 4 points</div>
                               <div>• Business slowdown: 2 points</div>
-                              <div>• Other: 2 points</div>
+                              <div>• Other: 3 points</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 2 - Motivation for Debt Freedom:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Peace of mind/reduce stress: 3 points</div>
-                              <div>• Save for major goal: 3 points</div>
-                              <div>• Better life for family: 3 points</div>
-                              <div>• Stop collection calls: 2 points</div>
+                              <div>• Peace of mind/reduce stress: 5 points</div>
+                              <div>• Save for major goal: 4 points</div>
+                              <div>• Better life for family: 4 points</div>
+                              <div>• Stop collection calls: 3 points</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 3 - Options Already Explored:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Multiple approaches (tried several options): 3 points</div>
-                              <div>• Tried borrowing or loans: 2 points</div>
-                              <div>• Basic budgeting only: 1 point</div>
+                              <div>• Multiple approaches (tried several options): 5 points</div>
+                              <div>• Tried borrowing or loans: 4 points</div>
+                              <div>• Basic budgeting only: 3 points</div>
                               <div>• Haven't explored other options yet: 1 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 4 - Credit Score Importance (next 1-2 years):</div>
                             <div className="ml-2 space-y-1">
                               <div>• Very important, cannot afford drop: 1 point</div>
-                              <div>• Somewhat important, debt is priority: 2 points</div>
-                              <div>• Not important, understand it may get worse: 3 points</div>
+                              <div>• Somewhat important, debt is priority: 3 points</div>
+                              <div>• Not important, understand it may get worse: 5 points</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 5 - Spouse/Partner Involvement:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Making decision together, full agreement: 3 points</div>
-                              <div>• Aware and support: 3 points</div>
-                              <div>• Not applicable: 2 points</div>
-                              <div>• Not aware or disagree: 1 point</div>
+                              <div>• Making decision together, full agreement: 5 points</div>
+                              <div>• Aware and support: 4 points</div>
+                              <div>• Not applicable: 3 points</div>
+                              <div>• Not aware or disagree: 2 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 6 - Payment Confidence:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Very Confident: 3 points</div>
-                              <div>• Somewhat Confident: 2 points</div>
+                              <div>• Very Confident: 5 points</div>
+                              <div>• Somewhat Confident: 3 points</div>
                               <div>• Not Confident: 1 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 7 - $500 Emergency Expense Handling:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Cut personal budget: 3 points</div>
-                              <div>• Use emergency fund: 3 points</div>
+                              <div>• Cut personal budget: 4 points</div>
+                              <div>• Use emergency fund: 5 points</div>
                               <div>• Ask for payment flexibility: 2 points</div>
                               <div>• Put on credit card: 1 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 8 - Collection Calls Preparedness:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Prepared, understand it's part of process: 3 points</div>
-                              <div>• Nervous but can manage with plan: 2 points</div>
+                              <div>• Prepared, understand it's part of process: 5 points</div>
+                              <div>• Nervous but can manage with plan: 3 points</div>
                               <div>• Not prepared for increase: 1 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Step 9 - Financial Stress Management Approach:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Proactively research solutions and stick to plan: 3 points</div>
-                              <div>• Try to address but sometimes overwhelmed: 2 points</div>
+                              <div>• Proactively research solutions and stick to plan: 5 points</div>
+                              <div>• Try to address but sometimes overwhelmed: 3 points</div>
                               <div>• Tend to avoid until escalate: 1 point</div>
                             </div>
 
                             <div className="font-medium mt-3">Maximum Possible Score:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Base Assessment (Steps 1-9): 27 points max</div>
+                              <div>• Base Assessment (Steps 1-9): 47 points max</div>
                               <div>• Video Bonus: 5 points max</div>
-                              <div>• <strong>Total Possible: 32 points</strong></div>
+                              <div>• <strong>Total Possible: 52 points</strong></div>
                             </div>
                           </div>
                         </div>
@@ -351,16 +412,16 @@ export default function Results() {
                           <div className="ml-4 space-y-2 text-xs">
                             <div className="font-medium">Your Strengths Section:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Shows when step score ≥ 3 points</div>
-                              <div>• Step 1 (≥3): "Clear understanding of financial hardship"</div>
-                              <div>• Step 2 (≥3): "Strong personal motivation for debt freedom"</div>
-                              <div>• Step 3 (≥3): "Thoroughly explored alternative solutions"</div>
+                              <div>• Shows when step score ≥ 4 points (Step 3 ≥ 4, Step 4 ≥ 3)</div>
+                              <div>• Step 1 (≥4): "Clear understanding of financial hardship"</div>
+                              <div>• Step 2 (≥4): "Strong personal motivation for debt freedom"</div>
+                              <div>• Step 3 (≥4): "Thoroughly explored alternative solutions"</div>
                               <div>• Step 4 (≥3): "Realistic expectations about credit impact"</div>
-                              <div>• Step 5 (≥3): "Full household support for decision"</div>
-                              <div>• Step 6 (≥3): "High confidence in payment ability"</div>
-                              <div>• Step 7 (≥3): "Good emergency expense management"</div>
-                              <div>• Step 8 (≥3): "Prepared for collection call challenges"</div>
-                              <div>• Step 9 (≥3): "Proactive stress management approach"</div>
+                              <div>• Step 5 (≥4): "Full household support for decision"</div>
+                              <div>• Step 6 (≥4): "High confidence in payment ability"</div>
+                              <div>• Step 7 (≥4): "Good emergency expense management"</div>
+                              <div>• Step 8 (≥4): "Prepared for collection call challenges"</div>
+                              <div>• Step 9 (≥4): "Proactive stress management approach"</div>
                             </div>
 
                             <div className="font-medium mt-3">Areas of Concern Section:</div>
@@ -400,7 +461,7 @@ export default function Results() {
                                 const stepData = formData[stepKey];
                                 if (!stepData || stepData.points === undefined) return null;
                                 const stepNumber = stepKey.replace('step', '');
-                                const isStrength = stepData.points >= 3;
+                                const isStrength = stepData.points >= 4 || (stepKey === 'step3' && stepData.points >= 3) || (stepKey === 'step4' && stepData.points >= 3);
                                 const isConcern = stepData.points <= 1;
                                 const isModerateConcern = stepData.points === 2;
 
@@ -417,59 +478,118 @@ export default function Results() {
                         <div>
                           <h5 className="font-medium">Readiness What's Next Section Logic:</h5>
                           <div className="ml-4 space-y-2 text-xs">
-                            <div className="font-medium">Letter Grade Calculation:</div>
+                            <div className="font-medium">Combined Score Letter Grade Calculation:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Formula: (readiness score ÷ 35) × 100</div>
-                              <div>• Max possible readiness score: 35 points</div>
-                              <div>• Grade A: 90-100% (32-35 points)</div>
-                              <div>• Grade B: 80-89% (28-31 points)</div>
-                              <div>• Grade C: 70-79% (25-27 points)</div>
-                              <div>• Grade D: 60-69% (21-24 points)</div>
-                              <div>• Grade F: 0-59% (0-20 points)</div>
-                              <div>• Your Grade: {(() => {
-                                const percentage = Math.round((totalScore / 35) * 100);
-                                if (percentage >= 90) return 'A';
-                                if (percentage >= 80) return 'B';
-                                if (percentage >= 70) return 'C';
-                                if (percentage >= 60) return 'D';
-                                return 'F';
-                              })()} ({Math.round((totalScore / 35) * 100)}%)</div>
+                              <div>• Formula: ((readiness score + Smart Estimator score) ÷ 87) × 100</div>
+                              <div>• Max possible combined score: 87 points (52 readiness + 35 Smart Estimator)</div>
+                              <div>• Grade A: 90-100% (79-87 points)</div>
+                              <div>• Grade B: 80-89% (70-78 points)</div>
+                              <div>• Grade C: 70-79% (61-69 points)</div>
+                              <div>• Grade D: 60-69% (52-60 points)</div>
+                              <div>• Grade F: 0-59% (0-51 points)</div>
+                              {hasSmartEstimatorData ? (
+                                <div>• Your Combined Grade: {(() => {
+                                  const combinedScore = totalScore + smartEstimatorScore;
+                                  const percentage = Math.round((combinedScore / 70) * 100);
+                                  if (percentage >= 90) return 'A';
+                                  if (percentage >= 80) return 'B';
+                                  if (percentage >= 70) return 'C';
+                                  if (percentage >= 60) return 'D';
+                                  return 'F';
+                                })()} ({Math.round(((totalScore + smartEstimatorScore) / 70) * 100)}%)</div>
+                              ) : (
+                                <div>• Your Readiness-Only Grade: {(() => {
+                                  const percentage = Math.round((totalScore / 35) * 100);
+                                  if (percentage >= 90) return 'A';
+                                  if (percentage >= 80) return 'B';
+                                  if (percentage >= 70) return 'C';
+                                  if (percentage >= 60) return 'D';
+                                  return 'F';
+                                })()} ({Math.round((totalScore / 35) * 100)}%) - Readiness only</div>
+                              )}
                             </div>
 
-                            <div className="font-medium mt-3">Score Range Categories:</div>
+                            <div className="font-medium mt-3">Score Categories (Readiness-only fallback):</div>
                             <div className="ml-2 space-y-1">
-                              <div>• High Readiness: 25-35 points</div>
-                              <div>• Moderate Readiness: 18-24 points</div>
-                              <div>• Low Readiness: 0-17 points</div>
+                              <div>• High Readiness: 35-50 points</div>
+                              <div>• Moderate Readiness: 25-34 points</div>
+                              <div>• Low Readiness: 0-24 points</div>
                             </div>
 
-                            <div className="font-medium mt-3">Message Logic by Score Range:</div>
+                            <div className="font-medium mt-3">Message Logic:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• High (25-35): "Let's verify debt settlement is right for you by verifying your financial situation."</div>
-                              <div>• Moderate (18-24): "Improve your score by viewing the videos below. Once you have completed this task, you will be able to verify you financial situation."</div>
-                              <div>• Low (0-17): "Debt settlement is likely not a good fit for you but we have resources available for you to improve your situation."</div>
+                              {hasSmartEstimatorData ? (
+                                <>
+                                  <div>• Combined score used when Smart Estimator data available</div>
+                                  <div>• High combined (72-87): "Let's verify debt settlement is right for you by verifying your financial situation."</div>
+                                  <div>• Moderate combined (57-71): "Improve your score by viewing the videos below. Once you have completed this task, you will be able to verify you financial situation."</div>
+                                  <div>• Low combined (0-56): "Debt settlement is likely not a good fit for you but we have resources available for you to improve your situation."</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div>• Readiness-only score used when no Smart Estimator data</div>
+                                  <div>• High readiness (37-52): "Let's verify debt settlement is right for you by verifying your financial situation."</div>
+                                  <div>• Moderate readiness (26-36): "Improve your score by viewing the videos below. Once you have completed this task, you will be able to verify you financial situation."</div>
+                                  <div>• Low readiness (0-25): "Debt settlement is likely not a good fit for you but we have resources available for you to improve your situation."</div>
+                                </>
+                              )}
                             </div>
 
-                            <div className="font-medium mt-3">Button Logic by Score Range:</div>
+                            <div className="font-medium mt-3">Button Logic:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• High (25-35): "See your plan" → /your-plan</div>
-                              <div>• Moderate (18-24): "See your plan" → /your-plan</div>
-                              <div>• Low (0-17): "Resources" → /resources</div>
+                              {hasSmartEstimatorData ? (
+                                <>
+                                  <div>• Combined High/Moderate (57-87): "See your plan" → /your-plan</div>
+                                  <div>• Combined Low (0-56): "Resources" → /resources</div>
+                                  <div>• Disqualified: "View Resources" → /resources</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div>• Readiness High/Moderate (26-52): "See your plan" → /your-plan</div>
+                                  <div>• Readiness Low (0-25): "Resources" → /resources</div>
+                                </>
+                              )}
                             </div>
 
-                            <div className="font-medium mt-3">Your Current Readiness Status:</div>
+                            <div className="font-medium mt-3">Your Current Status:</div>
                             <div className="ml-2 space-y-1">
-                              <div>• Readiness Score: {totalScore}/35 points</div>
-                              <div>• Category: {totalScore >= 25 ? 'High Readiness' : totalScore >= 18 ? 'Moderate Readiness' : 'Low Readiness'}</div>
-                              <div>• Letter Grade: {(() => {
-                                const percentage = Math.round((totalScore / 35) * 100);
-                                if (percentage >= 90) return 'A';
-                                if (percentage >= 80) return 'B';
-                                if (percentage >= 70) return 'C';
-                                if (percentage >= 60) return 'D';
-                                return 'F';
-                              })()}</div>
-                              <div>• Next Step: {totalScore >= 18 ? 'See your plan' : 'Resources'}</div>
+                              <div>• Readiness Score: {totalScore}/52 points</div>
+                              {hasSmartEstimatorData && (
+                                <>
+                                  <div>• Smart Estimator Score: {smartEstimatorScore}/35 points</div>
+                                  <div>• Combined Score: {totalScore + smartEstimatorScore}/87 points</div>
+                                  <div>• Combined Category: {(() => {
+                                    const combined = totalScore + smartEstimatorScore;
+                                    if (combined >= 63) return 'High';
+                                    if (combined >= 49) return 'Moderate';
+                                    return 'Low';
+                                  })()}</div>
+                                  <div>• Letter Grade: {(() => {
+                                    const combinedScore = totalScore + smartEstimatorScore;
+                                    const percentage = Math.round((combinedScore / 87) * 100);
+                                    if (percentage >= 90) return 'A';
+                                    if (percentage >= 80) return 'B';
+                                    if (percentage >= 70) return 'C';
+                                    if (percentage >= 60) return 'D';
+                                    return 'F';
+                                  })()}</div>
+                                  <div>• Next Step: {(totalScore + smartEstimatorScore) >= 57 ? 'See your plan' : 'Resources'}</div>
+                                </>
+                              )}
+                              {!hasSmartEstimatorData && (
+                                <>
+                                  <div>• Category: {totalScore >= 35 ? 'High Readiness' : totalScore >= 25 ? 'Moderate Readiness' : 'Low Readiness'}</div>
+                                  <div>• Letter Grade: {(() => {
+                                    const percentage = Math.round((totalScore / 52) * 100);
+                                    if (percentage >= 90) return 'A';
+                                    if (percentage >= 80) return 'B';
+                                    if (percentage >= 70) return 'C';
+                                    if (percentage >= 60) return 'D';
+                                    return 'F';
+                                  })()}</div>
+                                  <div>• Next Step: {totalScore >= 25 ? 'See your plan' : 'Resources'}</div>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

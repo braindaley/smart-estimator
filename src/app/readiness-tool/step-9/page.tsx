@@ -7,8 +7,8 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Proactively research solutions and stick to plan", value: "proactive", points: 3 },
-  { label: "Try to address but sometimes overwhelmed", value: "try_overwhelmed", points: 2 },
+  { label: "Proactively research solutions and stick to plan", value: "proactive", points: 5 },
+  { label: "Try to address but sometimes overwhelmed", value: "try_overwhelmed", points: 3 },
   { label: "Tend to avoid until escalate", value: "avoid", points: 1 },
 ];
 

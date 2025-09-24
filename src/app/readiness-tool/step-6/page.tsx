@@ -7,8 +7,8 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Very Confident", value: "very_confident", points: 3 },
-  { label: "Somewhat Confident", value: "somewhat_confident", points: 2 },
+  { label: "Very Confident", value: "very_confident", points: 5 },
+  { label: "Somewhat Confident", value: "somewhat_confident", points: 3 },
   { label: "Not Confident", value: "not_confident", points: 1 },
 ];
 

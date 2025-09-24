@@ -7,8 +7,8 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Prepared, understand it's part of process", value: "prepared", points: 3 },
-  { label: "Nervous but can manage with plan", value: "nervous_manage", points: 2 },
+  { label: "Prepared, understand it's part of process", value: "prepared", points: 5 },
+  { label: "Nervous but can manage with plan", value: "nervous_manage", points: 3 },
   { label: "Not prepared for increase", value: "not_prepared", points: 1 },
 ];
 

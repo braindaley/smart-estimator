@@ -361,6 +361,18 @@ export default function EquifaxCodesPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Reset to default configuration
+  const handleResetToDefaults = () => {
+    if (confirm('Are you sure you want to reset to default configuration? This will overwrite any custom changes.')) {
+      // Clear localStorage
+      localStorage.removeItem('equifax-narrative-codes');
+      localStorage.removeItem('debt-portfolio-filters');
+
+      // Reload the page to reinitialize with defaults
+      window.location.reload();
+    }
+  };
+
   // Filter codes based on search
   const filteredCodes = narrativeCodes.filter(code =>
     code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -558,6 +570,13 @@ export default function EquifaxCodesPage() {
                   variant="outline"
                 >
                   Export JSON
+                </Button>
+                <Button
+                  onClick={handleResetToDefaults}
+                  variant="outline"
+                  className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                >
+                  Reset to Defaults
                 </Button>
               </div>
             </div>

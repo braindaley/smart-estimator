@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/header';
 import LoanQualificationEnhanced from '@/components/LoanQualificationEnhanced';
+import PersonaSelector from '@/components/PersonaSelector';
 
 export default function LoanQualificationPage() {
   const [userId, setUserId] = useState(null);
+  const [currentPersona, setCurrentPersona] = useState(null);
 
   useEffect(() => {
     // Generate or retrieve user ID
@@ -26,6 +28,12 @@ export default function LoanQualificationPage() {
     // - Saving to a database
     // - Redirecting to an application page
     // - Showing additional options
+  };
+
+  const handlePersonaChange = (persona) => {
+    setCurrentPersona(persona);
+    // Force a page refresh to reload data with new persona
+    window.location.reload();
   };
 
   if (!userId) {
@@ -59,7 +67,17 @@ export default function LoanQualificationPage() {
 
         {/* Main Content */}
         <div className="container mx-auto max-w-7xl px-4 py-12">
-          <LoanQualificationEnhanced 
+          {/* Persona Selector for Testing */}
+          {userId && (
+            <div className="mb-8">
+              <PersonaSelector
+                userId={userId}
+                onPersonaChange={handlePersonaChange}
+              />
+            </div>
+          )}
+
+          <LoanQualificationEnhanced
             userId={userId}
             onComplete={handleQualificationComplete}
           />

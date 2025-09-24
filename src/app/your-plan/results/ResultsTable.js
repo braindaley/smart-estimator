@@ -1,0 +1,114 @@
+// Separate component to avoid re-rendering issues
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+export default function ResultsTable({ momentumResults, currentPathResults }) {
+  if (!momentumResults || !currentPathResults) {
+    return null;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-1/2 pb-4 text-center align-top bg-blue-50">
+            <div className="flex flex-col items-center">
+              <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
+                Recommended
+              </div>
+              <p className="text-base font-semibold text-blue-600">Momentum Plan</p>
+              <p className="text-xs text-muted-foreground">Pay off debt faster with structured settlement.</p>
+            </div>
+          </TableHead>
+          <TableHead className="w-1/2 pb-4 text-center align-top">
+            <div className="flex flex-col items-center">
+              <div className="bg-white border border-red-600 text-red-600 text-xs px-2 py-1 rounded-full font-medium mt-4 mb-1">
+                Do nothing
+              </div>
+              <p className="text-base font-semibold">Current Path</p>
+              <p className="text-xs text-muted-foreground">Keep making minimum payments.</p>
+            </div>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {/* Payment Details Row */}
+        <TableRow>
+          <TableCell className="text-center align-top bg-blue-50">
+            <div className="text-sm font-bold mb-2">Payment Details</div>
+            {momentumResults.belowMinimum ? (
+              <div className="text-sm space-y-2">
+                <div className="text-red-600 font-medium">Below Minimum Requirement</div>
+                <div className="text-xs">
+                  Minimum debt required: {formatCurrency(momentumResults.minimumRequired)}
+                  <br />
+                  Your eligible debt: {formatCurrency(momentumResults.totalDebt)}
+                </div>
+                <div className="text-xs text-gray-600 mt-2">
+                  The Momentum Plan requires a minimum of $15,000 in eligible debt.
+                  You may need to include more accounts or consider alternative options.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm space-y-1">
+                  <div className="text-lg font-bold">{formatCurrency(momentumResults.monthlyPayment)}/mo</div>
+                  <div>{momentumResults.term} months</div>
+                  <div>Total cost: {formatCurrency(momentumResults.totalCost)}</div>
+                </div>
+
+                <div className="mt-4 text-xs text-left">
+                  <div className="text-sm font-bold mb-2">Legal Assistance Program</div>
+                  <div className="text-xs">
+                    Based on your creditors, we require that you sign up for legal assistance program.
+                    The cost will not exceed $50/mo and will cover all of your potential legal fees.
+                  </div>
+                </div>
+              </>
+            )}
+          </TableCell>
+          <TableCell className="text-center align-top">
+            <div className="text-sm font-bold mb-2">Payment Details</div>
+            <div className="text-sm space-y-1">
+              <div className="text-lg font-bold">{formatCurrency(currentPathResults.monthlyPayment)}/mo</div>
+              <div>{currentPathResults.term} months</div>
+              <div>Total cost {formatCurrency(currentPathResults.totalCost)}</div>
+              <div className="text-xs">Payment decreases over time</div>
+            </div>
+          </TableCell>
+        </TableRow>
+
+        {/* Summary Row */}
+        <TableRow>
+          <TableCell className="text-left align-top bg-blue-50 px-4">
+            <div className="text-sm font-bold mb-2">Summary</div>
+            <ul className="text-xs space-y-1 list-disc list-inside">
+              <li><span className="font-semibold">Accounts to settle:</span> {momentumResults.accountCount}</li>
+              <li><span className="font-semibold">Total debt amount:</span> {formatCurrency(momentumResults.totalDebt)}</li>
+              <li><span className="font-semibold">Settlement amount (60%):</span> {formatCurrency(momentumResults.totalDebt * 0.60)}</li>
+              <li><span className="font-semibold">Approval:</span> {momentumResults.belowMinimum ? 'Does not meet minimum' : 'Yes, no credit required'}</li>
+              <li><span className="font-semibold">Pros:</span> Immediate relief, faster recovery</li>
+              <li><span className="font-semibold">Cons:</span> Temporary harm to credit</li>
+            </ul>
+          </TableCell>
+          <TableCell className="text-left align-top px-4">
+            <div className="text-sm font-bold mb-2">Summary</div>
+            <ul className="text-xs space-y-1 list-disc list-inside">
+              <li><span className="font-semibold">Pros:</span> No monthly payment</li>
+              <li><span className="font-semibold">Cons:</span> Growing debt, no solution</li>
+            </ul>
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  );
+}

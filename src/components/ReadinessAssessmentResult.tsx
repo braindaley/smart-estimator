@@ -3,10 +3,12 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { checkDisqualification, getDisqualificationMessage, type ReadinessFormData } from '@/lib/readiness-disqualification';
 
 interface ReadinessAssessmentResultProps {
   totalScore: number;
   questionScores: { [key: string]: number };
+  formData?: ReadinessFormData;
 }
 
 type ReadinessLevel = {
@@ -20,7 +22,7 @@ type ReadinessLevel = {
 
 const readinessLevels: ReadinessLevel[] = [
   {
-    range: [25, 35],
+    range: [37, 52],
     title: "High Readiness",
     message: "You demonstrate strong readiness for debt settlement. Your responses show good financial discipline, realistic expectations, and preparation for the challenges ahead.",
     strengths: "Strong payment confidence, good stress management, prepared for process challenges",
@@ -28,7 +30,7 @@ const readinessLevels: ReadinessLevel[] = [
     likelihood: "High - You have the key factors for successful completion"
   },
   {
-    range: [18, 24],
+    range: [26, 36],
     title: "Moderate Readiness",
     message: "You show moderate readiness for debt settlement with some areas to address. Additional preparation will improve your chances of success.",
     strengths: "Good motivation and understanding of the process, some financial preparation",
@@ -36,7 +38,7 @@ const readinessLevels: ReadinessLevel[] = [
     likelihood: "Moderate - Success possible with additional preparation"
   },
   {
-    range: [0, 17],
+    range: [0, 25],
     title: "Low Readiness",
     message: "Your readiness for debt settlement is limited. Several important factors need attention before proceeding.",
     strengths: "Recognition of debt problem, some motivation to address it",
@@ -44,6 +46,15 @@ const readinessLevels: ReadinessLevel[] = [
     likelihood: "Low - Significant preparation needed before proceeding"
   }
 ];
+
+const disqualifiedLevel: ReadinessLevel = {
+  range: [0, 0],
+  title: "Not Eligible",
+  message: "Based on your current situation, debt settlement is not recommended at this time.",
+  strengths: "Recognition of debt challenges and willingness to seek solutions",
+  recommendations: "Address the specific concerns identified, then reassess your readiness for debt settlement",
+  likelihood: "Not Recommended - Critical factors need resolution first"
+};
 
 const strengthIndicators: { [key: string]: string } = {
   'step1': "Clear understanding of financial hardship",
@@ -86,12 +97,18 @@ const moderateConcernRecommendations: { [key: string]: string } = {
 
 export default function ReadinessAssessmentResult({
   totalScore,
-  questionScores
+  questionScores,
+  formData
 }: ReadinessAssessmentResultProps) {
-  // Find the appropriate readiness level
-  const readinessLevel = readinessLevels.find(level => 
-    totalScore >= level.range[0] && totalScore <= level.range[1]
-  ) || readinessLevels[2]; // Default to "Low Readiness"
+  // Check for disqualification first
+  const disqualificationCheck = formData ? checkDisqualification(formData) : { isDisqualified: false, disqualificationReasons: [] };
+
+  // Find the appropriate readiness level - force to disqualified if necessary
+  const readinessLevel = disqualificationCheck.isDisqualified
+    ? disqualifiedLevel
+    : (readinessLevels.find(level =>
+        totalScore >= level.range[0] && totalScore <= level.range[1]
+      ) || readinessLevels[2]); // Default to "Low Readiness"
 
   // Generate dynamic strengths and concerns
   const dynamicStrengths: string[] = [];
@@ -100,7 +117,7 @@ export default function ReadinessAssessmentResult({
   const moderateRecommendations: string[] = [];
 
   Object.entries(questionScores).forEach(([step, score]) => {
-    if (score >= 3 && strengthIndicators[step]) {
+    if ((score >= 4 || (step === 'step3' && score >= 4) || (step === 'step4' && score >= 3)) && strengthIndicators[step]) {
       dynamicStrengths.push(strengthIndicators[step]);
     }
     if (score <= 1 && concernIndicators[step]) {
@@ -121,7 +138,10 @@ export default function ReadinessAssessmentResult({
           {readinessLevel.title}
         </CardTitle>
         <CardDescription className="text-base mt-4">
-          {readinessLevel.message}
+          {disqualificationCheck.isDisqualified
+            ? getDisqualificationMessage(disqualificationCheck.disqualificationReasons)
+            : readinessLevel.message
+          }
         </CardDescription>
       </CardHeader>
 
@@ -155,12 +175,21 @@ export default function ReadinessAssessmentResult({
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  {dynamicConcerns.length > 0 
-                    ? "These areas may need attention to improve your debt settlement readiness"
-                    : "No specific concerns identified based on your responses"
+                  {disqualificationCheck.isDisqualified
+                    ? "Critical factors that prevent debt settlement eligibility:"
+                    : dynamicConcerns.length > 0
+                      ? "These areas may need attention to improve your debt settlement readiness"
+                      : "No specific concerns identified based on your responses"
                   }
                 </p>
-                {dynamicConcerns.length > 0 && (
+                {disqualificationCheck.isDisqualified && (
+                  <ul className="list-disc list-inside text-sm space-y-1 ml-4 text-red-600 font-medium">
+                    {disqualificationCheck.disqualificationReasons.map((reason, index) => (
+                      <li key={index}>{reason}</li>
+                    ))}
+                  </ul>
+                )}
+                {!disqualificationCheck.isDisqualified && dynamicConcerns.length > 0 && (
                   <ul className="list-disc list-inside text-sm space-y-1 ml-4">
                     {dynamicConcerns.map((concern, index) => (
                       <li key={index}>{concern}</li>

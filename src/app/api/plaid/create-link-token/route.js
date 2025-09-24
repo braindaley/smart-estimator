@@ -73,7 +73,7 @@ export async function POST(request) {
         client_user_id: userId,
       },
       client_name: 'Smart Estimator',
-      products: ['assets', 'identity', 'liabilities'], // Core products for debt settlement - NO income products
+      products: ['assets', 'identity', 'liabilities', 'transactions'], // Core products for debt settlement + transactions
       country_codes: ['US'], // Use string literal instead of CountryCode.Us
       language: 'en',
     };

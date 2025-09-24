@@ -3,25 +3,36 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PersonaSelector to avoid SSR issues
+const PersonaSelector = dynamic(() => import('@/components/PersonaSelector'), {
+  ssr: false,
+  loading: () => <div>Loading personas...</div>
+});
 
 export default function CreditResultsPage() {
   const router = useRouter();
   const [creditData, setCreditData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showClosedAccounts, setShowClosedAccounts] = useState(true);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     // Get user ID from localStorage
-    const userId = localStorage.getItem('loan_user_id');
-    console.log('Credit Results - User ID:', userId);
-    
-    if (!userId) {
+    const currentUserId = localStorage.getItem('loan_user_id');
+    console.log('Credit Results - User ID:', currentUserId);
+
+    if (!currentUserId) {
       console.log('No user ID found, redirecting to your-plan');
       router.push('/your-plan');
       return;
     }
 
+    setUserId(currentUserId);
+
     // Get credit data from local storage
-    const storedCreditData = localStorage.getItem(`credit_data_${userId}`);
+    const storedCreditData = localStorage.getItem(`credit_data_${currentUserId}`);
     console.log('Credit Results - Stored data exists:', !!storedCreditData);
     console.log('Credit Results - Raw stored data:', storedCreditData);
     
@@ -43,6 +54,22 @@ export default function CreditResultsPage() {
       setIsLoading(false);
     }
   }, [router]);
+
+  const handleClearCreditData = () => {
+    if (confirm('Are you sure you want to clear your credit report data? This cannot be undone.')) {
+      // Clear credit data from localStorage
+      const userId = localStorage.getItem('loan_user_id');
+      if (userId) {
+        localStorage.removeItem(`credit_data_${userId}`);
+      }
+      window.location.href = '/your-plan';
+    }
+  };
+
+  const handlePersonaChange = (persona) => {
+    // Reload the page to show new persona data
+    window.location.reload();
+  };
 
   if (isLoading) {
     return (
@@ -91,6 +118,20 @@ export default function CreditResultsPage() {
     return { rating: 'Poor', color: '', bgColor: '', borderColor: 'border-gray-200' };
   };
 
+  // Filter function to determine if account is closed
+  const isAccountClosed = (account) => {
+    const statusDesc = account.rate?.description ? account.rate.description.toString().toLowerCase() : '';
+    const statusCode = account.rate?.code ? account.rate.code.toString().toLowerCase() : '';
+    return statusDesc.includes('closed') || statusCode.includes('closed') ||
+           statusDesc.includes('inactive') || statusCode.includes('inactive');
+  };
+
+  // Filter accounts based on closed status
+  const filteredTrades = creditData?.trades ? creditData.trades.filter(account => {
+    if (showClosedAccounts) return true;
+    return !isAccountClosed(account);
+  }) : [];
+
   // Handle different creditScore structures
   let scoreValue = null;
   if (creditData.creditScore) {
@@ -111,24 +152,44 @@ export default function CreditResultsPage() {
         {/* Hero Section */}
         <div className="">
           <div className="container mx-auto max-w-7xl px-4 py-8">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-4">
-                Your Credit Report Results
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                Here's a comprehensive overview of your credit profile and qualifying debts
-              </p>
-              {creditData.isMockData && (
-                <div className="mt-4 inline-block px-4 py-2 border rounded-lg">
-                  <span className="font-semibold">⚠️ Mock Data</span>
-                  <span className="text-sm ml-2">
-                    {creditData.mockReason || 'API temporarily unavailable'}
-                  </span>
-                </div>
-              )}
+            <div className="flex justify-between items-start">
+              <div className="text-center flex-1">
+                <h1 className="text-3xl font-bold mb-4">
+                  Your Credit Report Results
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                  Here's a comprehensive overview of your credit profile and qualifying debts
+                </p>
+                {creditData.isMockData && (
+                  <div className="mt-4 inline-block px-4 py-2 border rounded-lg">
+                    <span className="font-semibold">⚠️ Mock Data</span>
+                    <span className="text-sm ml-2">
+                      {creditData.mockReason || 'API temporarily unavailable'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="ml-4">
+                <button
+                  onClick={handleClearCreditData}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                >
+                  Clear Credit Data
+                </button>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Persona Selector for Testing */}
+        {userId && (
+          <div className="container mx-auto max-w-7xl px-4 pb-8">
+            <PersonaSelector
+              userId={userId}
+              onPersonaChange={handlePersonaChange}
+            />
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -449,9 +510,24 @@ export default function CreditResultsPage() {
           {/* Credit Accounts */}
           {creditData.trades && creditData.trades.length > 0 && (
             <div className="mt-6 rounded-xl p-6 border border-border bg-white">
-              <h2 className="text-lg font-semibold mb-4">Credit Accounts ({creditData.trades.length})</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">
+                  Credit Accounts ({filteredTrades.length}{!showClosedAccounts ? ` of ${creditData.trades.length}` : ''})
+                </h2>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={showClosedAccounts}
+                      onChange={(e) => setShowClosedAccounts(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Show closed accounts
+                  </label>
+                </div>
+              </div>
               <div className="space-y-4">
-                {creditData.trades.map((account, index) => (
+                {filteredTrades.map((account, index) => (
                   <div key={index} className="border rounded-lg p-4">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
@@ -1147,24 +1223,6 @@ export default function CreditResultsPage() {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => router.push('/your-plan')}
-              className="px-6 py-3 border font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              Back to Your Plan
-            </button>
-            <button
-              onClick={() => {
-                // Navigate to the debt settlement program results page
-                router.push('/your-plan/results');
-              }}
-              className="px-6 py-3 border font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              View Debt Settlement Program
-            </button>
-          </div>
 
           {/* Disclaimer */}
           <div className="mt-8 rounded-lg border p-4">

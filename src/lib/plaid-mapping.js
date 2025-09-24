@@ -24,6 +24,7 @@ export const EXPENSE_MAPPINGS = {
   'RENT_AND_UTILITIES_RENT': 'housingPayment',
   'LOAN_PAYMENTS_MORTGAGE_PAYMENT': 'housingPayment',
   'LOAN_PAYMENTS_CAR_PAYMENT': 'autoPayments',
+  'LOAN_PAYMENTS_PERSONAL_LOAN_PAYMENT': 'debtOther',
   'GENERAL_SERVICES_INSURANCE': 'homeOwnersInsurance', // Will need context-based detection
   
   // Travel (for the United Airlines example we saw)
@@ -63,6 +64,8 @@ export const EXPENSE_MAPPINGS = {
   // Personal Care
   'GENERAL_MERCHANDISE_CLOTHING_AND_ACCESSORIES': 'clothing',
   'GENERAL_MERCHANDISE_DEPARTMENT_STORES': 'householdItems',
+  'GENERAL_MERCHANDISE_ELECTRONICS': 'householdItems',
+  'GENERAL_MERCHANDISE_ONLINE_MARKETPLACES': 'householdItems',
   'GENERAL_MERCHANDISE_OTHER_GENERAL_MERCHANDISE': 'householdItems',
   'GENERAL_MERCHANDISE_SPORTING_GOODS': 'entertainment',
   'ENTERTAINMENT_MUSIC_AND_AUDIO': 'entertainment',

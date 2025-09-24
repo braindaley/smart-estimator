@@ -7,9 +7,9 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Multiple approaches (tried several options)", value: "multiple_approaches", points: 3 },
-  { label: "Tried borrowing or loans", value: "borrowing_loans", points: 2 },
-  { label: "Basic budgeting only", value: "basic_budgeting", points: 1 },
+  { label: "Multiple approaches (tried several options)", value: "multiple_approaches", points: 5 },
+  { label: "Tried borrowing or loans", value: "borrowing_loans", points: 4 },
+  { label: "Basic budgeting only", value: "basic_budgeting", points: 3 },
   { label: "Haven't explored other options yet", value: "not_explored", points: 1 },
 ];
 

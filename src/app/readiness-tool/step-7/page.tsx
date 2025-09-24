@@ -7,10 +7,10 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Put on credit card", value: "credit_card", points: 1 },
-  { label: "Cut personal budget", value: "cut_budget", points: 3 },
-  { label: "Use emergency fund", value: "emergency_fund", points: 3 },
+  { label: "Cut personal budget", value: "cut_budget", points: 4 },
+  { label: "Use emergency fund", value: "emergency_fund", points: 5 },
   { label: "Ask for payment flexibility", value: "payment_flexibility", points: 2 },
+  { label: "Put on credit card", value: "credit_card", points: 1 },
 ];
 
 export default function Step7() {

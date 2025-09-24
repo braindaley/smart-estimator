@@ -7,10 +7,10 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Making decision together, full agreement", value: "together_agree", points: 3 },
-  { label: "Aware and support", value: "aware_support", points: 3 },
-  { label: "Not aware or disagree", value: "not_aware", points: 1 },
-  { label: "Not applicable", value: "not_applicable", points: 2 },
+  { label: "Making decision together, full agreement", value: "together_agree", points: 5 },
+  { label: "Aware and support", value: "aware_support", points: 4 },
+  { label: "Not applicable", value: "not_applicable", points: 3 },
+  { label: "Not aware or disagree", value: "not_aware", points: 2 },
 ];
 
 export default function Step5() {

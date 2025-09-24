@@ -4,10 +4,67 @@ import { useState, useEffect } from 'react';
 import { getTokenClient } from '@/lib/client-token-store';
 import { getPlaidData } from '@/lib/session-store';
 import { INCOME_MAPPINGS, EXPENSE_MAPPINGS, getFieldDisplayName } from '@/lib/plaid-mapping';
+import { getMockCraIncomeForPeriod, calculateAverageMonthlyIncome, getIncomeConfidencePercentage } from '@/lib/mock-cra-income';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 /**
  * PlaidDataDisplay Component - Shows all raw Plaid data after connection
  */
+// Mock income data from Plaid CRA Income API - updated to match new values
+const mockIncomeData = {
+  "income_summary": {
+    "total_monthly_income": calculateAverageMonthlyIncome(), // $17,333.33
+    "total_annual_income": calculateAverageMonthlyIncome() * 12, // $208,000
+    "income_stability": getIncomeConfidencePercentage() / 100, // 0.95 (95% confidence)
+    "employment_status": [
+      {
+        "employer": "TechCorp Solutions Inc.",
+        "monthly_income": calculateAverageMonthlyIncome(),
+        "confidence": getIncomeConfidencePercentage() / 100 // 0.95
+      }
+    ]
+  },
+  "income_streams": [
+    {
+      "name": "TechCorp Bi-Weekly Payroll",
+      "monthly_income": calculateAverageMonthlyIncome(), // $17,333.33
+      "confidence": getIncomeConfidencePercentage() / 100, // 0.95
+      "employer": {
+        "employer_name": "TechCorp Solutions Inc."
+      },
+      "income_breakdown": {
+        "type": "salary",
+        "rate": calculateAverageMonthlyIncome(),
+        "pay_frequency": "biweekly"
+      }
+    }
+  ]
+};
+
+// Raw income JSON data from the provided file (truncated for display)
+const rawIncomeJsonData = {
+  "accounts": [
+    {
+      "account_id": "e5gWrMamKbUnkpZQpPmPfGK8zEKaVXHrwJd3a",
+      "balances": {
+        "available": 100,
+        "current": 110,
+        "iso_currency_code": "USD",
+        "limit": null,
+        "unofficial_currency_code": null
+      },
+      "holder_category": "personal",
+      "mask": "0000",
+      "name": "Plaid Checking",
+      "official_name": "Plaid Gold Standard 0% Interest Checking",
+      "subtype": "checking",
+      "type": "depository"
+    }
+  ],
+  "transactions": "... (contains transaction data with income categorization)",
+  "note": "This is sample data from the Plaid Income API response file provided. The full dataset contains detailed transaction history and categorization."
+};
+
 export default function PlaidDataDisplay({ userId, connectionMetadata, isResultsPage = false }) {
   const [plaidData, setPlaidData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,18 +81,38 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
   }, [userId, connectionMetadata, isResultsPage]);
 
   const loadFromSession = () => {
+    console.log('[PlaidDataDisplay] === LOAD FROM SESSION START ===');
+    console.log('[PlaidDataDisplay] isResultsPage:', isResultsPage);
+    console.log('[PlaidDataDisplay] userId:', userId);
+
     try {
       const sessionData = getPlaidData();
+      console.log('[PlaidDataDisplay] Raw session data from getPlaidData():', sessionData);
+      console.log('[PlaidDataDisplay] Session data type:', typeof sessionData);
+      console.log('[PlaidDataDisplay] Session data keys:', sessionData ? Object.keys(sessionData) : 'null');
+
       if (sessionData && sessionData.data) {
+        console.log('[PlaidDataDisplay] Found sessionData.data, type:', typeof sessionData.data);
+        console.log('[PlaidDataDisplay] sessionData.data keys:', Object.keys(sessionData.data));
+        console.log('[PlaidDataDisplay] Setting plaid data to:', sessionData.data);
         setPlaidData(sessionData.data);
+        console.log('[PlaidDataDisplay] Successfully set plaid data');
       } else {
+        console.log('[PlaidDataDisplay] No session data found or missing .data property');
+        console.log('[PlaidDataDisplay] sessionData exists:', !!sessionData);
+        if (sessionData) {
+          console.log('[PlaidDataDisplay] sessionData.data exists:', !!sessionData.data);
+        }
         setError('No Plaid data found in session');
       }
     } catch (err) {
       console.error('[PlaidDataDisplay] Error loading from session:', err);
+      console.error('[PlaidDataDisplay] Error stack:', err.stack);
       setError('Error loading stored data');
     } finally {
+      console.log('[PlaidDataDisplay] Setting loading to false');
       setLoading(false);
+      console.log('[PlaidDataDisplay] === LOAD FROM SESSION END ===');
     }
   };
 
@@ -79,13 +156,24 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
       if (!accountsResponse.ok) {
         throw new Error('Failed to fetch accounts');
       }
-      if (!transactionsResponse.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
 
       const accountsData = await accountsResponse.json();
-      const transactionsData = await transactionsResponse.json();
-      
+
+      // Handle transactions failure gracefully (common in sandbox environment)
+      let transactionsData = null;
+      if (!transactionsResponse.ok) {
+        console.warn('[PlaidDataDisplay] Failed to fetch transactions, continuing without them');
+        const errorText = await transactionsResponse.text();
+        console.warn('[PlaidDataDisplay] Transaction error:', errorText);
+        transactionsData = {
+          transactions: [],
+          total_transactions: 0,
+          error: 'Transactions not available yet. This is common in sandbox mode - please try again in a few moments.'
+        };
+      } else {
+        transactionsData = await transactionsResponse.json();
+      }
+
       // Handle optional data that may not be available for all accounts
       let identityData = null;
       let liabilitiesData = null;
@@ -326,7 +414,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
   const calculateSummaryMetrics = () => {
     const accounts = plaidData.accounts?.accounts || [];
     const transactions = plaidData.transactions?.transactions || [];
-    const income = plaidData.income?.income_summary || {};
+    const income = plaidData.income?.income_summary || mockIncomeData.income_summary;
     const liabilities = plaidData.liabilities?.debt_summary || {};
 
     // Total assets
@@ -506,7 +594,7 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
       </div>
 
       {/* Expense Analysis from Transactions */}
-      {plaidData.transactions && plaidData.transactions.transactions && (
+      {plaidData.transactions && plaidData.transactions.transactions && plaidData.transactions.transactions.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-yellow-900 mb-4">
             Monthly Expense Breakdown
@@ -562,8 +650,17 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
         <h2 className="text-xl font-semibold text-orange-900 mb-4">
           Recent Transactions ({plaidData.transactions.transactions?.length || 0})
         </h2>
-        
-        {plaidData.transactions.transactions && plaidData.transactions.transactions.length > 0 ? (
+
+        {plaidData.transactions.error ? (
+          <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-yellow-700">{plaidData.transactions.error}</p>
+            </div>
+          </div>
+        ) : plaidData.transactions.transactions && plaidData.transactions.transactions.length > 0 ? (
           <>
             <div className="mb-4 text-sm text-orange-700">
               Total transactions available: {plaidData.transactions.total_transactions}
@@ -908,12 +1005,12 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
       )}
 
       {/* Settlement Capacity Analysis */}
-      {plaidData.income && plaidData.liabilities && (
+      {(plaidData.income || mockIncomeData) && plaidData.liabilities && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-blue-900 mb-4">
             Debt Settlement Capacity Analysis
           </h2>
-          
+
           <div className="bg-white rounded-lg border border-blue-300 p-4 mb-4">
             <h3 className="font-semibold text-blue-800 mb-3">Settlement Recommendations</h3>
             <div className="space-y-3">
@@ -923,14 +1020,8 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
                   <p className="text-red-700 text-sm">Your debt-to-income ratio of {(summaryMetrics.debtToIncomeRatio * 100).toFixed(1)}% indicates you may benefit from debt settlement.</p>
                 </div>
               )}
-              
-              {summaryMetrics.availableFunds > 1000 && (
-                <div className="bg-green-100 border border-green-300 rounded p-3">
-                  <p className="text-green-800 font-medium">✅ Settlement Funds Available</p>
-                  <p className="text-green-700 text-sm">You have approximately {formatCurrency(summaryMetrics.availableFunds)} available for potential settlements.</p>
-                </div>
-              )}
-              
+
+
               {summaryMetrics.monthlyIncome > 3000 && (
                 <div className="bg-blue-100 border border-blue-300 rounded p-3">
                   <p className="text-blue-800 font-medium">💼 Stable Income</p>
@@ -943,126 +1034,233 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
       )}
 
       {/* Income Information - Settlement Capacity Analysis */}
-      {plaidData.income && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-emerald-900 mb-4">
-            Income Analysis & Employment Details
-          </h2>
-          
-          {plaidData.income.income_summary && (
-            <div className="bg-white rounded-lg border border-emerald-300 p-4 mb-4">
-              <h3 className="font-semibold text-emerald-800 mb-3">Income Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <h4 className="font-medium text-emerald-700">Monthly Income</h4>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(plaidData.income.income_summary.total_monthly_income)}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-emerald-700">Annual Income</h4>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(plaidData.income.income_summary.total_annual_income)}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-emerald-700">Income Stability</h4>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {Math.round(plaidData.income.income_summary.income_stability * 100)}%
-                  </p>
-                </div>
-              </div>
-              
-              {plaidData.income.income_summary.employment_status.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="font-medium text-emerald-700 mb-2">Employment Status</h4>
-                  <div className="space-y-2">
-                    {plaidData.income.income_summary.employment_status.map((employment, index) => (
-                      <div key={index} className="flex justify-between items-center bg-emerald-25 p-2 rounded">
-                        <span className="text-emerald-700">{employment.employer}</span>
-                        <span className="font-semibold text-emerald-600">
-                          {formatCurrency(employment.monthly_income)}/month
-                          <span className="text-sm text-emerald-500 ml-2">
-                            ({Math.round(employment.confidence * 100)}% confidence)
-                          </span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+      {(() => {
+        // Use mock data when API doesn't return income data
+        const incomeData = plaidData.income || mockIncomeData;
+        const hasMockData = !plaidData.income;
+
+        return (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-emerald-900">
+                Income Analysis & Employment Details
+              </h2>
+              {hasMockData && (
+                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">
+                  Using Mock Data
+                </span>
               )}
             </div>
-          )}
-          
-          {plaidData.income.income_streams && plaidData.income.income_streams.length > 0 ? (
-            <div className="space-y-4">
-              {plaidData.income.income_streams.map((stream, index) => (
-                <div key={index} className="bg-white rounded-lg border border-emerald-300 p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-medium text-emerald-900">{stream.name}</h3>
-                      {stream.employer && (
-                        <p className="text-sm text-emerald-600">{stream.employer.employer_name}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-emerald-600">
-                        {formatCurrency(stream.monthly_income)}/month
-                      </p>
-                      <p className="text-sm text-emerald-500">
-                        Confidence: {Math.round(stream.confidence * 100)}%
-                      </p>
+
+            {incomeData.income_summary && (
+              <div className="bg-white rounded-lg border border-emerald-300 p-4 mb-4">
+                <h3 className="font-semibold text-emerald-800 mb-3">Income Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <h4 className="font-medium text-emerald-700">Monthly Income</h4>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {formatCurrency(incomeData.income_summary.total_monthly_income)}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-emerald-700">Annual Income</h4>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {formatCurrency(incomeData.income_summary.total_annual_income)}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-emerald-700">Income Stability</h4>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {Math.round(incomeData.income_summary.income_stability * 100)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Period Breakdown Table - matching deal sheet format */}
+                <div className="mt-6">
+                  <h4 className="font-medium text-emerald-700 mb-3">Income Period Analysis (95% Confidence - Plaid CRA)</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-gray-300">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-300 p-3 text-left font-semibold">Field</th>
+                          <th className="border border-gray-300 p-3 text-center font-semibold">Current Period<br/><span className="text-xs font-normal text-gray-600">Last 30 days</span></th>
+                          <th className="border border-gray-300 p-3 text-center font-semibold">Period 2<br/><span className="text-xs font-normal text-gray-600">31-60 days ago</span></th>
+                          <th className="border border-gray-300 p-3 text-center font-semibold">Period 3<br/><span className="text-xs font-normal text-gray-600">61-90 days ago</span></th>
+                          <th className="border border-gray-300 p-3 text-center font-semibold bg-blue-50">Average</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-green-50">
+                          <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-green-800">
+                            INCOME FIELDS <span className="text-xs font-normal ml-2">(95% Confidence - Plaid CRA Income Verification)</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-300 p-3 font-semibold">Net Monthly Employment Income</td>
+                          <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(getMockCraIncomeForPeriod(1).income.summary.total_monthly_income)}</td>
+                          <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(getMockCraIncomeForPeriod(2).income.summary.total_monthly_income)}</td>
+                          <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(getMockCraIncomeForPeriod(3).income.summary.total_monthly_income)}</td>
+                          <td className="border border-gray-300 p-3 text-center bg-blue-50 font-semibold">{formatCurrency(calculateAverageMonthlyIncome())}</td>
+                        </tr>
+                        {/* Transaction detail rows for each period */}
+                        <tr className="text-xs text-gray-600">
+                          <td className="border border-gray-300 p-2 pl-8">→ TechCorp Bi-Weekly Payroll<br/>→ INCOME_WAGES</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>8/22/2024</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>7/11/2024</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>6/27/2024</td>
+                          <td className="border border-gray-300 p-2 text-center bg-blue-50">—</td>
+                        </tr>
+                        <tr className="text-xs text-gray-600">
+                          <td className="border border-gray-300 p-2 pl-8">→ TechCorp Bi-Weekly Payroll<br/>→ INCOME_WAGES</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>9/5/2024</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>7/25/2024</td>
+                          <td className="border border-gray-300 p-2 text-center">$12,000.00<br/>6/14/2024</td>
+                          <td className="border border-gray-300 p-2 text-center bg-blue-50">—</td>
+                        </tr>
+                        <tr className="text-xs text-gray-600">
+                          <td className="border border-gray-300 p-2 pl-8">→ TechCorp Bi-Weekly Payroll<br/>→ INCOME_WAGES</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>9/19/2024</td>
+                          <td className="border border-gray-300 p-2 text-center">$4,000.00<br/>8/9/2024</td>
+                          <td className="border border-gray-300 p-2 text-center"></td>
+                          <td className="border border-gray-300 p-2 text-center bg-blue-50">—</td>
+                        </tr>
+                        <tr className="text-xs text-gray-600">
+                          <td className="border border-gray-300 p-2 pl-8">→ TechCorp Payroll<br/>→ INCOME_WAGES</td>
+                          <td className="border border-gray-300 p-2 text-center">$12,000.00<br/>9/14/2024</td>
+                          <td className="border border-gray-300 p-2 text-center"></td>
+                          <td className="border border-gray-300 p-2 text-center"></td>
+                          <td className="border border-gray-300 p-2 text-center bg-blue-50">—</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {incomeData.income_summary.employment_status && incomeData.income_summary.employment_status.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-emerald-700 mb-2">Employment Status</h4>
+                    <div className="space-y-2">
+                      {incomeData.income_summary.employment_status.map((employment, index) => (
+                        <div key={index} className="flex justify-between items-center bg-emerald-25 p-2 rounded">
+                          <span className="text-emerald-700">{employment.employer}</span>
+                          <span className="font-semibold text-emerald-600">
+                            {formatCurrency(employment.monthly_income)}/month
+                            <span className="text-sm text-emerald-500 ml-2">
+                              ({Math.round(employment.confidence * 100)}% confidence)
+                            </span>
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  
-                  {stream.income_breakdown && (
-                    <div className="bg-emerald-25 p-3 rounded">
-                      <h4 className="font-medium text-emerald-800 mb-2">Income Details</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                        <p className="text-emerald-700">Type: {stream.income_breakdown.type}</p>
-                        <p className="text-emerald-700">Rate: {formatCurrency(stream.income_breakdown.rate)}</p>
-                        <p className="text-emerald-700">Frequency: {stream.income_breakdown.pay_frequency}</p>
+                )}
+              </div>
+            )}
+
+            {incomeData.income_streams && incomeData.income_streams.length > 0 ? (
+              <div className="space-y-4">
+                {incomeData.income_streams.map((stream, index) => (
+                  <div key={index} className="bg-white rounded-lg border border-emerald-300 p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-medium text-emerald-900">{stream.name}</h3>
+                        {stream.employer && (
+                          <p className="text-sm text-emerald-600">{stream.employer.employer_name}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-semibold text-emerald-600">
+                          {formatCurrency(stream.monthly_income)}/month
+                        </p>
+                        <p className="text-sm text-emerald-500">
+                          Confidence: {Math.round(stream.confidence * 100)}%
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-emerald-700">No income streams found</p>
-          )}
-        </div>
-      )}
+
+                    {stream.income_breakdown && (
+                      <div className="bg-emerald-25 p-3 rounded">
+                        <h4 className="font-medium text-emerald-800 mb-2">Income Details</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                          <p className="text-emerald-700">Type: {stream.income_breakdown.type}</p>
+                          <p className="text-emerald-700">Rate: {formatCurrency(stream.income_breakdown.rate)}</p>
+                          <p className="text-emerald-700">Frequency: {stream.income_breakdown.pay_frequency}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-emerald-700">No income streams found</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Raw JSON Data */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Raw JSON Data</h2>
-        <details className="cursor-pointer">
-          <summary className="text-blue-600 hover:text-blue-800 font-medium">
-            Click to view complete raw data
-          </summary>
-          <pre className="mt-4 bg-gray-800 text-green-400 p-4 rounded text-xs overflow-x-auto">
-            {JSON.stringify(plaidData, null, 2)}
-          </pre>
-        </details>
+
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="complete-data">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <span>📄 Click to view complete raw data</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="bg-gray-800 text-green-400 p-4 rounded text-xs overflow-x-auto max-h-96">
+                <pre className="whitespace-pre-wrap">
+                  {JSON.stringify(plaidData, null, 2)}
+                </pre>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="income-data">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <span>💰 Income API Raw Data (Sample from provided file)</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="bg-gray-800 text-green-400 p-4 rounded text-xs overflow-x-auto max-h-96">
+                <pre className="whitespace-pre-wrap">
+                  {JSON.stringify(rawIncomeJsonData, null, 2)}
+                </pre>
+              </div>
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> This is sample data from the Plaid Income API response file you provided.
+                  The full dataset contains extensive transaction history with income categorization using Plaid's
+                  Personal Finance Category taxonomy.
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
 
       {/* Action Buttons */}
       <div className="flex justify-center space-x-4">
         {!isResultsPage && (
-          <button 
-            onClick={fetchAllPlaidData}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Refresh Data
-          </button>
+          <>
+            <button
+              onClick={fetchAllPlaidData}
+              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Refresh Data
+            </button>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Start Over
+            </button>
+          </>
         )}
-        <button 
-          onClick={() => window.location.href = '/'}
-          className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          {isResultsPage ? 'Back to Home' : 'Start Over'}
-        </button>
       </div>
     </div>
   );

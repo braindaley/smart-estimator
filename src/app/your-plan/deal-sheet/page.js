@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import TransactionDetailsModal from '@/components/TransactionDetailsModal';
 import ClickableLabel from '@/components/ClickableLabel';
 import { mapPlaidToDealsSheet, getFieldDisplayName, formatCurrency } from '@/lib/plaid-mapping';
+import { getMockCraIncomeForPeriod, calculateAverageMonthlyIncome, getIncomeConfidencePercentage } from '@/lib/mock-cra-income';
+import { calculateMonthlyMomentumPayment } from '@/lib/calculations';
 
 // Dynamically import session-store to avoid SSR issues
 const getPlaidData = typeof window !== 'undefined' 
@@ -33,68 +35,123 @@ const getCreditData = () => {
   }
 };
 
-// Function to match account types with fuzzy logic
-const matchesAccountType = (account, targetTypes) => {
-  const getDescription = (field) => {
-    if (!field) return '';
-    // Check for codeabv field (API response field)
-    if (field.codeabv) return field.codeabv + ' ' + (field.description || '');
-    return field.description || field.code || field || '';
-  };
-
-  const accountType = getDescription(account.portfolioTypeCode).toLowerCase();
-  const accountTypeCode = getDescription(account.accountTypeCode).toLowerCase();
-  const customerName = (account.customerName || '').toLowerCase();
-  const narrativeDescription = account.narrativeCodes && account.narrativeCodes[0]
-    ? getDescription(account.narrativeCodes[0]).toLowerCase()
-    : '';
-
-  // Also check industryCode if available
-  const industryCode = account.industryCode ? getDescription(account.industryCode).toLowerCase() : '';
-
-  const searchText = `${accountType} ${accountTypeCode} ${customerName} ${narrativeDescription} ${industryCode}`;
-
-  // Check for specific AO code for auto loans
-  if (account.portfolioTypeCode?.codeabv === 'AO' ||
-      account.accountTypeCode?.codeabv === 'AO' ||
-      accountType.includes('ao ') ||
-      accountTypeCode.includes('ao ')) {
-    return 'Auto Loan';
+// Function to get Equifax narrative codes configuration
+const getEquifaxNarrativeCodes = () => {
+  if (typeof window === 'undefined') return [];
+  const savedConfig = localStorage.getItem('equifax-narrative-codes');
+  if (!savedConfig) return [];
+  try {
+    return JSON.parse(savedConfig);
+  } catch {
+    return [];
   }
-
-  for (const targetType of targetTypes) {
-    const keywords = targetType.keywords;
-    const hasMatch = keywords.some(keyword => searchText.includes(keyword));
-    if (hasMatch) {
-      return targetType.type;
-    }
-  }
-  return null;
 };
 
-// Account type matching configuration
-const DEBT_ACCOUNT_TYPES = [
-  {
-    type: 'Credit Card',
-    keywords: ['credit card', 'credit', 'card', 'revolving', 'discover', 'visa', 'mastercard', 'american express', 'amex', 'chase', 'capital one', 'citi']
-  },
-  {
-    type: 'Auto Loan',
-    keywords: ['auto', 'automobile', 'vehicle', 'car', 'gmac', 'toyota', 'honda', 'ford', 'chrysler', 'nissan', 'hyundai', 'mazda', 'subaru', 'volkswagen', 'bmw', 'mercedes', 'audi', 'lexus', 'acura', 'infiniti', 'kia', 'mitsubishi', 'motor', 'motors', 'automotive', 'finance']
-  },
-  {
-    type: 'Personal Loan',
-    keywords: ['personal loan', 'personal', 'loan', 'installment', 'lending', 'upstart', 'prosper', 'sofi', 'marcus']
-  },
-  {
-    type: 'Medical',
-    keywords: ['medical', 'healthcare', 'hospital', 'clinic', 'physician', 'doctor', 'health']
-  },
-  {
-    type: 'Retail Credit',
-    keywords: ['retail', 'store', 'macy', 'macys', 'best buy', 'target', 'walmart', 'home depot', 'lowes', 'kohls', 'jcpenney', 'sears', 'nordstrom']
+// Function to check if an account's narrative codes are included in settlement
+const isNarrativeCodeIncludedInSettlement = (account, narrativeCodes) => {
+  if (narrativeCodes.length === 0) {
+    return false;
   }
-];
+
+  const accountNarrativeCodes = [];
+  if (account.narrativeCodes && Array.isArray(account.narrativeCodes)) {
+    account.narrativeCodes.forEach(nc => {
+      if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);
+      if (nc.code) accountNarrativeCodes.push(nc.code);
+    });
+  }
+
+  if (accountNarrativeCodes.length === 0) {
+    return false;
+  }
+
+  const hasIncludedCode = accountNarrativeCodes.some(accountCode => {
+    const narrativeConfig = narrativeCodes.find(config => config.code === accountCode);
+    return narrativeConfig && narrativeConfig.includeInSettlement;
+  });
+
+  return hasIncludedCode;
+};
+
+// Function to determine display category from narrative codes
+const getDisplayCategoryFromNarrativeCodes = (account) => {
+  // Check narrative codes for account type indicators
+  if (!account.narrativeCodes || !Array.isArray(account.narrativeCodes)) {
+    return 'Other';
+  }
+
+  // Map narrative codes to display categories (for UI purposes only)
+  const narrativeCodeToDisplayCategory = {
+    // Credit Cards
+    'FE': 'Credit Card',
+    'AV': 'Credit Card', // Charge
+    'CV': 'Credit Card', // Line of credit
+    'CK': 'Credit Card', // Debit card
+    'GR': 'Credit Card', // Secured credit card
+    'JX': 'Credit Card', // Flexible spending credit card
+
+    // Personal Loans
+    'AU': 'Personal Loan',
+    'DS': 'Personal Loan', // Single payment loan
+    'JO': 'Personal Loan', // Note loan
+    'EX': 'Personal Loan', // Unsecured
+    'EY': 'Personal Loan', // Business account -personal guarantee
+
+    // Auto Loans
+    'AO': 'Auto Loan',
+    'AM': 'Auto Loan', // Voluntary surrender; there may be a balance due
+    'AN': 'Auto Loan', // Involuntary repossession
+    'JQ': 'Auto Loan', // Auto lease
+
+    // Medical
+    'GS': 'Medical',
+
+    // Collections (display as Personal Loan for settlement purposes)
+    'CZ': 'Personal Loan', // Collection account
+    'BY': 'Personal Loan', // Collection agency account - status unknown
+    'ER': 'Personal Loan', // Paid collection
+
+    // Retail/Store Credit
+    'AQ': 'Retail Credit', // Household goods
+    'GQ': 'Retail Credit', // Recreational merchandise
+
+    // Student Loans (if they somehow get through admin filter)
+    'BU': 'Student Loan', // Student loan
+    'EG': 'Student Loan', // Guaranteed student loan
+    'EH': 'Student Loan', // National direct student loan
+    'DQ': 'Student Loan', // Student loan - payment deferred
+    'FD': 'Student Loan', // Defaulted student loan
+    'GJ': 'Student Loan', // Student loan assigned to government
+
+    // Mortgages (if they somehow get through admin filter)
+    'AR': 'Mortgage', // Home loan
+    'AS': 'Mortgage', // Home improvement loan
+    'EF': 'Mortgage', // Real estate mortgage
+    'EC': 'Mortgage', // Home equity
+    'JU': 'Mortgage', // Home equity line of credit
+    'JW': 'Mortgage', // Construction loan
+    'HP': 'Mortgage', // Fha mortgage
+    'HQ': 'Mortgage', // Va mortgage
+    'HR': 'Mortgage', // Conventional mortgage
+    'HS': 'Mortgage', // Second mortgage
+    'DT': 'Mortgage', // Amortized mortgage
+    'GP': 'Mortgage', // Manufactured housing
+  };
+
+  // Check all narrative codes for the account
+  for (const narrativeCode of account.narrativeCodes) {
+    const code = narrativeCode.code || narrativeCode.codeabv;
+    if (code && narrativeCodeToDisplayCategory.hasOwnProperty(code)) {
+      return narrativeCodeToDisplayCategory[code];
+    }
+  }
+
+  // If no specific mapping found, return 'Other'
+  return 'Other';
+};
+
+// Note: Account types are now determined directly from narrative codes
+// No longer need keyword-based matching configuration
 
 
 export default function DealSheetPage() {
@@ -108,6 +165,8 @@ export default function DealSheetPage() {
   const [debtAccounts, setDebtAccounts] = useState([]);
   const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [availableAccounts, setAvailableAccounts] = useState([]);
+  const [liabilitiesData, setLiabilitiesData] = useState(null);
+  const [calculatedProgramCost, setCalculatedProgramCost] = useState(0);
   const [formData, setFormData] = useState({
     // Monthly Expenditure Details
     totalMonthlyIncome: '',
@@ -192,26 +251,37 @@ export default function DealSheetPage() {
   const loadCreditData = () => {
     try {
       const data = getCreditData();
+      const narrativeCodes = getEquifaxNarrativeCodes();
+
       if (data && data.trades && Array.isArray(data.trades)) {
         setCreditData(data);
-        
-        // Filter and categorize debt accounts
-        const matchedAccounts = data.trades
-          .map(account => {
-            const matchedType = matchesAccountType(account, DEBT_ACCOUNT_TYPES);
-            if (matchedType) {
-              return {
-                ...account,
-                matchedType,
-                balance: account.balance || 0
-              };
-            }
-            return null;
-          })
-          .filter(account => account !== null);
-          
-        setDebtAccounts(matchedAccounts);
-        console.log('[DealSheet] Loaded debt accounts:', matchedAccounts);
+
+        // Filter accounts with positive balance first (same logic as results page)
+        const accountsWithBalance = data.trades.filter(account => {
+          const balance = typeof account.balance === 'number' ? account.balance : parseFloat(account.balance) || 0;
+          return balance > 0;
+        });
+
+        // Filter accounts eligible for settlement using narrative codes (same logic as results page)
+        const eligibleAccounts = accountsWithBalance.filter(account =>
+          isNarrativeCodeIncludedInSettlement(account, narrativeCodes)
+        );
+
+        // Add display category based on narrative codes (all eligible accounts are included)
+        const accountsWithTypes = eligibleAccounts.map(account => {
+          const matchedType = getDisplayCategoryFromNarrativeCodes(account);
+          return {
+            ...account,
+            matchedType,
+            balance: typeof account.balance === 'number' ? account.balance : parseFloat(account.balance) || 0
+          };
+        });
+
+        setDebtAccounts(accountsWithTypes);
+        console.log('[DealSheet] Loaded eligible debt accounts (settlement-eligible only):', accountsWithTypes);
+        console.log('[DealSheet] Total accounts in credit report:', data.trades.length);
+        console.log('[DealSheet] Accounts with positive balance:', accountsWithBalance.length);
+        console.log('[DealSheet] Accounts eligible for settlement:', accountsWithTypes.length);
       } else {
         console.log('[DealSheet] No credit data or trades found');
         setCreditData(null);
@@ -221,6 +291,37 @@ export default function DealSheetPage() {
       console.error('Error loading credit data:', error);
       setCreditData(null);
       setDebtAccounts([]);
+    }
+  };
+
+  // Function to load liabilities data
+  const loadLiabilitiesData = async () => {
+    try {
+      const userId = sessionStorage.getItem('userId') || 'demo-user';
+      const clientToken = sessionStorage.getItem('plaidAccessToken');
+
+      const response = await fetch('/api/plaid/liabilities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          clientToken
+        }),
+      });
+
+      if (response.ok) {
+        const liabilities = await response.json();
+        console.log('[DealSheet] Liabilities data loaded:', liabilities);
+        setLiabilitiesData(liabilities);
+      } else {
+        console.log('[DealSheet] Failed to load liabilities data');
+        setLiabilitiesData(null);
+      }
+    } catch (error) {
+      console.error('[DealSheet] Error loading liabilities data:', error);
+      setLiabilitiesData(null);
     }
   };
 
@@ -287,12 +388,26 @@ export default function DealSheetPage() {
           setTimeout(() => {
             const updatedFormData = {};
             
-            // Map income fields using 3-period averages
-            Object.keys(mapped.income).forEach(key => {
-              const average = getFieldAverage(key, false);
-              if (average > 0) {
-                updatedFormData[key] = average.toFixed(2);
-              }
+            // Map income fields using mock CRA data (3-period averages)
+            // Use mock CRA income data instead of transaction-based mapping
+            const mockCraPeriod1 = getMockCraIncomeForPeriod(1);
+            const mockCraPeriod2 = getMockCraIncomeForPeriod(2);
+            const mockCraPeriod3 = getMockCraIncomeForPeriod(3);
+
+            const period1Income = mockCraPeriod1.income.summary.total_monthly_income;
+            const period2Income = mockCraPeriod2.income.summary.total_monthly_income;
+            const period3Income = mockCraPeriod3.income.summary.total_monthly_income;
+            const averageIncome = calculateAverageMonthlyIncome();
+
+            // Set the Net Monthly Employment Income based on mock CRA data
+            updatedFormData.netMonthlyEmploymentIncome = averageIncome.toFixed(2);
+
+            console.log('[DealSheet] Mock CRA Income Data:', {
+              period1: period1Income,
+              period2: period2Income,
+              period3: period3Income,
+              average: averageIncome,
+              confidence: getIncomeConfidencePercentage() + '%'
             });
             
             // Map expense fields using 3-period averages
@@ -361,7 +476,44 @@ export default function DealSheetPage() {
   useEffect(() => {
     loadPlaidData();
     loadCreditData();
+    loadLiabilitiesData();
   }, []);
+
+  // Calculate program cost after liabilities data is loaded
+  useEffect(() => {
+    const getMomentumResults = () => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const stored = sessionStorage.getItem('momentumResults');
+        return stored ? JSON.parse(stored) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    // Get program cost from stored momentum results or calculate as fallback
+    const momentumResults = getMomentumResults();
+    console.log('[DealSheet] Retrieved momentum results:', momentumResults);
+
+    let programCost = momentumResults?.monthlyPayment || 0;
+    console.log('[DealSheet] Monthly payment from stored results:', programCost);
+
+    // Fallback: calculate program cost if no stored results and we have debt data
+    if (programCost === 0 && liabilitiesData?.debt_summary) {
+      const totalDebtAmount = liabilitiesData.debt_summary.total_credit_card_debt +
+        liabilitiesData.debt_summary.total_student_loan_debt;
+
+      if (totalDebtAmount >= 15000) { // Minimum for Momentum plan
+        programCost = calculateMonthlyMomentumPayment(totalDebtAmount);
+        console.log('[DealSheet] Calculated fallback program cost:', programCost, 'for debt amount:', totalDebtAmount);
+      }
+    }
+
+    console.log('[DealSheet] Final monthly program cost:', programCost);
+    console.log('[DealSheet] Is using stored results?', !!momentumResults);
+    console.log('[DealSheet] Is using fallback calculation?', programCost > 0 && !momentumResults);
+    setCalculatedProgramCost(programCost);
+  }, [liabilitiesData]);
 
   // Listen for storage events to refresh when Plaid data is updated
   useEffect(() => {
@@ -478,27 +630,61 @@ export default function DealSheetPage() {
     });
   };
 
-  // Function to calculate period date ranges
+  // Function to calculate period date ranges based on actual transaction data
   const getPeriodDateRanges = () => {
-    const now = new Date();
-    
-    // Period 1: Last 30 days (0-30 days ago)
-    const period1End = new Date(now);
-    const period1Start = new Date(now);
-    period1Start.setDate(period1Start.getDate() - 30);
-    
-    // Period 2: 31-60 days ago
-    const period2End = new Date(now);
-    period2End.setDate(period2End.getDate() - 31);
-    const period2Start = new Date(now);
-    period2Start.setDate(period2Start.getDate() - 60);
-    
-    // Period 3: 61-90 days ago
-    const period3End = new Date(now);
-    period3End.setDate(period3End.getDate() - 61);
-    const period3Start = new Date(now);
-    period3Start.setDate(period3Start.getDate() - 90);
-    
+    // Get actual date range from transaction data
+    const allTransactions = mappedData?.transactionDetails ?
+      Object.values(mappedData.transactionDetails).flat() : [];
+
+    if (allTransactions.length === 0) {
+      // Fallback to current date if no transactions
+      const now = new Date();
+      const period1Start = new Date(now); period1Start.setDate(period1Start.getDate() - 30);
+      const period2Start = new Date(now); period2Start.setDate(period2Start.getDate() - 60);
+      const period3Start = new Date(now); period3Start.setDate(period3Start.getDate() - 90);
+
+      return {
+        period1: { start: period1Start, end: new Date(now) },
+        period2: { start: period2Start, end: period1Start },
+        period3: { start: period3Start, end: period2Start }
+      };
+    }
+
+    // Find actual date range from transactions
+    let minDate = null;
+    let maxDate = null;
+    allTransactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.date);
+      if (!minDate || transactionDate < minDate) minDate = transactionDate;
+      if (!maxDate || transactionDate > maxDate) maxDate = transactionDate;
+    });
+
+    // Calculate 30-day periods based on actual data range
+    const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
+    const periodLength = Math.ceil(totalDays / 3);
+
+    // Period 1: Most recent period
+    const period1End = new Date(maxDate);
+    const period1Start = new Date(maxDate);
+    period1Start.setDate(period1Start.getDate() - periodLength);
+
+    // Period 2: Middle period
+    const period2End = new Date(period1Start);
+    const period2Start = new Date(period1Start);
+    period2Start.setDate(period2Start.getDate() - periodLength);
+
+    // Period 3: Oldest period
+    const period3End = new Date(period2Start);
+    const period3Start = new Date(minDate);
+
+    console.log('[Periods] Date ranges calculated:', {
+      totalDays,
+      periodLength,
+      period1: { start: period1Start.toDateString(), end: period1End.toDateString() },
+      period2: { start: period2Start.toDateString(), end: period2End.toDateString() },
+      period3: { start: period3Start.toDateString(), end: period3End.toDateString() }
+    });
+
     return {
       period1: { start: period1Start, end: period1End },
       period2: { start: period2Start, end: period2End },
@@ -647,6 +833,17 @@ export default function DealSheetPage() {
         const period2Transactions = getTransactionsForPeriod(transactions, periods.period2.start, periods.period2.end);
         const period3Transactions = getTransactionsForPeriod(transactions, periods.period3.start, periods.period3.end);
 
+        // Debug logging for transaction distribution
+        if (field === 'netMonthlyEmploymentIncome' && period1Transactions.length + period2Transactions.length + period3Transactions.length > 0) {
+          console.log(`[Debug] Field: ${field}`, {
+            total: transactions.length,
+            period1Count: period1Transactions.length,
+            period2Count: period2Transactions.length,
+            period3Count: period3Transactions.length,
+            sampleDates: transactions.slice(0, 5).map(tx => tx.date)
+          });
+        }
+
         // Calculate totals and store transactions for each period
         if (dataToUse.income[field] !== undefined) {
           // Income field
@@ -666,6 +863,27 @@ export default function DealSheetPage() {
       }
     });
 
+    // Override income calculations with mock CRA data
+    const mockCraPeriod1 = getMockCraIncomeForPeriod(1);
+    const mockCraPeriod2 = getMockCraIncomeForPeriod(2);
+    const mockCraPeriod3 = getMockCraIncomeForPeriod(3);
+
+    // Replace netMonthlyEmploymentIncome with mock CRA values
+    if (periodData.period1.income.hasOwnProperty('netMonthlyEmploymentIncome')) {
+      periodData.period1.income.netMonthlyEmploymentIncome = mockCraPeriod1.income.summary.total_monthly_income;
+      periodData.period2.income.netMonthlyEmploymentIncome = mockCraPeriod2.income.summary.total_monthly_income;
+      periodData.period3.income.netMonthlyEmploymentIncome = mockCraPeriod3.income.summary.total_monthly_income;
+
+      console.log('[getPeriodData] Overriding income with mock CRA data:', {
+        period1: periodData.period1.income.netMonthlyEmploymentIncome,
+        period2: periodData.period2.income.netMonthlyEmploymentIncome,
+        period3: periodData.period3.income.netMonthlyEmploymentIncome,
+        average: (periodData.period1.income.netMonthlyEmploymentIncome +
+                 periodData.period2.income.netMonthlyEmploymentIncome +
+                 periodData.period3.income.netMonthlyEmploymentIncome) / 3
+      });
+    }
+
     return periodData;
   };
 
@@ -683,7 +901,7 @@ export default function DealSheetPage() {
                 {hasPlaidData && (
                   <div className="flex items-center gap-2">
                     {isRefreshing && (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
                     )}
                     <Button
                       onClick={loadPlaidData}
@@ -708,7 +926,7 @@ export default function DealSheetPage() {
               <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
                 Your personalized deal sheet with all the details of your debt settlement plan.
                 {hasPlaidData && (
-                  <span className="block mt-1 text-green-600">
+                  <span className="block mt-1 text-gray-600">
                     ✓ Connected to bank data - values update automatically
                   </span>
                 )}
@@ -727,11 +945,8 @@ export default function DealSheetPage() {
             <TabsContent value="deal-sheet" className="space-y-8">
           {/* Debt Portfolio Section */}
           <Card className="p-6 mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-6 h-6 bg-red-500 rounded flex items-center justify-center">
-                <span className="text-white text-sm font-bold">💳</span>
-              </div>
-              <h2 className="text-lg font-semibold text-red-700">Debt Portfolio</h2>
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700">Debt Portfolio</h2>
             </div>
             
             {debtAccounts.length > 0 ? (
@@ -741,7 +956,7 @@ export default function DealSheetPage() {
                     <div key={index} className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                          <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">
                             {account.matchedType}
                           </span>
                           <span className="text-xs text-gray-500">
@@ -761,17 +976,17 @@ export default function DealSheetPage() {
                         <div className="pt-2 border-t">
                           <div className="flex justify-between items-center">
                             <span className="text-xs text-gray-600">Balance</span>
-                            <span className="font-semibold text-sm text-red-600">
+                            <span className="font-semibold text-sm text-gray-600">
                               {account.balance && account.balance !== 'N/A' 
                                 ? `$${account.balance.toLocaleString()}` 
                                 : 'N/A'}
                             </span>
                           </div>
-                          {account.scheduledPaymentAmount && account.scheduledPaymentAmount !== 'N/A' && (
+                          {(account.minimumPayment || account.scheduledPaymentAmount) && (account.minimumPayment !== 'N/A' && account.scheduledPaymentAmount !== 'N/A') && (
                             <div className="flex justify-between items-center mt-1">
-                              <span className="text-xs text-gray-600">Monthly Payment</span>
+                              <span className="text-xs text-gray-600">Min Payment</span>
                               <span className="text-xs text-gray-800">
-                                ${account.scheduledPaymentAmount.toLocaleString()}
+                                ${(account.minimumPayment || account.scheduledPaymentAmount || 0).toLocaleString()}
                               </span>
                             </div>
                           )}
@@ -780,11 +995,11 @@ export default function DealSheetPage() {
                         {account.rate?.description && (
                           <div className="pt-1">
                             <span className={`inline-block px-2 py-1 text-xs rounded ${
-                              account.rate.description.toLowerCase().includes('current') 
-                                ? 'bg-green-100 text-green-700' 
+                              account.rate.description.toLowerCase().includes('current')
+                                ? 'bg-gray-100 text-gray-700'
                                 : account.rate.description.toLowerCase().includes('past due')
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
+                                ? 'bg-gray-100 text-gray-700'
+                                : 'bg-gray-100 text-gray-700'
                             }`}>
                               {account.rate.description}
                             </span>
@@ -805,7 +1020,7 @@ export default function DealSheetPage() {
                       <div className="text-sm text-gray-600">Total Accounts</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-red-600">
+                      <div className="text-2xl font-bold text-gray-600">
                         ${debtAccounts
                           .reduce((sum, account) => sum + (account.balance || 0), 0)
                           .toLocaleString()}
@@ -813,15 +1028,15 @@ export default function DealSheetPage() {
                       <div className="text-sm text-gray-600">Total Balance</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-gray-600">
                         ${debtAccounts
-                          .reduce((sum, account) => sum + (account.scheduledPaymentAmount || 0), 0)
+                          .reduce((sum, account) => sum + (account.minimumPayment || account.scheduledPaymentAmount || 0), 0)
                           .toLocaleString()}
                       </div>
                       <div className="text-sm text-gray-600">Monthly Payments</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-2xl font-bold text-gray-600">
                         {[...new Set(debtAccounts.map(account => account.matchedType))].length}
                       </div>
                       <div className="text-sm text-gray-600">Account Types</div>
@@ -834,7 +1049,6 @@ export default function DealSheetPage() {
                 <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8">
                   <div className="flex flex-col items-center">
                     <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                      <span className="text-2xl text-gray-400">💳</span>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No Credit Data Available</h3>
                     <p className="text-sm text-gray-600 mb-4 max-w-md">
@@ -848,7 +1062,7 @@ export default function DealSheetPage() {
                     </div>
                     <button
                       onClick={() => window.location.href = '/your-plan'}
-                      className="mt-6 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                      className="mt-6 px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
                     >
                       Complete Credit Check
                     </button>
@@ -861,16 +1075,16 @@ export default function DealSheetPage() {
           {/* No Plaid Data Warning */}
           {!hasPlaidData && (
             <div className="mb-8">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-amber-800">No Bank Data Connected</h3>
-                    <p className="mt-1 text-sm text-amber-700">
+                    <h3 className="text-sm font-medium text-gray-800">No Bank Data Connected</h3>
+                    <p className="mt-1 text-sm text-gray-700">
                       To see auto-filled income and expense data in your deal sheet, you need to connect your bank account first. 
                       <a href="/your-plan" className="ml-1 underline hover:no-underline">Go back to connect your bank account</a>.
                     </p>
@@ -883,21 +1097,45 @@ export default function DealSheetPage() {
           <div className="space-y-8">
             {/* Monthly Expenditure Details */}
             <Card className="p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">$</span>
-                </div>
-                <h2 className="text-lg font-semibold text-green-700">Monthly Expenditure Details</h2>
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-700">Monthly Expenditure Details</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-6">
                 {(() => {
                   // Calculate dynamic values from Plaid data
-                  const totalMonthlyIncome = mappedData ? 
-                    Object.values(mappedData.income).reduce((a, b) => a + b, 0) : 0;
-                  const totalExpenses = mappedData ? 
-                    Object.values(mappedData.expenses).reduce((a, b) => a + b, 0) : 0;
-                  const programCost = 0; // This would come from your program cost logic
+                  // Calculate total income including wages + dividends
+                  const wagesIncome = formData.netMonthlyEmploymentIncome ?
+                    parseFloat(formData.netMonthlyEmploymentIncome) :
+                    calculateAverageMonthlyIncome();
+                  const dividendsIncome = formData.dividends ? parseFloat(formData.dividends) : 0;
+                  const totalMonthlyIncome = wagesIncome + dividendsIncome;
+                  // Calculate total minimum payments from debt accounts
+                  const totalDebtMinimumPayments = debtAccounts
+                    .reduce((sum, account) => sum + (account.minimumPayment || account.scheduledPaymentAmount || 0), 0);
+
+                  // Calculate total expenses using the 3-period averages from form data
+                  // Exclude debt payments since they're being replaced by program cost
+                  const expenseFields = [
+                    'housingPayment', 'homeOwnersInsurance', 'secondaryHousingPayment', 'healthLifeInsurance',
+                    'medicalCare', 'prescriptionsMedicalExp', 'autoPayments', 'gasoline', 'repairsMaintenance',
+                    'parking', 'commuting', 'groceries', 'eatingOut', 'entertainment', 'hobbies',
+                    'miscellaneousPersonal', 'petCare', 'clothingHousehold', 'taxPreparation',
+                    'tuition', 'childcare', 'alimonyChildSupport', 'gym', 'personalCare', 'charityDonations',
+                    'daycareChildExpenses', 'nursingCare', 'misc'
+                  ];
+
+                  const baseExpenses = expenseFields.reduce((total, field) => {
+                    const value = formData[field] ? parseFloat(formData[field]) : 0;
+                    return total + (isNaN(value) ? 0 : value);
+                  }, 0);
+
+                  // Add back any debtOther if it exists but subtract actual minimum payments
+                  const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
+                  const totalExpenses = baseExpenses + Math.max(0, debtOther - totalDebtMinimumPayments);
+
+                  // Use the calculated program cost from state
+                  const programCost = calculatedProgramCost;
                   const totalExpensesWithProgram = totalExpenses + programCost;
                   const availableFunds = totalMonthlyIncome - totalExpensesWithProgram;
                   const debtToIncomeWithProgram = totalMonthlyIncome > 0 ? 
@@ -907,70 +1145,58 @@ export default function DealSheetPage() {
                   
                   return (
                     <>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Total Monthly Income</Label>
-                        <div className={`text-lg font-semibold ${totalMonthlyIncome > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                      <div className="text-center">
+                        <div className={`text-lg font-semibold ${totalMonthlyIncome > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
                           {formatCurrency(totalMonthlyIncome)}
                         </div>
-                        {mappedData && (
-                          <div className="text-xs text-gray-500">Auto-calculated from Plaid</div>
-                        )}
+                        <div className="text-xs text-gray-600 mt-1">Total Monthly Income</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Wages: ${formatCurrency(wagesIncome)} {dividendsIncome > 0 ? `+ Dividends: ${formatCurrency(dividendsIncome)}` : ''}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Program Cost</Label>
-                        <div className="text-lg font-semibold text-blue-600">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-gray-900">
                           {formatCurrency(programCost)}
                         </div>
-                        <div className="text-xs text-gray-500">To be determined</div>
+                        <div className="text-xs text-gray-600 mt-1">Program Cost</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Settlement Debt</Label>
-                        <Input
-                          placeholder="$0.00"
-                          value={formData.settlementDebt ? formatCurrency(formData.settlementDebt) : ''}
-                          onChange={(e) => handleInputChange('settlementDebt', e.target.value)}
-                          className="text-lg font-semibold"
-                        />
-                        <div className="text-xs text-gray-500">Enter total settlement debt</div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Total Expenses</Label>
-                        <div className={`text-lg font-semibold ${totalExpenses > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                      <div className="text-center">
+                        <div className={`text-lg font-semibold ${totalExpenses > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
                           {formatCurrency(totalExpenses)}
                         </div>
-                        {mappedData && (
-                          <div className="text-xs text-gray-500">Auto-calculated from Plaid</div>
-                        )}
+                        <div className="text-xs text-gray-600 mt-1">Total Expenses</div>
+                        <div className="text-xs text-gray-500 mt-1">Excludes debt minimum payments (${totalDebtMinimumPayments.toLocaleString()})</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Total Monthly Expense (With Program Cost)</Label>
-                        <div className="text-lg font-semibold text-red-600">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-gray-900">
                           {formatCurrency(totalExpensesWithProgram)}
                         </div>
+                        <div className="text-xs text-gray-600 mt-1">Total Monthly Expense (With Program Cost)</div>
+                        <div className="text-xs text-gray-500 mt-1">Total Expenses + Program Cost (${formatCurrency(programCost)})</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Available Funds</Label>
-                        <div className={`text-lg font-semibold ${availableFunds >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className="text-center">
+                        <div className={`text-lg font-semibold ${availableFunds >= 0 ? 'text-gray-900' : 'text-gray-700'}`}>
                           {formatCurrency(availableFunds)}
                         </div>
+                        <div className="text-xs text-gray-600 mt-1">Available Funds</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Monthly Debt to Income Ratio (With Program)</Label>
+                      <div className="text-center">
                         <div className={`text-lg font-semibold ${
-                          debtToIncomeWithProgram > 50 ? 'text-red-600' : 
-                          debtToIncomeWithProgram > 30 ? 'text-yellow-600' : 'text-green-600'
+                          debtToIncomeWithProgram > 50 ? 'text-gray-900' :
+                          debtToIncomeWithProgram > 30 ? 'text-gray-700' : 'text-gray-600'
                         }`}>
                           {debtToIncomeWithProgram.toFixed(1)}%
                         </div>
+                        <div className="text-xs text-gray-600 mt-1">Monthly Debt to Income Ratio (With Program)</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Monthly Debt to Income Ratio (Without Program)</Label>
+                      <div className="text-center">
                         <div className={`text-lg font-semibold ${
-                          debtToIncomeWithoutProgram > 50 ? 'text-red-600' : 
-                          debtToIncomeWithoutProgram > 30 ? 'text-yellow-600' : 'text-green-600'
+                          debtToIncomeWithoutProgram > 50 ? 'text-gray-900' :
+                          debtToIncomeWithoutProgram > 30 ? 'text-gray-700' : 'text-gray-600'
                         }`}>
                           {debtToIncomeWithoutProgram.toFixed(1)}%
                         </div>
+                        <div className="text-xs text-gray-600 mt-1">Monthly Debt to Income Ratio (Without Program)</div>
                       </div>
                     </>
                   );
@@ -993,16 +1219,14 @@ export default function DealSheetPage() {
                       >
                         Net Monthly Employment Income
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.netMonthlyEmploymentIncome ? formatCurrency(formData.netMonthlyEmploymentIncome) : ''}
                         onChange={(e) => handleInputChange('netMonthlyEmploymentIncome', e.target.value)}
+                        readOnly
                       />
-                      {mappedData && getFieldAverage('netMonthlyEmploymentIncome') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('netMonthlyEmploymentIncome'))}
-                        </p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <ClickableLabel 
@@ -1011,16 +1235,13 @@ export default function DealSheetPage() {
                       >
                         Self Employment
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.selfEmployment ? formatCurrency(formData.selfEmployment) : ''}
                         onChange={(e) => handleInputChange('selfEmployment', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('selfEmployment') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('selfEmployment'))}
-                        </p>
-                      )}
                     </div>
                   </div>
                   
@@ -1032,16 +1253,13 @@ export default function DealSheetPage() {
                       >
                         Social Security
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.socialSecurity}
                         onChange={(e) => handleInputChange('socialSecurity', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('socialSecurity') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('socialSecurity'))}
-                        </p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <ClickableLabel 
@@ -1050,16 +1268,13 @@ export default function DealSheetPage() {
                       >
                         Unemployment
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.unemployment}
                         onChange={(e) => handleInputChange('unemployment', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('unemployment') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('unemployment'))}
-                        </p>
-                      )}
                     </div>
                   </div>
                   
@@ -1071,16 +1286,13 @@ export default function DealSheetPage() {
                       >
                         Alimony
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.alimony}
                         onChange={(e) => handleInputChange('alimony', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('alimony') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('alimony'))}
-                        </p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <ClickableLabel 
@@ -1089,32 +1301,33 @@ export default function DealSheetPage() {
                       >
                         Child Support
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.childSupport}
                         onChange={(e) => handleInputChange('childSupport', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('childSupport') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('childSupport'))}
-                        </p>
-                      )}
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Other Govt. Assistance</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.otherGovtAssistance}
                         onChange={(e) => handleInputChange('otherGovtAssistance', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Annuities</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.annuities}
                         onChange={(e) => handleInputChange('annuities', e.target.value)}
                       />
@@ -1129,16 +1342,13 @@ export default function DealSheetPage() {
                       >
                         Dividends
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.dividends}
                         onChange={(e) => handleInputChange('dividends', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('dividends') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('dividends'))}
-                        </p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <ClickableLabel 
@@ -1147,16 +1357,13 @@ export default function DealSheetPage() {
                       >
                         Retirement
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.retirement}
                         onChange={(e) => handleInputChange('retirement', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('retirement') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('retirement'))}
-                        </p>
-                      )}
                     </div>
                   </div>
                   
@@ -1168,16 +1375,13 @@ export default function DealSheetPage() {
                       >
                         Other Income
                       </ClickableLabel>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.otherIncome}
                         onChange={(e) => handleInputChange('otherIncome', e.target.value)}
                       />
-                      {mappedData && getFieldAverage('otherIncome') > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {formatCurrency(getFieldAverage('otherIncome'))}
-                        </p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Income Frequency</Label>
@@ -1217,16 +1421,20 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Net Monthly Employment Income</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantNetMonthlyIncome}
                         onChange={(e) => handleInputChange('coApplicantNetMonthlyIncome', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Self Employment</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantSelfEmployment}
                         onChange={(e) => handleInputChange('coApplicantSelfEmployment', e.target.value)}
                       />
@@ -1236,16 +1444,20 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Social Security</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantSocialSecurity}
                         onChange={(e) => handleInputChange('coApplicantSocialSecurity', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Unemployment</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantUnemployment}
                         onChange={(e) => handleInputChange('coApplicantUnemployment', e.target.value)}
                       />
@@ -1255,16 +1467,20 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Alimony</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantAlimony}
                         onChange={(e) => handleInputChange('coApplicantAlimony', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Child Support</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantChildSupport}
                         onChange={(e) => handleInputChange('coApplicantChildSupport', e.target.value)}
                       />
@@ -1274,16 +1490,20 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Other Govt. Assistance</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantOtherGovtAssistance}
                         onChange={(e) => handleInputChange('coApplicantOtherGovtAssistance', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Annuities</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantAnnuities}
                         onChange={(e) => handleInputChange('coApplicantAnnuities', e.target.value)}
                       />
@@ -1293,16 +1513,20 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Dividends</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantDividends}
                         onChange={(e) => handleInputChange('coApplicantDividends', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Retirement</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantRetirement}
                         onChange={(e) => handleInputChange('coApplicantRetirement', e.target.value)}
                       />
@@ -1312,8 +1536,10 @@ export default function DealSheetPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-gray-600">Other Income</Label>
-                      <Input
+                      <Input readOnly
                         placeholder="$0.00"
+                        readOnly
+                        readOnly
                         value={formData.coApplicantOtherIncome}
                         onChange={(e) => handleInputChange('coApplicantOtherIncome', e.target.value)}
                       />
@@ -1361,7 +1587,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Housing
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1384,16 +1609,13 @@ export default function DealSheetPage() {
                         >
                           Housing Payment
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.housingPayment}
                           onChange={(e) => handleInputChange('housingPayment', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('housingPayment', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('housingPayment', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1402,20 +1624,18 @@ export default function DealSheetPage() {
                         >
                           Home Owners Insurance
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.homeOwnersInsurance}
                           onChange={(e) => handleInputChange('homeOwnersInsurance', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('homeOwnersInsurance', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('homeOwnersInsurance', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Secondary Housing Payment</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1424,7 +1644,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Medical
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1434,16 +1653,13 @@ export default function DealSheetPage() {
                         >
                           Health/Life Insurance
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.healthLifeInsurance}
                           onChange={(e) => handleInputChange('healthLifeInsurance', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('healthLifeInsurance', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('healthLifeInsurance', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1452,16 +1668,13 @@ export default function DealSheetPage() {
                         >
                           Medical Care
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.medicalCare}
                           onChange={(e) => handleInputChange('medicalCare', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('medicalCare', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('medicalCare', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1470,16 +1683,13 @@ export default function DealSheetPage() {
                         >
                           Prescriptions/Medical Exp
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.prescriptionsMedicalExp}
                           onChange={(e) => handleInputChange('prescriptionsMedicalExp', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('prescriptionsMedicalExp', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('prescriptionsMedicalExp', true))}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1488,7 +1698,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Transportation
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1498,16 +1707,13 @@ export default function DealSheetPage() {
                         >
                           Auto Payments
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.autoPayments}
                           onChange={(e) => handleInputChange('autoPayments', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('autoPayments', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('autoPayments', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1516,16 +1722,13 @@ export default function DealSheetPage() {
                         >
                           Auto Insurance
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.autoInsurance}
                           onChange={(e) => handleInputChange('autoInsurance', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('autoInsurance', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('autoInsurance', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1534,16 +1737,13 @@ export default function DealSheetPage() {
                         >
                           Repairs/Maintenance
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.repairsMaintenance}
                           onChange={(e) => handleInputChange('repairsMaintenance', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('repairsMaintenance', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('repairsMaintenance', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1552,16 +1752,13 @@ export default function DealSheetPage() {
                         >
                           Gasoline
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.gasoline}
                           onChange={(e) => handleInputChange('gasoline', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('gasoline', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('gasoline', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1570,16 +1767,13 @@ export default function DealSheetPage() {
                         >
                           Parking
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.parking}
                           onChange={(e) => handleInputChange('parking', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('parking', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('parking', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1588,16 +1782,13 @@ export default function DealSheetPage() {
                         >
                           Commuting
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.commuting}
                           onChange={(e) => handleInputChange('commuting', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('commuting', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('commuting', true))}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1606,7 +1797,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Food
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1616,16 +1806,13 @@ export default function DealSheetPage() {
                         >
                           Groceries
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.groceries}
                           onChange={(e) => handleInputChange('groceries', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('groceries', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('groceries', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1634,16 +1821,13 @@ export default function DealSheetPage() {
                         >
                           Eating Out
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.eatingOut}
                           onChange={(e) => handleInputChange('eatingOut', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('eatingOut', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('eatingOut', true))}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1652,7 +1836,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Utilities
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1662,16 +1845,13 @@ export default function DealSheetPage() {
                         >
                           Average Gas/Electricity/Oil
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.gasElectricOil}
                           onChange={(e) => handleInputChange('gasElectricOil', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('gasElectricOil', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('gasElectricOil', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1680,16 +1860,13 @@ export default function DealSheetPage() {
                         >
                           Average Phone Bill (Including Cell)
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.phoneIncludeCell}
                           onChange={(e) => handleInputChange('phoneIncludeCell', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('phoneIncludeCell', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('phoneIncludeCell', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1698,16 +1875,13 @@ export default function DealSheetPage() {
                         >
                           Average Water/Sewer/Garbage
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.waterSewerGarbage}
                           onChange={(e) => handleInputChange('waterSewerGarbage', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('waterSewerGarbage', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('waterSewerGarbage', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1716,16 +1890,13 @@ export default function DealSheetPage() {
                         >
                           Cable/Satellite/Internet Bill
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.cableSatelliteInternet}
                           onChange={(e) => handleInputChange('cableSatelliteInternet', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('cableSatelliteInternet', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('cableSatelliteInternet', true))}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1737,7 +1908,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Debt Expenses (Not Enrolled in The Program)
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1747,16 +1917,13 @@ export default function DealSheetPage() {
                         >
                           Debt Expenses Other
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.debtOther}
                           onChange={(e) => handleInputChange('debtOther', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('debtOther', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('debtOther', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1765,16 +1932,13 @@ export default function DealSheetPage() {
                         >
                           Govt. Student Loans (non-deferred status)
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.govtStudentLoans}
                           onChange={(e) => handleInputChange('govtStudentLoans', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('govtStudentLoans', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('govtStudentLoans', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1783,20 +1947,18 @@ export default function DealSheetPage() {
                         >
                           Private Student Loans (non-deferred status)
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.privateStudentLoans}
                           onChange={(e) => handleInputChange('privateStudentLoans', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('privateStudentLoans', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('privateStudentLoans', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Medical Debt</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1805,24 +1967,27 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Legal & Court Ordered Expenses
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Child Support</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Alimony</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Judgment Payments</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Back Taxes</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1831,7 +1996,6 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Personal Care
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
@@ -1841,16 +2005,13 @@ export default function DealSheetPage() {
                         >
                           Clothing
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.clothing}
                           onChange={(e) => handleInputChange('clothing', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('clothing', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('clothing', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1859,16 +2020,13 @@ export default function DealSheetPage() {
                         >
                           Household Items
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.householdItems}
                           onChange={(e) => handleInputChange('householdItems', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('householdItems', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('householdItems', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1877,36 +2035,38 @@ export default function DealSheetPage() {
                         >
                           Entertainment
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.entertainment}
                           onChange={(e) => handleInputChange('entertainment', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('entertainment', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('entertainment', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Pet Care</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Gifts</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Toiletries</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Hair Care</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Laundry</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <ClickableLabel 
@@ -1915,24 +2075,23 @@ export default function DealSheetPage() {
                         >
                           Gym
                         </ClickableLabel>
-                        <Input 
-                          placeholder="$0.00" 
+                        <Input readOnly
+                          placeholder="$0.00"
+                        readOnly
+                          readOnly 
                           value={formData.gym}
                           onChange={(e) => handleInputChange('gym', e.target.value)}
                         />
-                        {mappedData && getFieldAverage('gym', true) > 0 && (
-                          <p className="text-xs text-green-600 mt-1">
-                            {formatCurrency(getFieldAverage('gym', true))}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Personal Care</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Charity Donations</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1941,16 +2100,17 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Dependent Care
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Daycare/Child Expenses</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Nursing Care</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1959,16 +2119,17 @@ export default function DealSheetPage() {
                   <div className="space-y-4">
                     <h3 className="font-medium text-gray-900 flex items-center justify-between cursor-pointer">
                       Other Expenses
-                      <span className="text-gray-400">⌄</span>
                     </h3>
                     <div className="grid grid-cols-2 gap-4 pl-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Misc</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-gray-600">Funds Available</Label>
-                        <Input placeholder="$0.00" />
+                        <Input placeholder="$0.00"
+                        readOnly />
                       </div>
                     </div>
                   </div>
@@ -1979,11 +2140,8 @@ export default function DealSheetPage() {
             {/* Unmapped Data Section */}
             {mappedData && mappedData.unmapped && mappedData.unmapped.length > 0 && (
               <Card className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-6 h-6 bg-yellow-500 rounded flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">⚠</span>
-                  </div>
-                  <h2 className="text-lg font-semibold text-yellow-700">
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-gray-700">
                     Unmapped Transactions ({mappedData.unmapped.length})
                   </h2>
                 </div>
@@ -2027,7 +2185,7 @@ export default function DealSheetPage() {
               <Button variant="outline" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={handleSave} className="bg-gray-600 hover:bg-gray-700">
                 Save
               </Button>
             </div>
@@ -2103,8 +2261,8 @@ export default function DealSheetPage() {
                 
                 {/* Show message when no accounts are selected */}
                 {availableAccounts.length > 0 && selectedAccounts.length === 0 && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
+                  <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm text-gray-800">
                       <strong>No accounts selected.</strong> Please select at least one account to view transaction data.
                     </p>
                   </div>
@@ -2118,14 +2276,14 @@ export default function DealSheetPage() {
                         <th className="border border-gray-300 p-3 text-center font-semibold">Current Period<br/><span className="text-xs font-normal text-gray-600">Last 30 days</span></th>
                         <th className="border border-gray-300 p-3 text-center font-semibold">Period 2<br/><span className="text-xs font-normal text-gray-600">31-60 days ago</span></th>
                         <th className="border border-gray-300 p-3 text-center font-semibold">Period 3<br/><span className="text-xs font-normal text-gray-600">61-90 days ago</span></th>
-                        <th className="border border-gray-300 p-3 text-center font-semibold bg-blue-50">Average</th>
+                        <th className="border border-gray-300 p-3 text-center font-semibold bg-gray-50">Average</th>
                       </tr>
                     </thead>
                     <tbody>
                       {/* Income Section */}
-                      <tr className="bg-green-50">
-                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-green-800">
-                          INCOME FIELDS
+                      <tr className="bg-gray-50">
+                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-gray-800">
+                          INCOME FIELDS <span className="text-xs font-normal ml-2">(95% Confidence - Plaid CRA Income Verification)</span>
                         </td>
                       </tr>
                       {(() => {
@@ -2165,7 +2323,7 @@ export default function DealSheetPage() {
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period1Value)}</td>
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period2Value)}</td>
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period3Value)}</td>
-                              <td className="border border-gray-300 p-3 text-center bg-blue-50 font-semibold">{formatCurrency(average)}</td>
+                              <td className="border border-gray-300 p-3 text-center bg-gray-50 font-semibold">{formatCurrency(average)}</td>
                             </tr>
                           );
 
@@ -2185,53 +2343,40 @@ export default function DealSheetPage() {
                             rows.push(
                               <tr key={`${fieldKey}-tx-${i}`} className="bg-gray-50 text-sm">
                                 <td className="border border-gray-300 p-2 pl-6 text-gray-600">
-                                  {(tx1 || tx2 || tx3) ? '→ Transactions' : ''}
+                                  {(tx1 || tx2 || tx3) ? `→ ${(tx1 || tx2 || tx3).name || (tx1 || tx2 || tx3).merchant_name || 'Unknown Transaction'}` : ''}
+                                  {(tx1 || tx2 || tx3) && (tx1 || tx2 || tx3).personal_finance_category?.detailed && (
+                                    <div className="text-xs text-gray-400 mt-1">
+                                      → {(tx1 || tx2 || tx3).personal_finance_category.detailed}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx1 ? (
                                     <div>
-                                      <div>
-                                        {tx1.name || tx1.merchant_name || 'Unknown'}
-                                        {tx1.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx1.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx1.mappedAmount))}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx1.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(Math.abs(tx1.mappedAmount))}</div>
                                     </div>
                                   ) : ''}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx2 ? (
                                     <div>
-                                      <div>
-                                        {tx2.name || tx2.merchant_name || 'Unknown'}
-                                        {tx2.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx2.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx2.mappedAmount))}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx2.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(Math.abs(tx2.mappedAmount))}</div>
                                     </div>
                                   ) : ''}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx3 ? (
                                     <div>
-                                      <div>
-                                        {tx3.name || tx3.merchant_name || 'Unknown'}
-                                        {tx3.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx3.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(Math.abs(tx3.mappedAmount))}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx3.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(Math.abs(tx3.mappedAmount))}</div>
                                     </div>
                                   ) : ''}
                                 </td>
@@ -2243,10 +2388,32 @@ export default function DealSheetPage() {
                           return <React.Fragment key={fieldKey}>{rows}</React.Fragment>;
                         });
                       })()}
-                      
+
+                      {/* Total Income Summary Row */}
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        // Calculate total income for each period
+                        const period1Total = Object.values(periodData.period1.income).reduce((sum, val) => sum + (val || 0), 0);
+                        const period2Total = Object.values(periodData.period2.income).reduce((sum, val) => sum + (val || 0), 0);
+                        const period3Total = Object.values(periodData.period3.income).reduce((sum, val) => sum + (val || 0), 0);
+                        const averageTotal = (period1Total + period2Total + period3Total) / 3;
+
+                        return (
+                          <tr className="bg-blue-50 font-bold border-t-2 border-blue-200">
+                            <td className="border border-gray-300 p-3 font-bold text-gray-800">TOTAL INCOME</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period1Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period2Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period3Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center bg-blue-100 font-bold text-gray-800">{formatCurrency(averageTotal)}</td>
+                          </tr>
+                        );
+                      })()}
+
                       {/* Expense Section */}
-                      <tr className="bg-red-50">
-                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-red-800">
+                      <tr className="bg-gray-50">
+                        <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-gray-800">
                           EXPENSE FIELDS
                         </td>
                       </tr>
@@ -2287,7 +2454,7 @@ export default function DealSheetPage() {
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period1Value)}</td>
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period2Value)}</td>
                               <td className="border border-gray-300 p-3 text-center font-semibold">{formatCurrency(period3Value)}</td>
-                              <td className="border border-gray-300 p-3 text-center bg-blue-50 font-semibold">{formatCurrency(average)}</td>
+                              <td className="border border-gray-300 p-3 text-center bg-gray-50 font-semibold">{formatCurrency(average)}</td>
                             </tr>
                           );
 
@@ -2307,53 +2474,40 @@ export default function DealSheetPage() {
                             rows.push(
                               <tr key={`${fieldKey}-tx-${i}`} className="bg-gray-50 text-sm">
                                 <td className="border border-gray-300 p-2 pl-6 text-gray-600">
-                                  {(tx1 || tx2 || tx3) ? '→ Transactions' : ''}
+                                  {(tx1 || tx2 || tx3) ? `→ ${(tx1 || tx2 || tx3).name || (tx1 || tx2 || tx3).merchant_name || 'Unknown Transaction'}` : ''}
+                                  {(tx1 || tx2 || tx3) && (tx1 || tx2 || tx3).personal_finance_category?.detailed && (
+                                    <div className="text-xs text-gray-400 mt-1">
+                                      → {(tx1 || tx2 || tx3).personal_finance_category.detailed}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx1 ? (
                                     <div>
-                                      <div>
-                                        {tx1.name || tx1.merchant_name || 'Unknown'}
-                                        {tx1.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx1.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx1.mappedAmount)}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx1.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(tx1.mappedAmount)}</div>
                                     </div>
                                   ) : ''}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx2 ? (
                                     <div>
-                                      <div>
-                                        {tx2.name || tx2.merchant_name || 'Unknown'}
-                                        {tx2.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx2.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx2.mappedAmount)}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx2.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(tx2.mappedAmount)}</div>
                                     </div>
                                   ) : ''}
                                 </td>
                                 <td className="border border-gray-300 p-2 text-center text-gray-600">
                                   {tx3 ? (
                                     <div>
-                                      <div>
-                                        {tx3.name || tx3.merchant_name || 'Unknown'}
-                                        {tx3.personal_finance_category?.primary && (
-                                          <span className="text-xs text-gray-500"> ({tx3.personal_finance_category.primary})</span>
-                                        )}
-                                      </div>
+                                      <div className="font-medium">{formatCurrency(tx3.mappedAmount)}</div>
                                       <div className="text-xs text-gray-500">
                                         {new Date(tx3.date).toLocaleDateString()}
                                       </div>
-                                      <div className="font-medium">{formatCurrency(tx3.mappedAmount)}</div>
                                     </div>
                                   ) : ''}
                                 </td>
@@ -2365,20 +2519,74 @@ export default function DealSheetPage() {
                           return <React.Fragment key={fieldKey}>{rows}</React.Fragment>;
                         });
                       })()}
-                      
+
+                      {/* Total Expenses Summary Row */}
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        // Calculate total expenses for each period
+                        const period1Total = Object.values(periodData.period1.expenses).reduce((sum, val) => sum + (val || 0), 0);
+                        const period2Total = Object.values(periodData.period2.expenses).reduce((sum, val) => sum + (val || 0), 0);
+                        const period3Total = Object.values(periodData.period3.expenses).reduce((sum, val) => sum + (val || 0), 0);
+                        const averageTotal = (period1Total + period2Total + period3Total) / 3;
+
+                        return (
+                          <tr className="bg-red-50 font-bold border-t-2 border-red-200">
+                            <td className="border border-gray-300 p-3 font-bold text-gray-800">TOTAL EXPENSES</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period1Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period2Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period3Total)}</td>
+                            <td className="border border-gray-300 p-3 text-center bg-red-100 font-bold text-gray-800">{formatCurrency(averageTotal)}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* Net Income Summary Row (Income - Expenses) */}
+                      {(() => {
+                        const periodData = getPeriodData();
+                        if (!periodData) return null;
+
+                        // Calculate total income for each period
+                        const period1Income = Object.values(periodData.period1.income).reduce((sum, val) => sum + (val || 0), 0);
+                        const period2Income = Object.values(periodData.period2.income).reduce((sum, val) => sum + (val || 0), 0);
+                        const period3Income = Object.values(periodData.period3.income).reduce((sum, val) => sum + (val || 0), 0);
+
+                        // Calculate total expenses for each period
+                        const period1Expenses = Object.values(periodData.period1.expenses).reduce((sum, val) => sum + (val || 0), 0);
+                        const period2Expenses = Object.values(periodData.period2.expenses).reduce((sum, val) => sum + (val || 0), 0);
+                        const period3Expenses = Object.values(periodData.period3.expenses).reduce((sum, val) => sum + (val || 0), 0);
+
+                        // Calculate net income (income - expenses) for each period
+                        const period1Net = period1Income - period1Expenses;
+                        const period2Net = period2Income - period2Expenses;
+                        const period3Net = period3Income - period3Expenses;
+                        const averageNet = (period1Net + period2Net + period3Net) / 3;
+
+                        return (
+                          <tr className="bg-green-50 font-bold border-t-2 border-green-200">
+                            <td className="border border-gray-300 p-3 font-bold text-gray-800">NET INCOME (Income - Expenses)</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period1Net)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period2Net)}</td>
+                            <td className="border border-gray-300 p-3 text-center font-bold text-gray-800">{formatCurrency(period3Net)}</td>
+                            <td className="border border-gray-300 p-3 text-center bg-green-100 font-bold text-gray-800">{formatCurrency(averageNet)}</td>
+                          </tr>
+                        );
+                      })()}
+
                       {/* Uncategorized Items Section */}
                       {(() => {
                         const filteredData = getFilteredMappedData();
                         const dataToUse = filteredData || mappedData;
                         return dataToUse && dataToUse.unmapped && dataToUse.unmapped.length > 0 && (
                           <>
-                            <tr className="bg-yellow-50">
-                              <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-yellow-800">
+                            <tr className="bg-gray-50">
+                              <td colSpan={5} className="border border-gray-300 p-2 font-semibold text-gray-800">
                                 UNCATEGORIZED TRANSACTIONS ({dataToUse.unmapped.length})
                               </td>
                             </tr>
                             {dataToUse.unmapped.map((transaction, idx) => (
-                            <tr key={`unmapped-${idx}`} className="bg-yellow-25 text-sm">
+                            <tr key={`unmapped-${idx}`} className="bg-gray-25 text-sm">
                               <td className="border border-gray-300 p-2 pl-6 text-gray-600">
                                 → {transaction.name || transaction.merchant_name || 'Unknown Transaction'}
                                 <br />
@@ -2407,37 +2615,6 @@ export default function DealSheetPage() {
                         );
                       })()}
                       
-                      {/* Totals Row */}
-                      {(() => {
-                        const periodData = getPeriodData();
-                        if (!periodData) return null;
-
-                        const period1Total = Object.values(periodData.period1.income).reduce((a, b) => a + b, 0) + 
-                                           Object.values(periodData.period1.expenses).reduce((a, b) => a + b, 0);
-                        const period2Total = Object.values(periodData.period2.income).reduce((a, b) => a + b, 0) + 
-                                           Object.values(periodData.period2.expenses).reduce((a, b) => a + b, 0);
-                        const period3Total = Object.values(periodData.period3.income).reduce((a, b) => a + b, 0) + 
-                                           Object.values(periodData.period3.expenses).reduce((a, b) => a + b, 0);
-                        const averageTotal = (period1Total + period2Total + period3Total) / 3;
-
-                        return (
-                          <tr className="bg-gray-100 font-semibold">
-                            <td className="border border-gray-300 p-3">TOTAL</td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {formatCurrency(period1Total)}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {formatCurrency(period2Total)}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {formatCurrency(period3Total)}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center bg-blue-100 font-bold">
-                              {formatCurrency(averageTotal)}
-                            </td>
-                          </tr>
-                        );
-                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -2450,7 +2627,6 @@ export default function DealSheetPage() {
                     <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8">
                       <div className="flex flex-col items-center">
                         <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                          <span className="text-2xl text-gray-400">📊</span>
                         </div>
                         <h3 className="text-lg font-medium text-gray-900 mb-2">No Bank Data Available</h3>
                         <p className="text-sm text-gray-600 mb-4 max-w-md">
@@ -2458,7 +2634,7 @@ export default function DealSheetPage() {
                         </p>
                         <button
                           onClick={() => window.location.href = '/your-plan'}
-                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                          className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
                         >
                           Connect Bank Account
                         </button>

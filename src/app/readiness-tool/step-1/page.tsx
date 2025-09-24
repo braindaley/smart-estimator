@@ -7,11 +7,11 @@ import { useReadinessStore } from '@/lib/readiness-store';
 import { ReadinessStepNavigation } from '@/components/readiness-step-navigation';
 
 const options = [
-  { label: "Job loss (laid-off, temporary loss, pay cut)", value: "job_loss", points: 3 },
-  { label: "Medical/disability (illness, injury, disability)", value: "medical_disability", points: 3 },
-  { label: "Life changes (divorce, loss of provider)", value: "life_changes", points: 2 },
+  { label: "Job loss (laid-off, temporary loss, pay cut)", value: "job_loss", points: 5 },
+  { label: "Medical/disability (illness, injury, disability)", value: "medical_disability", points: 4 },
+  { label: "Life changes (divorce, loss of provider)", value: "life_changes", points: 4 },
   { label: "Business slowdown", value: "business_slowdown", points: 2 },
-  { label: "Other", value: "other", points: 2 },
+  { label: "Other", value: "other", points: 3 },
 ];
 
 export default function Step1() {

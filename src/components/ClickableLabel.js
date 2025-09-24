@@ -9,11 +9,11 @@ export default function ClickableLabel({
   className = '' 
 }) {
   const baseClasses = "text-sm text-gray-600";
-  const clickableClasses = hasData 
-    ? "cursor-pointer hover:text-blue-600 hover:underline" 
+  const clickableClasses = hasData
+    ? "cursor-pointer hover:text-gray-900 hover:underline"
     : "";
-  const indicatorClasses = hasData 
-    ? "relative after:content-['📊'] after:ml-1 after:text-xs" 
+  const indicatorClasses = hasData
+    ? "relative"
     : "";
 
   return (

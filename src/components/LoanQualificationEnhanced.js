@@ -21,10 +21,38 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
   const router = useRouter();
   const [stepStatus, setStepStatus] = useState({});
   const [isProcessing, setIsProcessing] = useState({});
+  const [stepStatusLoaded, setStepStatusLoaded] = useState(false);
 
-  // Load step status from session
+  // Load step status from session and refresh periodically to catch persona changes
   useEffect(() => {
-    setStepStatus(getStepStatus());
+    const refreshStepStatus = () => {
+      const currentStepStatus = getStepStatus();
+      console.log('[LoanQualification] Step status loaded:', {
+        bankCompleted: !!currentStepStatus.bank_connection?.completed,
+        creditCompleted: !!currentStepStatus.credit_check?.completed
+      });
+      setStepStatus(currentStepStatus);
+      setStepStatusLoaded(true);
+    };
+
+    refreshStepStatus();
+
+    // Set up an interval to refresh step status (to catch persona changes)
+    const interval = setInterval(refreshStepStatus, 1000);
+
+    // Also listen for storage changes (when personas are applied)
+    const handleStorageChange = (e) => {
+      if (e.key === 'user_steps' || e.key?.includes('selected_persona')) {
+        refreshStepStatus();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Bank connection handler
@@ -250,6 +278,11 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   <span className="text-blue-600 text-sm">Processing...</span>
                 </div>
+              ) : !stepStatusLoaded ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  <span className="text-gray-600 text-sm">Loading...</span>
+                </div>
               ) : (
                 <PlaidLink
                   userId={userId}
@@ -298,6 +331,11 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   <span className="text-blue-600 text-sm">Processing...</span>
+                </div>
+              ) : !stepStatusLoaded ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  <span className="text-gray-600 text-sm">Loading...</span>
                 </div>
               ) : (
                 <CreditCheckForm

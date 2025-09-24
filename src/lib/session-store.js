@@ -57,11 +57,40 @@ export const storePlaidData = (userId, data) => {
   }
 };
 
-// Get Plaid data
+// Get Plaid data (checks both sessionStorage and localStorage for persona data)
 export const getPlaidData = () => {
   if (typeof window !== 'undefined') {
+    console.log('[SessionStore] getPlaidData called');
+
+    // First check sessionStorage for persona data
+    try {
+      const sessionData = sessionStorage.getItem('plaid_session_data');
+      if (sessionData) {
+        const parsed = JSON.parse(sessionData);
+        console.log('[SessionStore] Found persona data in sessionStorage:', parsed);
+        return parsed;
+      }
+    } catch (e) {
+      console.log('[SessionStore] SessionStorage error:', e);
+      // Fallback to localStorage if sessionStorage is not available
+      try {
+        const localSessionData = localStorage.getItem('plaid_session_data');
+        if (localSessionData) {
+          const parsed = JSON.parse(localSessionData);
+          console.log('[SessionStore] Found persona data in localStorage fallback:', parsed);
+          return parsed;
+        }
+      } catch (e2) {
+        console.log('[SessionStore] LocalStorage fallback error:', e2);
+        // Continue to original logic
+      }
+    }
+
+    // Original logic - get from localStorage
     const stored = localStorage.getItem(SESSION_KEYS.PLAID_DATA);
-    return stored ? JSON.parse(stored) : null;
+    const result = stored ? JSON.parse(stored) : null;
+    console.log('[SessionStore] Using original plaid_data from localStorage:', result);
+    return result;
   }
   return null;
 };
@@ -72,6 +101,39 @@ export const clearSessionData = () => {
     Object.values(SESSION_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
+  }
+};
+
+// Clear only Plaid data (keep credit data)
+export const clearPlaidData = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(SESSION_KEYS.PLAID_DATA);
+    localStorage.removeItem(SESSION_KEYS.BANK_CONNECTED);
+    // Update user steps to remove bank connection step
+    const steps = getStepStatus();
+    if (steps.bank_connection) {
+      delete steps.bank_connection;
+      localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
+    }
+  }
+};
+
+// Clear only credit data (keep Plaid data)
+export const clearCreditData = () => {
+  if (typeof window !== 'undefined') {
+    // Remove credit data for all users
+    const userId = localStorage.getItem('loan_user_id');
+    if (userId) {
+      localStorage.removeItem(`credit_data_${userId}`);
+    }
+    localStorage.removeItem(SESSION_KEYS.CREDIT_DATA);
+    localStorage.removeItem(SESSION_KEYS.CREDIT_CHECKED);
+    // Update user steps to remove credit check step
+    const steps = getStepStatus();
+    if (steps.credit_check) {
+      delete steps.credit_check;
+      localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
+    }
   }
 };
 
