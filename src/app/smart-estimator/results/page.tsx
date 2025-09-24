@@ -564,6 +564,168 @@ export default function Results() {
       </div>
 
       <Accordion type="single" collapsible className="mt-8">
+        <AccordionItem value="user-stories" className="border-0">
+          <AccordionTrigger className="text-xs text-muted-foreground hover:text-muted-foreground py-2 px-0">User Stories/Success Criteria</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">User Stories & Success Criteria</CardTitle>
+                  <CardDescription>User scenarios with corresponding measurable success criteria</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 1: Quick Debt Relief Estimation</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As a debt-burdened consumer, I want to quickly estimate my debt relief options so that I can understand what solutions are available to me without committing to a consultation.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Users can complete the 5-step estimation process in under 3 minutes</li>
+                        <li>- Results page loads and displays accurate calculations within 2 seconds</li>
+                        <li>- At least 70% of users complete all steps without abandoning the process</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 2: Clear Comparison of Options</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As someone struggling with multiple creditors, I want to see a clear comparison of different debt relief approaches so that I can make an informed decision about my financial future.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Comparison table clearly highlights the recommended Momentum option</li>
+                        <li>- Users can easily understand which options they qualify for and why</li>
+                        <li>- Payment calculations match real-world program terms and conditions</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 3: Credit Score-Based Filtering</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As a person with varying credit scores, I want to see realistic options based on my creditworthiness so that I don't waste time pursuing solutions I won't qualify for.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Personal loan eligibility correctly filters based on FICO scores and debt amounts</li>
+                        <li>- Momentum Score accurately reflects client suitability using proven algorithm</li>
+                        <li>- Users with FICO scores below 580 see appropriate messaging about eligibility</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 4: Financial Impact Understanding</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As someone considering debt settlement, I want to understand how Momentum compares to personal loans and doing nothing so that I can see the financial impact of each choice.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Total costs and monthly payments are clearly displayed for each option</li>
+                        <li>- Calculations show realistic timeframes and payment structures</li>
+                        <li>- Users can see the long-term consequences of doing nothing vs taking action</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 5: Mobile Accessibility</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As a user on mobile devices, I want a responsive interface that clearly presents my options so that I can access this tool anywhere, anytime.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Mobile experience maintains full functionality across all device sizes</li>
+                        <li>- Comparison table adapts to card-based layout on smaller screens</li>
+                        <li>- Touch targets meet accessibility standards for mobile interaction</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 6: Personalized Momentum Score</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As a potential client, I want to see my personalized Momentum Score so that I can understand how well-suited I am for debt settlement.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Score calculation uses all five input factors (debt, creditors, payment status, income, credit)</li>
+                        <li>- Users with high scores (>29) are routed to plan verification</li>
+                        <li>- Users with lower scores are engaged through readiness assessment</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 7: Non-Income User Support</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As someone without steady income, I want to be directed to appropriate non-payment relief options so that I can still find help for my situation.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Users without steady income are appropriately directed to alternative resources</li>
+                        <li>- Clear messaging explains why payment-based solutions aren't available</li>
+                        <li>- Legal aid partner resources are prominently displayed</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 8: Calculation Transparency</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As a data-driven user, I want to see the calculations behind my estimates so that I can verify and understand how the numbers were determined.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- Detailed calculation accordion shows formulas and logic used</li>
+                        <li>- All currency formatting and number displays remain consistent</li>
+                        <li>- Calculator settings load dynamically from admin configuration</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Story 9: Clear Next Steps</h4>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">User Story:</p>
+                      <p className="text-sm text-gray-600">As someone ready to move forward, I want clear next steps that match my situation so that I can easily progress toward debt resolution.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Success Criteria:</p>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>- At least 70% of eligible users proceed to the "What's Next" action</li>
+                        <li>- Bounce rate from results page remains below 40%</li>
+                        <li>- Users can easily restart the process if they want to adjust their inputs</li>
+                        <li>- All form data persists correctly through the estimation process</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                </CardContent>
+              </Card>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
         <AccordionItem value="debug-info" className="border-0">
           <AccordionTrigger className="text-xs text-muted-foreground hover:text-muted-foreground py-2 px-0">Calculations</AccordionTrigger>
           <AccordionContent>
