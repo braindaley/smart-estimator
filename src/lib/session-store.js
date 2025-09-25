@@ -7,6 +7,8 @@ const SESSION_KEYS = {
   PLAID_DATA: 'plaid_data',
   CREDIT_CHECKED: 'credit_checked',
   CREDIT_DATA: 'credit_data',
+  PHONE_VERIFIED: 'phone_verified',
+  PHONE_DATA: 'phone_data',
   USER_STEPS: 'user_steps'
 };
 
@@ -163,4 +165,40 @@ export const getCreditData = () => {
     return stored ? JSON.parse(stored) : null;
   }
   return null;
+};
+
+// Store phone verification data
+export const storePhoneData = (userId, data) => {
+  if (typeof window !== 'undefined') {
+    const phoneData = {
+      userId,
+      data,
+      storedAt: new Date().toISOString()
+    };
+    localStorage.setItem(SESSION_KEYS.PHONE_DATA, JSON.stringify(phoneData));
+    setStepCompleted('phone_verification', true, { userId, verificationTime: new Date().toISOString() });
+  }
+};
+
+// Get phone verification data
+export const getPhoneData = () => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(SESSION_KEYS.PHONE_DATA);
+    return stored ? JSON.parse(stored) : null;
+  }
+  return null;
+};
+
+// Clear phone verification data
+export const clearPhoneData = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(SESSION_KEYS.PHONE_DATA);
+    localStorage.removeItem(SESSION_KEYS.PHONE_VERIFIED);
+    // Update user steps to remove phone verification step
+    const steps = getStepStatus();
+    if (steps.phone_verification) {
+      delete steps.phone_verification;
+      localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
+    }
+  }
 };

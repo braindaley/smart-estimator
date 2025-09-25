@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check Credit', className = '' }) {
+export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check Credit', className = '', disabled = false }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -178,8 +178,13 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
-        className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 text-sm ${className}`}
+        onClick={() => !disabled && setIsOpen(true)}
+        disabled={disabled}
+        className={`px-4 py-2 font-semibold rounded-lg transition-all duration-200 text-sm ${
+          disabled
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+        } ${className}`}
       >
         {buttonText}
       </button>

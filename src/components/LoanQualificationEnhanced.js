@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PlaidLink from './PlaidLink';
 import CreditCheckForm from './CreditCheckForm';
-import { 
-  setStepCompleted, 
-  getStepStatus, 
-  isStepCompleted, 
-  storePlaidData, 
-  generateResultsUrl, 
-  storeCreditData 
+import PhoneVerification from './PhoneVerification';
+import {
+  setStepCompleted,
+  getStepStatus,
+  isStepCompleted,
+  storePlaidData,
+  generateResultsUrl,
+  storeCreditData,
+  storePhoneData
 } from '@/lib/session-store';
 import { getTokenClient } from '@/lib/client-token-store';
 
@@ -28,6 +30,7 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
     const refreshStepStatus = () => {
       const currentStepStatus = getStepStatus();
       console.log('[LoanQualification] Step status loaded:', {
+        phoneCompleted: !!currentStepStatus.phone_verification?.completed,
         bankCompleted: !!currentStepStatus.bank_connection?.completed,
         creditCompleted: !!currentStepStatus.credit_check?.completed
       });
@@ -208,17 +211,55 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
   // Credit check handler
   const handleCreditCheck = (creditData) => {
     console.log('[LoanQualification] Credit check completed:', creditData);
-    
+
     // Store credit data in session
     storeCreditData(userId, creditData);
-    
+
     // Update local state
     const newStepStatus = getStepStatus();
     setStepStatus(newStepStatus);
-    
+
     // Call onComplete callback if provided
     if (onComplete) {
       onComplete(creditData);
+    }
+  };
+
+  // Phone verification handler
+  const handlePhoneVerified = (phoneData) => {
+    console.log('[LoanQualification] Phone verified:', phoneData);
+
+    // Store phone data in session
+    storePhoneData(userId, phoneData);
+
+    // Update local state
+    const newStepStatus = getStepStatus();
+    setStepStatus(newStepStatus);
+
+    // Call onComplete callback if provided
+    if (onComplete) {
+      onComplete(phoneData);
+    }
+  };
+
+  // Reset all steps handler
+  const handleResetAllSteps = () => {
+    if (confirm('Are you sure you want to reset all progress and start over?')) {
+      // Clear all localStorage data
+      localStorage.removeItem('user_steps');
+      localStorage.removeItem('plaid_data');
+      localStorage.removeItem('credit_data');
+      localStorage.removeItem('phone_data');
+
+      // Clear user-specific data
+      if (userId) {
+        localStorage.removeItem(`credit_data_${userId}`);
+        localStorage.removeItem(`plaid_data_${userId}`);
+        localStorage.removeItem(`phone_data_${userId}`);
+      }
+
+      // Reload the page to reset all states
+      window.location.reload();
     }
   };
 
@@ -233,17 +274,17 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
           Ready to see your plan? Connect your accounts below to get started.
         </h1>
         <p className="text-lg text-gray-600 mt-2">
-          Get instant approval decision in 3 simple steps
+          Get instant approval decision in 4 simple steps
         </p>
       </div>
 
       <div className="rounded-xl p-6 border border-border mb-8">
         <h3 className="text-lg font-semibold text-foreground mb-4">How It Works</h3>
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* Step 1: Bank Account Access */}
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          {/* Step 1: Phone Verification */}
           <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
             <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
-              {stepStatus.bank_connection?.completed ? (
+              {stepStatus.phone_verification?.completed ? (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
@@ -251,11 +292,59 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                 '1'
               )}
             </div>
+            <h4 className="font-semibold text-foreground mb-2 pr-4">Phone Verification</h4>
+            <p className="text-sm text-muted-foreground mb-4 flex-grow">
+              Verify your identity with your phone number to secure your account
+            </p>
+
+            {/* Action Area */}
+            <div className="mt-auto">
+              {stepStatus.phone_verification?.completed ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium text-sm">Phone Verified</span>
+                  </div>
+                </div>
+              ) : isProcessing.phone_verification ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-blue-600 text-sm">Processing...</span>
+                </div>
+              ) : !stepStatusLoaded ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  <span className="text-gray-600 text-sm">Loading...</span>
+                </div>
+              ) : (
+                <PhoneVerification
+                  userId={userId}
+                  onSuccess={handlePhoneVerified}
+                  buttonText="Verify Phone"
+                  className="w-full h-10"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Step 2: Bank Account Access */}
+          <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
+            <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
+              {stepStatus.bank_connection?.completed ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                '2'
+              )}
+            </div>
             <h4 className="font-semibold text-foreground mb-2 pr-4">Bank Account Access</h4>
             <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Verify your income and expenses to calculate an affordable monthly payment
             </p>
-            
+
             {/* Action Area */}
             <div className="mt-auto">
               {stepStatus.bank_connection?.completed ? (
@@ -278,23 +367,19 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   <span className="text-blue-600 text-sm">Processing...</span>
                 </div>
-              ) : !stepStatusLoaded ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                  <span className="text-gray-600 text-sm">Loading...</span>
-                </div>
               ) : (
                 <PlaidLink
                   userId={userId}
                   onSuccess={handleBankConnected}
                   buttonText="Connect Bank Account"
                   className="w-full h-10"
+                  disabled={!stepStatusLoaded || !stepStatus.phone_verification?.completed}
                 />
               )}
             </div>
           </div>
 
-          {/* Step 2: Credit Check */}
+          {/* Step 3: Credit Check */}
           <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
             <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
               {stepStatus.credit_check?.completed ? (
@@ -302,14 +387,14 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                '2'
+                '3'
               )}
             </div>
             <h4 className="font-semibold text-foreground mb-2 pr-4">Credit Check</h4>
             <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Review your current debts to determine which accounts qualify for settlement
             </p>
-            
+
             {/* Action Area */}
             <div className="mt-auto">
               {stepStatus.credit_check?.completed ? (
@@ -332,40 +417,38 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   <span className="text-blue-600 text-sm">Processing...</span>
                 </div>
-              ) : !stepStatusLoaded ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                  <span className="text-gray-600 text-sm">Loading...</span>
-                </div>
               ) : (
                 <CreditCheckForm
                   userId={userId}
                   onSuccess={handleCreditCheck}
                   buttonText="Start Credit Check"
                   className="w-full h-10"
+                  disabled={!stepStatusLoaded || !stepStatus.phone_verification?.completed || !stepStatus.bank_connection?.completed}
                 />
               )}
             </div>
           </div>
+        </div>
 
-          {/* Step 3: Instant Results */}
-          <div className="rounded-lg p-4 border border-border relative min-h-[180px] flex flex-col">
-            <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
-              {stepStatus.plan_generation?.completed ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                '3'
-              )}
+        {/* Instant Results Box - Moved Below */}
+        <div className="rounded-lg p-6 border-2 border-blue-200 bg-blue-50 relative">
+          <div className="absolute -top-3 -left-3 w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-10">
+            {stepStatus.plan_generation?.completed ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              '4'
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex-grow">
+              <h4 className="font-semibold text-foreground mb-2 pr-4">Instant Results</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Get your customized plan with real payment amounts and projected timelines
+              </p>
             </div>
-            <h4 className="font-semibold text-foreground mb-2 pr-4">Instant Results</h4>
-            <p className="text-sm text-muted-foreground mb-4 flex-grow">
-              Get your customized plan with real payment amounts and projected timelines
-            </p>
-            
-            {/* Action Area */}
-            <div className="mt-auto">
+            <div className="flex-shrink-0 ml-6">
               {stepStatus.plan_generation?.completed ? (
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
@@ -388,21 +471,21 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                 </div>
               ) : (
                 <button
-                  disabled={!stepStatus.bank_connection?.completed || !stepStatus.credit_check?.completed}
+                  disabled={!stepStatus.phone_verification?.completed || !stepStatus.bank_connection?.completed || !stepStatus.credit_check?.completed}
                   onClick={() => {
-                    if (stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed) {
+                    if (stepStatus.phone_verification?.completed && stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed) {
                       router.push('/your-plan/results');
                     }
                   }}
-                  className={`w-full h-10 px-4 font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center ${
-                    stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
+                  className={`px-6 py-3 font-semibold rounded-lg transition-all duration-200 text-sm flex items-center justify-center ${
+                    stepStatus.phone_verification?.completed && stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
                       ? 'bg-green-600 hover:bg-green-700 text-white'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
+                  {stepStatus.phone_verification?.completed && stepStatus.bank_connection?.completed && stepStatus.credit_check?.completed
                     ? 'Generate Plan'
-                    : 'Complete Steps 1 & 2'
+                    : 'Complete All Steps Above'
                   }
                 </button>
               )}
@@ -440,6 +523,16 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Reset Link */}
+      <div className="text-center mt-8 pt-6 border-t border-border">
+        <button
+          onClick={handleResetAllSteps}
+          className="text-sm text-muted-foreground hover:text-foreground underline transition-colors"
+        >
+          Reset All Progress & Start Over
+        </button>
       </div>
     </div>
   );
