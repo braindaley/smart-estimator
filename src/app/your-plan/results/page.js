@@ -423,59 +423,6 @@ export default function ResultsPage() {
                           </div>
 
                           <div>
-                            <h3 className="font-bold text-lg mb-4">DATA INTEGRATION ARCHITECTURE</h3>
-
-                            <h4 className="font-semibold mb-2">Credit Data Processing (src/app/your-plan/results/page.js lines 126-193):</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                1. getCreditData() - Retrieves from localStorage['credit_data_{`userId`}']<br/>
-                                2. getEquifaxNarrativeCodes() - Gets narrative code config from localStorage<br/>
-                                3. Filter accounts: data.trades.filter(account {`=>`} balance &gt; 0)<br/>
-                                4. Filter eligible: accounts.filter(isNarrativeCodeIncludedInSettlement)<br/>
-                                5. Calculate total debt: eligible.reduce((sum, account) {`=>`} sum + balance, 0)<br/>
-                                6. Apply minimum threshold: totalDebt {`>=`} 15000 for Momentum Plan
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Narrative Code Eligibility Logic:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                function isNarrativeCodeIncludedInSettlement(account, narrativeCodes) {`{`}<br/>
-                                &nbsp;&nbsp;const accountNarrativeCodes = [];<br/>
-                                &nbsp;&nbsp;account.narrativeCodes.forEach(nc {`=>`} {`{`}<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.codeabv) accountNarrativeCodes.push(nc.codeabv);<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;if (nc.code) accountNarrativeCodes.push(nc.code);<br/>
-                                &nbsp;&nbsp;{`}`});<br/>
-                                &nbsp;&nbsp;return accountNarrativeCodes.some(accountCode {`=>`} {`{`}<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;const config = narrativeCodes.find(c {`=>`} c.code {`===`} accountCode);<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;return config && config.includeInSettlement;<br/>
-                                &nbsp;&nbsp;{`}`});<br/>
-                                {`}`}
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Calculator Settings Integration:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                API: /api/admin/calculator-settings<br/>
-                                Structure: {`{`} debtTiers: [tier1, tier2, ...] {`}`}<br/>
-                                Tier Properties: minAmount, maxAmount, feePercentage, maxTerm, programType<br/>
-                                Used by: getMomentumFeePercentage(), getMomentumTermLength()
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Current Session State:</h4>
-                            <div className="space-y-1">
-                              <div>Total Credit Accounts: {creditData?.trades?.length || 0}</div>
-                              <div>Accounts with Balance &gt; 0: {creditData?.trades?.filter(a => (typeof a.balance === 'number' ? a.balance : parseFloat(a.balance) || 0) > 0).length || 0}</div>
-                              <div>Eligible for Settlement: {eligibleAccounts.length}</div>
-                              <div>Total Eligible Debt: {formatCurrency(momentumResults?.totalDebt || 0)}</div>
-                              <div>Narrative Codes Configured: {narrativeCodes.length}</div>
-                              <div>Minimum Threshold Met: {momentumResults?.totalDebt >= 15000 ? 'Yes' : 'No'}</div>
-                            </div>
-                          </div>
-
-                          <div>
                             <h3 className="font-bold text-lg mb-4">DATA SOURCES & CONFIGURATION ACCESS</h3>
 
                             <h4 className="font-semibold mb-2">View Data Sources:</h4>
