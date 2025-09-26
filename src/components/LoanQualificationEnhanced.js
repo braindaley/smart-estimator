@@ -369,12 +369,12 @@ export default function LoanQualificationEnhanced({ userId, onComplete }) {
                 </div>
               ) : (
                 <PlaidLink
-                  userId={userId}
-                  onSuccess={handleBankConnected}
-                  buttonText="Connect Bank Account"
-                  className="w-full h-10"
-                  disabled={!stepStatusLoaded || !stepStatus.phone_verification?.completed}
-                />
+                    userId={userId}
+                    onSuccess={handleBankConnected}
+                    buttonText="Connect Bank Account"
+                    className="w-full h-10"
+                    disabled={!stepStatusLoaded || !stepStatus.phone_verification?.completed}
+                  />
               )}
             </div>
           </div>

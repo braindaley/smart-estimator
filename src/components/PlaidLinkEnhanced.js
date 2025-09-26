@@ -238,11 +238,11 @@ export default function PlaidLinkEnhanced({
 
   const { open, ready } = usePlaidLink(config);
 
-  console.log('[PlaidLink] Plaid Link state:', { 
-    hasLinkToken: !!linkToken, 
-    ready, 
-    isLoading, 
-    error: !!error 
+  console.log('[PlaidLink] Plaid Link state:', {
+    hasLinkToken: !!linkToken,
+    ready,
+    isLoading,
+    error: !!error
   });
 
   // Determine button state
