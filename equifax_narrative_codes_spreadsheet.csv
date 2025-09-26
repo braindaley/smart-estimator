@@ -1,0 +1,245 @@
+Code,Description,Include in Settlement,Category,Notes
+AA,Consumer says merchandise or service unsatisfactory,No,Dispute,Service/product dispute
+AB,Consumer says account paid/being paid by insurance,No,Insurance,Insurance claim related
+AC,Consumer says acct is responsibility of separated or divorced spouse,No,Dispute,Spousal responsibility
+AE,Consumer says acct. Involved in business venture held personally liab,No,Business,Business liability
+AF,Consumer says account involves lease agreement dispute,No,Dispute,Lease dispute
+AG,Consumer disputes account - litigation pending,No,Legal,Active litigation
+AH,Consumer says account slow due to billing dispute with creditor,No,Dispute,Billing dispute
+AI,Consumer says account slow due to employment issues,No,Hardship,Employment related
+AJ,Consumer says account slow due to medical expenses/illness,No,Hardship,Medical hardship
+AL,Consumer says warranty dispute,No,Dispute,Warranty issue
+AM,Voluntary surrender; there may be a balance due,No,Repossession,Voluntary surrender
+AN,Involuntary repossession,No,Repossession,Forced repossession
+AO,Auto,No,Loan Type,Auto loan
+AP,Commercial account,No,Business,Commercial account
+AQ,Household goods,No,Loan Type,Secured by goods
+AR,Home loan,No,Mortgage,Home mortgage
+AS,Home improvement loan,No,Mortgage,Home improvement
+AT,Checking account loan plan,No,Banking,Checking account
+AU,Personal loan,Yes,Unsecured Debt,Common debt settlement
+AV,Charge,Yes,Unsecured Debt,Charge account - common settlement
+AW,Secured by household goods,No,Secured,Secured loan
+AX,Paid by dealer,No,Auto,Dealer paid
+AY,Voluntarily surrendered – then redeemed or reinstated,No,Repossession,Redeemed
+AZ,Amount in h/c column is credit limit,No,Information,Credit limit info
+BB,Consumer disputes this account information,No,Dispute,General dispute
+BC,Account transferred or sold,No,Transfer,Account sold
+BD,Paid - credit line closed,No,Closed,Paid and closed
+BE,Credit line closed,No,Closed,Line closed
+BG,Claim filed with government,No,Government,Government claim
+BH,Dispute - resolution pending,No,Dispute,Pending resolution
+BK,Redeemed or reinstated repossession,No,Repossession,Reinstated
+BL,Consumer says account slow due to domestic problems,No,Hardship,Domestic issues
+BM,Consumer says paid on notification - no prior knowledge of balance due,No,Dispute,No notice
+BN,Consumer says co-signed account - not aware of delinquency,No,Co-signer,Co-signer issue
+BO,Consumer says no statement received due to address change,No,Communication,Address change
+BP,Consumer says this account spouse's responsibility,No,Spousal,Spouse account
+BQ,Paid charge off,No,Charge Off,Paid charge off
+BR,Foreclosure process started,No,Foreclosure,Foreclosure begun
+BS,Paid or being paid by government guarantor,No,Government,Government guarantee
+BT,Lease,No,Lease,Lease account
+BU,Student loan,No,Student Loan,Education debt - typically excluded
+BV,Consumer dispute following resolution,No,Dispute,Post-resolution dispute
+BW,Included in bankruptcy,No,Bankruptcy,In bankruptcy
+BX,Payments managed by financial counseling program,No,Counseling,Credit counseling
+BY,Collection agency account - status unknown,No,Collection,Unknown status
+BZ,Account paid for less than full balance,No,Settlement,Already settled
+CA,Charge off - making payments,No,Charge Off,Paying on charge off
+CB,Charged off - check presented was uncollectible,No,Charge Off,Bad check
+CD,Customer has now located consumer,No,Contact,Located consumer
+CE,Refinanced,No,Refinance,Account refinanced
+CF,Closed account,No,Closed,Account closed
+CG,Account closed - reason unknown,No,Closed,Unknown closure
+CH,Account paid after foreclosure started,No,Foreclosure,Paid after foreclosure
+CI,Insurance claim pending,No,Insurance,Pending claim
+CJ,Customer unable to locate consumer,No,Contact,Cannot locate
+CK,Debit card,No,Banking,Debit card
+CL,Paid or being paid by co-signer or guarantor,No,Co-signer,Co-signer paying
+CM,Account assumed by another party,No,Transfer,Assumed account
+CN,Paying under a partial payment agreement,No,Payment Plan,Partial payments
+CP,Consumer says personal bankruptcy filed due to business failure,No,Bankruptcy,Business bankruptcy
+CQ,Pltff verified judgment paid/satisfaction not recorded with court,No,Legal,Judgment paid
+CS,Secured credit line,No,Secured,Secured line
+CT,Voluntary,No,Voluntary,Voluntary action
+CU,Involuntary,No,Involuntary,Involuntary action
+CV,Line of credit,Yes,Unsecured Debt,Credit line - common settlement
+CW,Account closed by credit grantor,No,Closed,Creditor closed
+CX,Payment is payroll deductible,No,Payment Method,Payroll deduction
+CY,Account charged to profit and loss,No,Charge Off,Written off
+CZ,Collection account,Yes,Collection,Collection - common settlement
+DA,Account closed by consumer,No,Closed,Consumer closed
+DB,Charged off account,No,Charge Off,Charged off
+DC,Consumer says account not paid promptly - insurance claim delayed,No,Insurance,Insurance delay
+DD,Balance is deficiency amount,No,Deficiency,Deficiency balance
+DE,Consumer says account paid in full,No,Dispute,Claims paid
+DG,Title 1 loan,No,Government,Title 1 loan
+DH,Balance not paid by insurance,No,Insurance,Insurance didn't pay
+DI,Balance paid or being paid by insurance company,No,Insurance,Insurance paying
+DJ,Foreclosure,No,Foreclosure,Foreclosed
+DK,Paid or being paid by garnishment,No,Garnishment,Wage garnishment
+DL,Consumer recalled to active military duty,No,Military,Military duty
+DM,Forfeit of deed in lieu of foreclosure,No,Foreclosure,Deed in lieu
+DN,Broken lease agreement,No,Lease,Broken lease
+DO,Bankruptcy chapter 13,No,Bankruptcy,Chapter 13
+DP,Conversion loss paid by insurance,No,Insurance,Insurance paid loss
+DQ,Student loan - payment deferred,No,Student Loan,Deferred student loan
+DS,Single payment loan,No,Loan Type,Single payment
+DT,Amortized mortgage,No,Mortgage,Amortized mortgage
+DU,Sheriff sale,No,Foreclosure,Sheriff sale
+DV,Amount in high credit includes finance charge,No,Information,Finance charge included
+DW,Return mail,No,Contact,Mail returned
+DX,Balance owing - amount not reported,No,Information,Balance unknown
+EA,Paid or making payments - not according to terms of agreement,No,Payment Status,Not per terms
+EB,Lease - early termination by default,No,Lease,Lease default
+EC,Home equity,No,Mortgage,Home equity
+ED,Making payment - foreclosure was initiated,No,Foreclosure,Paying after foreclosure
+EE,Secured,No,Secured,Secured loan
+EF,Real estate mortgage,No,Mortgage,Real estate
+EG,Guaranteed student loan,No,Student Loan,Guaranteed student loan
+EH,National direct student loan,No,Student Loan,Direct student loan
+EI,Consumer disputes account - litigation filed by creditor pending,No,Legal,Creditor litigation
+EJ,Consumer disputes account - litigation filed by consumer pending,No,Legal,Consumer litigation
+EK,Child/family support obligation,No,Support,Child support
+EL,Defendant verified item pd/satisfaction not recorded with court,No,Legal,Court recording issue
+EM,Voluntary return of purchase,No,Return,Voluntary return
+EN,Account included in wep filed by another person,No,Legal,Other's wep
+EO,Account included in bankruptcy of another person,No,Bankruptcy,Other's bankruptcy
+EP,Fixed rate,No,Loan Terms,Fixed rate
+EQ,Variable/adjustable rate,No,Loan Terms,Variable rate
+ER,Paid collection,No,Collection,Collection paid
+ES,Charged back to dealer,No,Auto,Dealer charge back
+ET,Paid repossession,No,Repossession,Repossession paid
+EU,See consumer statement,No,Information,See statement
+EV,Bankruptcy chapter 11,No,Bankruptcy,Chapter 11
+EX,Unsecured,Yes,Unsecured Debt,Unsecured - common settlement
+EY,Business account -personal guarantee,Yes,Business/Personal,Personal guarantee - settleable
+EZ,Has co-signer,No,Co-signer,Co-signed account
+FA,Closed or paid account/zero balance,No,Closed,Zero balance
+FB,Included in orderly payment debt,No,Payment Plan,Payment plan
+FC,Credit line suspended,No,Suspended,Line suspended
+FD,Defaulted student loan,No,Student Loan,Student loan default
+FE,Credit card,Yes,Credit Card,Credit card - most common settlement
+FF,Consumer says account not his/hers,No,Dispute,Not consumer's account
+FG,Consumer says account never late,No,Dispute,Claims never late
+FH,Consumer says this public record not his/hers,No,Dispute,Not consumer's record
+FL,Consumer says this public record filed in error,No,Dispute,Record error
+FM,Consumer says this public record item satisfied or released,No,Dispute,Record satisfied
+FO,Consumer says bankruptcy discharged,No,Bankruptcy,Bankruptcy discharged
+FP,Consumer says bankruptcy dismissed,No,Bankruptcy,Bankruptcy dismissed
+FQ,Consumer says current rate/status incorrect,No,Dispute,Rate/status dispute
+FR,Making payments,No,Payment Status,Currently paying
+FS,Annual payment,No,Payment Terms,Annual payments
+FT,Not included in bankruptcy,No,Bankruptcy,Not in bankruptcy
+FU,Charged off checking account,No,Banking,Checking charge off
+FV,Pltff verified lien pd/release not recorded with court,No,Legal,Lien recording issue
+FW,Consumer disputes – reinvestigation in progress,No,Dispute,Under investigation
+FX,Account listed as public record,No,Public Record,Public record
+FZ,Account reinstated with lender,No,Reinstated,Account reinstated
+GA,Paid by collateral,No,Secured,Collateral payment
+GB,Account being paid through wep,No,Legal,WEP payment
+GC,Account being paid through financial counseling plan,No,Counseling,Counseling plan
+GD,Account paid through financial counseling plan,No,Counseling,Paid via counseling
+GE,Consumer disputes this item,No,Dispute,Item dispute
+GF,Reaffirmation of debt,No,Bankruptcy,Debt reaffirmed
+GH,Plaintiff/counsel verified judgement paid,No,Legal,Judgment verified paid
+GI,Utility,No,Utility,Utility bill
+GJ,Student loan assigned to government,No,Student Loan,Government student loan
+GK,Affected by natural disaster,No,Hardship,Natural disaster
+GL,First payment never received,No,Payment Issue,No first payment
+GM,Account acquired by fdic/ncua,No,Government,FDIC/NCUA acquired
+GN,Government debt,No,Government,Government debt
+GO,Debt consolidation,No,Consolidation,Consolidated debt
+GP,Manufactured housing,No,Housing,Manufactured home
+GQ,Recreational merchandise,No,Loan Type,Recreational loan
+GR,Secured credit card,No,Secured,Secured card
+GS,Medical,Yes,Medical Debt,Medical debt - common settlement
+HF,Account closed by consumer,No,Closed,Consumer closed
+HL,100% payment to creditors filing claims,No,Bankruptcy,Full payment plan
+HM,Account included in bankruptcy of primary borrower,No,Bankruptcy,Primary bankruptcy
+HN,Account included in bankruptcy of secondary borrower,No,Bankruptcy,Secondary bankruptcy
+HO,Returned check,No,Payment Issue,Bounced check
+HP,Fha mortgage,No,Mortgage,FHA mortgage
+HQ,Va mortgage,No,Mortgage,VA mortgage
+HR,Conventional mortgage,No,Mortgage,Conventional mortgage
+HS,Second mortgage,No,Mortgage,Second mortgage
+HT,Agricultural,No,Loan Type,Agricultural loan
+HU,Commercial mortgage-individual liable company is guarantor,No,Commercial,Commercial mortgage
+HV,Deposit related,No,Banking,Deposit account
+HW,Child/family support,No,Support,Family support
+HX,Transferred to recovery,No,Recovery,In recovery
+IA,Consumer voluntarily withdrew from bankruptcy,No,Bankruptcy,Bankruptcy withdrawn
+IB,Lease - full termination,No,Lease,Lease terminated
+IC,Lease - early termination,No,Lease,Early lease termination
+ID,Status pending,No,Status,Pending status
+IE,Fannie mae account,No,Mortgage,Fannie Mae
+IF,Freddie mac account,No,Mortgage,Freddie Mac
+IG,Prepaid lease,No,Lease,Prepaid lease
+IH,Consumer pays balance in full each month,No,Payment Behavior,Pays in full
+II,Principal deferred/interest payment only,No,Payment Terms,Interest only
+IJ,Payment deferred,No,Deferment,Payment deferred
+IK,Bankruptcy voluntarily withdrawn,No,Bankruptcy,Voluntary withdrawal
+IL,Bankruptcy chapter 7,No,Bankruptcy,Chapter 7
+IM,Bankruptcy chapter 12,No,Bankruptcy,Chapter 12
+IN,Reaffirmation of debt rescinded,No,Bankruptcy,Reaffirmation rescinded
+IP,Consumer disputes this account information,No,Dispute,Account dispute
+IQ,Consumer disputes after resolution,No,Dispute,Post-resolution dispute
+IR,Account closed at consumer's request,No,Closed,Consumer request
+IT,Account acquired from another lender,No,Transfer,Acquired account
+IZ,Amount in high credit is original charge-off amount,No,Information,Original charge-off amount
+JA,Election of remedy,No,Legal,Election of remedy
+JD,Consumer deceased,No,Deceased,Consumer deceased
+JE,Adjustment pending,No,Adjustment,Pending adjustment
+JF,Inactive account,No,Inactive,Account inactive
+JG,Dollar amount in excess of $1 billion,No,Information,Large amount
+JH,Personal receivership – repayment managed by court trustee,No,Legal,Court trustee
+JI,Guaranteed/insured,No,Insurance,Guaranteed/insured
+JJ,Time share loan,No,Loan Type,Time share
+JK,120 days past due,No,Delinquency,120 days late
+JL,150 days past due,No,Delinquency,150 days late
+JM,180 days or more past due,No,Delinquency,180+ days late
+JN,Partially secured,No,Secured,Partially secured
+JO,Note loan,No,Loan Type,Note loan
+JP,Rental agreement,No,Rental,Rental agreement
+JQ,Auto lease,No,Lease,Auto lease
+JR,Telecommunications/cellular,No,Utility,Telecom/cellular
+JS,Unsecured government loan,No,Government,Unsecured government
+JT,Secured government loan,No,Government,Secured government
+JU,Home equity line of credit,No,Mortgage,HELOC
+JV,Attorney fees,No,Legal,Attorney fees
+JW,Construction loan,No,Mortgage,Construction loan
+JX,Flexible spending credit card,No,Credit Card,Flexible spending card
+JY,Combined credit plan,No,Credit Plan,Combined plan
+JZ,Debt buyer account,No,Collection,Debt buyer
+KA,Installment sales contract,No,Contract,Installment contract
+KB,Bankruptcy petition,No,Bankruptcy,Bankruptcy petition
+KC,Bankruptcy discharged,No,Bankruptcy,Discharged
+KD,Bankruptcy completed,No,Bankruptcy,Completed
+KE,Lease assumption,No,Lease,Lease assumed
+KF,Account previously in dispute – now resolved by data furnisher,No,Dispute,Dispute resolved
+KG,Chapter 7 bankruptcy dismissed,No,Bankruptcy,Ch 7 dismissed
+KH,Chapter 11 bankruptcy dismissed,No,Bankruptcy,Ch 11 dismissed
+KI,Chapter 12 bankruptcy dismissed,No,Bankruptcy,Ch 12 dismissed
+KJ,Chapter 13 bankruptcy dismissed,No,Bankruptcy,Ch 13 dismissed
+KK,Chapter 7 bankruptcy withdrawn,No,Bankruptcy,Ch 7 withdrawn
+KL,Chapter 11 bankruptcy withdrawn,No,Bankruptcy,Ch 11 withdrawn
+KM,Chapter 12 bankruptcy withdrawn,No,Bankruptcy,Ch 12 withdrawn
+KN,Chapter 13 bankruptcy withdrawn,No,Bankruptcy,Ch 13 withdrawn
+KO,Bankrupcty – undesignated chapter,No,Bankruptcy,Unspecified bankruptcy
+KP,Account closed due to inactivity,No,Closed,Inactive closure
+KQ,Credit line no longer available - in repayment phase,No,Repayment,In repayment
+KR,Credit line reduced due to collateral depreciation,No,Credit Change,Line reduced
+KS,Credit line suspended due to collateral depreciation,No,Suspended,Collateral issue
+KT,Collateral released by creditor/balance owing,No,Collateral,Collateral released
+KU,Loan modified under a federal government plan,No,Modification,Government modification
+KV,Loan modified,No,Modification,Loan modified
+KW,Account in forbearance,No,Forbearance,In forbearance
+KZ,Account paid in full; was a voluntary surrender,No,Paid,Paid after surrender
+LB,Homeowners association (hoa),No,HOA,HOA fees
+R1,Pays as agreed,No,Payment Rating,Current/Good standing
+R2,30 days past due,Yes,Payment Rating,30 days late - settleable
+R3,60 days past due,Yes,Payment Rating,60 days late - settleable
+R4,90 days past due,Yes,Payment Rating,90 days late - settleable
+R7,Making regular payments under wage garnishment or similar arrangement,No,Payment Rating,Garnishment payments
+R8,Repossession,No,Payment Rating,Repossessed
+R9,Collection account,Yes,Payment Rating,In collections - settleable
