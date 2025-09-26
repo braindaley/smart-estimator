@@ -175,8 +175,6 @@ export default function DealSheetPage() {
     totalExpenses: '',
     totalMonthlyExpenseWithProgram: '',
     availableFunds: '',
-    monthlyDebtToIncomeRatio: '',
-    monthlyDebtToIncomeRatioWithoutProgram: '',
     
     // Hardship Reason (placeholder for now)
     hardshipReason: '',
@@ -1130,18 +1128,14 @@ export default function DealSheetPage() {
                     return total + (isNaN(value) ? 0 : value);
                   }, 0);
 
-                  // Add back any debtOther if it exists but subtract actual minimum payments
+                  // Total expenses from Plaid transactions only (no deductions for settled accounts)
                   const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
-                  const totalExpenses = baseExpenses + Math.max(0, debtOther - totalDebtMinimumPayments);
+                  const totalExpenses = baseExpenses + debtOther;
 
                   // Use the calculated program cost from state
                   const programCost = calculatedProgramCost;
                   const totalExpensesWithProgram = totalExpenses + programCost;
                   const availableFunds = totalMonthlyIncome - totalExpensesWithProgram;
-                  const debtToIncomeWithProgram = totalMonthlyIncome > 0 ? 
-                    (totalExpensesWithProgram / totalMonthlyIncome * 100) : 0;
-                  const debtToIncomeWithoutProgram = totalMonthlyIncome > 0 ? 
-                    (totalExpenses / totalMonthlyIncome * 100) : 0;
                   
                   return (
                     <>
@@ -1165,7 +1159,7 @@ export default function DealSheetPage() {
                           {formatCurrency(totalExpenses)}
                         </div>
                         <div className="text-xs text-gray-600 mt-1">Total Expenses</div>
-                        <div className="text-xs text-gray-500 mt-1">Excludes debt minimum payments (${totalDebtMinimumPayments.toLocaleString()})</div>
+                        <div className="text-xs text-gray-500 mt-1">From Plaid transaction data</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-semibold text-gray-900">
@@ -1179,24 +1173,6 @@ export default function DealSheetPage() {
                           {formatCurrency(availableFunds)}
                         </div>
                         <div className="text-xs text-gray-600 mt-1">Available Funds</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-lg font-semibold ${
-                          debtToIncomeWithProgram > 50 ? 'text-gray-900' :
-                          debtToIncomeWithProgram > 30 ? 'text-gray-700' : 'text-gray-600'
-                        }`}>
-                          {debtToIncomeWithProgram.toFixed(1)}%
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Monthly Debt to Income Ratio (With Program)</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-lg font-semibold ${
-                          debtToIncomeWithoutProgram > 50 ? 'text-gray-900' :
-                          debtToIncomeWithoutProgram > 30 ? 'text-gray-700' : 'text-gray-600'
-                        }`}>
-                          {debtToIncomeWithoutProgram.toFixed(1)}%
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Monthly Debt to Income Ratio (Without Program)</div>
                       </div>
                     </>
                   );

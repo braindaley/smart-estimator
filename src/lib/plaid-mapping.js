@@ -352,14 +352,53 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
     }
   });
 
+  // Process unmapped expense transactions - add them to "misc" category
+  console.log(`[Mapping] Processing ${mappedData.unmapped.length} unmapped transactions for misc category`);
+
+  // Initialize misc field if not already initialized
+  if (!mappedData.expenses.misc) {
+    mappedData.expenses.misc = 0;
+    mappedData.transactionDetails.misc = [];
+  }
+
+  // Filter unmapped transactions to only include expense transactions
+  const unmappedExpenses = mappedData.unmapped.filter(transaction => {
+    // Include positive amounts (expenses) or transactions from expense categories
+    return transaction.amount > 0 ||
+           (transaction.personal_finance_category &&
+            transaction.personal_finance_category.primary !== 'INCOME');
+  });
+
+  // Add unmapped expenses to misc category
+  unmappedExpenses.forEach(transaction => {
+    const amount = Math.abs(transaction.amount);
+    mappedData.expenses.misc += transaction.amount > 0 ? transaction.amount : amount;
+    mappedData.transactionDetails.misc.push({
+      ...transaction,
+      mappedAmount: transaction.amount > 0 ? transaction.amount : amount,
+      note: 'Auto-mapped to Miscellaneous (unmapped category)'
+    });
+    console.log(`[Mapping] Added unmapped expense to misc: ${transaction.name} ($${amount})`);
+  });
+
+  // Update unmapped to only include true income transactions that couldn't be mapped
+  mappedData.unmapped = mappedData.unmapped.filter(transaction => {
+    return transaction.personal_finance_category &&
+           transaction.personal_finance_category.primary === 'INCOME' &&
+           transaction.amount < 0; // Only keep unmapped income (negative amounts)
+  });
+
+  console.log(`[Mapping] Moved ${unmappedExpenses.length} expense transactions to misc category`);
+  console.log(`[Mapping] Remaining unmapped transactions: ${mappedData.unmapped.length} (income only)`);
+
   // Convert to monthly averages (assuming data is from last 30-90 days)
   const daysCovered = 30; // This should be calculated from actual date range
   const monthlyMultiplier = 30 / daysCovered;
-  
+
   Object.keys(mappedData.income).forEach(field => {
     mappedData.income[field] = Math.round(mappedData.income[field] * monthlyMultiplier * 100) / 100;
   });
-  
+
   Object.keys(mappedData.expenses).forEach(field => {
     mappedData.expenses[field] = Math.round(mappedData.expenses[field] * monthlyMultiplier * 100) / 100;
   });

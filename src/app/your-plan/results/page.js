@@ -91,6 +91,49 @@ const formatCurrency = (amount) => {
   }).format(amount);
 };
 
+// Mock co-applicant data for demo purposes
+const getMockCoApplicantData = () => {
+  return {
+    name: "Jane Smith",
+    phone: "(555) 123-4567",
+    creditData: {
+      trades: [
+        {
+          creditor: "CAPITAL ONE",
+          balance: 8500,
+          narrativeCodes: [{ codeabv: "FE", code: "FE" }]
+        },
+        {
+          creditor: "DISCOVER",
+          balance: 3200,
+          narrativeCodes: [{ codeabv: "FE", code: "FE" }]
+        },
+        {
+          creditor: "CHASE", // Joint account with primary
+          balance: 12000,
+          narrativeCodes: [{ codeabv: "FE", code: "FE" }],
+          isJoint: true
+        }
+      ]
+    },
+    plaidData: {
+      income: {
+        summary: {
+          total_monthly_income: 3200
+        }
+      },
+      transactions: [] // Mock transactions for expenses
+    }
+  };
+};
+
+// Check if user has co-applicant enabled
+const hasCoApplicant = () => {
+  if (typeof window === 'undefined') return false;
+  const stepStatus = JSON.parse(localStorage.getItem('user_steps') || '{}');
+  return stepStatus.co_applicant_check?.data?.hasCoApplicant || false;
+};
+
 export default function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [creditData, setCreditData] = useState(null);
@@ -99,6 +142,13 @@ export default function ResultsPage() {
   const [momentumResults, setMomentumResults] = useState(null);
   const [currentPathResults, setCurrentPathResults] = useState(null);
   const [calculatorSettings, setCalculatorSettings] = useState(null);
+  const [viewMode, setViewMode] = useState('primary'); // 'primary', 'co-applicant', 'combined'
+  const [coApplicantData, setCoApplicantData] = useState(null);
+  const [combinedResults, setCombinedResults] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState({
+    primaryCompleted: false,
+    coApplicantCompleted: false
+  });
 
   // Load calculator settings
   useEffect(() => {
@@ -110,6 +160,68 @@ export default function ResultsPage() {
         setCalculatorSettings({ debtTiers: [] });
       });
   }, []);
+
+  // Load co-applicant data and check for co-applicant mode
+  useEffect(() => {
+    const mockCoApplicant = getMockCoApplicantData();
+    setCoApplicantData(mockCoApplicant);
+
+    // Check verification status
+    const stepStatus = JSON.parse(localStorage.getItem('user_steps') || '{}');
+    const primaryCompleted = !!(stepStatus.phone_verification?.completed &&
+                               stepStatus.bank_connection?.completed &&
+                               stepStatus.credit_check?.completed);
+
+    // For demo purposes, co-applicant completion is stored separately
+    const coApplicantCompleted = localStorage.getItem('co_applicant_verification_complete') === 'true';
+
+    setVerificationStatus({
+      primaryCompleted,
+      coApplicantCompleted
+    });
+
+    // Set default view mode based on whether co-applicant exists
+    if (hasCoApplicant()) {
+      setViewMode('combined'); // Default to combined view if co-applicant exists
+    } else {
+      setViewMode('primary');
+    }
+  }, []);
+
+  // Calculate combined results when view mode changes
+  useEffect(() => {
+    if (viewMode === 'combined' && momentumResults && coApplicantData) {
+      // Calculate combined debt and results
+      const primaryDebt = momentumResults.totalDebt || 0;
+      const coApplicantDebt = coApplicantData.creditData.trades
+        .filter(account => !account.isJoint) // Don't double-count joint accounts
+        .reduce((sum, account) => sum + account.balance, 0);
+
+      const combinedTotalDebt = primaryDebt + coApplicantDebt;
+
+      // Calculate combined monthly income
+      const primaryIncome = 4500; // Mock primary income
+      const coApplicantIncome = coApplicantData.plaidData.income.summary.total_monthly_income;
+      const combinedIncome = primaryIncome + coApplicantIncome;
+
+      // Recalculate momentum plan with combined debt
+      if (calculatorSettings && combinedTotalDebt >= 15000) {
+        const combinedMomentumPayment = calculateMonthlyMomentumPayment(combinedTotalDebt, calculatorSettings.debtTiers);
+        const combinedTerm = getMomentumTermLength(combinedTotalDebt, calculatorSettings.debtTiers);
+        const combinedTotalCost = combinedMomentumPayment * combinedTerm;
+
+        setCombinedResults({
+          monthlyPayment: combinedMomentumPayment,
+          term: combinedTerm,
+          totalCost: combinedTotalCost,
+          totalDebt: combinedTotalDebt,
+          combinedIncome: combinedIncome,
+          accountCount: eligibleAccounts.length + coApplicantData.creditData.trades.filter(a => !a.isJoint).length,
+          belowMinimum: false
+        });
+      }
+    }
+  }, [viewMode, momentumResults, coApplicantData, calculatorSettings, eligibleAccounts]);
 
   // Load and process credit data
   useEffect(() => {
@@ -231,6 +343,144 @@ export default function ResultsPage() {
             )}
           </div>
 
+          {/* Verification Status & Co-Applicant View Switcher */}
+          {hasCoApplicant() && (
+            <div className="mb-8">
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Verification Status</h3>
+
+                  {/* Verification Status Checkboxes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="flex items-center space-x-3 p-3 border rounded-lg">
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        verificationStatus.primaryCompleted
+                          ? 'bg-green-500 border-green-500'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}>
+                        {verificationStatus.primaryCompleted && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">Primary Applicant</div>
+                        <div className="text-sm text-gray-600">
+                          Phone, Bank & Credit verification
+                        </div>
+                      </div>
+                      <div className={`text-sm font-medium ${
+                        verificationStatus.primaryCompleted ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {verificationStatus.primaryCompleted ? 'Complete' : 'Pending'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 border rounded-lg">
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        verificationStatus.coApplicantCompleted
+                          ? 'bg-green-500 border-green-500'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}>
+                        {verificationStatus.coApplicantCompleted && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{coApplicantData?.name}</div>
+                        <div className="text-sm text-gray-600">
+                          Phone, Bank & Credit verification
+                        </div>
+                      </div>
+                      <div className={`text-sm font-medium ${
+                        verificationStatus.coApplicantCompleted ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {verificationStatus.coApplicantCompleted ? 'Complete' : 'Pending'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Demo Toggle for Co-Applicant Completion */}
+                  {!verificationStatus.coApplicantCompleted && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-yellow-800">Demo Mode</div>
+                          <div className="text-xs text-yellow-700">Simulate co-applicant completion for testing</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            localStorage.setItem('co_applicant_verification_complete', 'true');
+                            setVerificationStatus(prev => ({ ...prev, coApplicantCompleted: true }));
+                          }}
+                          className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700"
+                        >
+                          Mark Complete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* View Switcher - Only show if both are complete */}
+                  {verificationStatus.primaryCompleted && verificationStatus.coApplicantCompleted ? (
+                    <>
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm font-medium text-green-700">Both Applicants Verified</span>
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                          <label className="text-sm font-medium text-gray-700">
+                            View as:
+                          </label>
+                          <select
+                            value={viewMode}
+                            onChange={(e) => setViewMode(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          >
+                            <option value="primary">Primary Applicant</option>
+                            <option value="co-applicant">Co-Applicant ({coApplicantData?.name})</option>
+                            <option value="combined">Combined Results</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* View Mode Explanation */}
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="text-sm text-blue-800">
+                          {viewMode === 'primary' && (
+                            <span><strong>Primary View:</strong> Showing your individual debt settlement plan</span>
+                          )}
+                          {viewMode === 'co-applicant' && (
+                            <span><strong>Co-Applicant View:</strong> Showing {coApplicantData?.name}'s individual debt settlement plan</span>
+                          )}
+                          {viewMode === 'combined' && (
+                            <span><strong>Combined View:</strong> Showing joint debt settlement plan with combined income and deduplicated joint accounts</span>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg text-center">
+                      <div className="text-sm text-gray-600 mb-2">
+                        <strong>Waiting for verification completion</strong>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Results will be available once both applicants complete their verification
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {!creditData || !creditData.trades ? (
             <Card>
               <CardContent className="p-6">
@@ -267,17 +517,151 @@ export default function ResultsPage() {
                 </div>
               </CardContent>
             </Card>
-          ) : momentumResults && currentPathResults ? (
+          ) : momentumResults && currentPathResults && (!hasCoApplicant() || (verificationStatus.primaryCompleted && verificationStatus.coApplicantCompleted)) ? (
             <div className="space-y-8">
               {/* Results Table */}
               <Card>
                 <CardContent className="p-6">
-                  <ResultsTable
-                    momentumResults={momentumResults}
-                    currentPathResults={currentPathResults}
-                  />
+                  {viewMode === 'co-applicant' ? (
+                    <div className="text-center py-8">
+                      <h3 className="text-xl font-semibold mb-4">Co-Applicant Results</h3>
+                      <div className="bg-gray-50 rounded-lg p-6 max-w-md mx-auto">
+                        <div className="space-y-3 text-left">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Eligible Debt:</span>
+                            <span className="font-medium">{formatCurrency(11700)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Monthly Income:</span>
+                            <span className="font-medium">{formatCurrency(3200)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Eligible Accounts:</span>
+                            <span className="font-medium">2 accounts</span>
+                          </div>
+                          <div className="border-t pt-3 mt-3">
+                            <div className="text-sm text-gray-600 mb-2">Settlement Plan:</div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Monthly Payment:</span>
+                              <span className="font-medium text-green-600">{formatCurrency(312)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Term:</span>
+                              <span className="font-medium">25 months</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-4">
+                        This shows {coApplicantData?.name}'s individual debt settlement plan
+                      </p>
+                    </div>
+                  ) : viewMode === 'combined' && combinedResults ? (
+                    <div>
+                      <div className="mb-4 p-4 bg-green-50 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <span className="font-medium text-green-800">Combined Household Results</span>
+                        </div>
+                        <div className="text-sm text-green-700">
+                          Joint accounts deduplicated • Combined income: {formatCurrency(combinedResults.combinedIncome)}/month
+                        </div>
+                      </div>
+                      <ResultsTable
+                        momentumResults={combinedResults}
+                        currentPathResults={{
+                          ...currentPathResults,
+                          totalCost: Math.round(currentPathResults.totalCost * (combinedResults.totalDebt / momentumResults.totalDebt))
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <ResultsTable
+                      momentumResults={momentumResults}
+                      currentPathResults={currentPathResults}
+                    />
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Verification Incomplete Message */}
+              {hasCoApplicant() && !(verificationStatus.primaryCompleted && verificationStatus.coApplicantCompleted) && (
+                <Card>
+                  <CardContent className="p-8">
+                    <div className="text-center">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100 mb-4">
+                        <svg className="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">Verification In Progress</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Your debt settlement plan will be available once both you and {coApplicantData?.name} complete verification.
+                        This ensures we have accurate information for joint accounts and combined income.
+                      </p>
+
+                      <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                        <div className="text-sm text-blue-800">
+                          <strong>Next Steps:</strong>
+                          <ul className="mt-2 text-left space-y-1">
+                            {!verificationStatus.primaryCompleted && (
+                              <li>• Complete your verification (phone, bank, credit)</li>
+                            )}
+                            {!verificationStatus.coApplicantCompleted && (
+                              <li>• {coApplicantData?.name} needs to complete verification via the link sent to {coApplicantData?.phone}</li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => window.location.href = '/your-plan'}
+                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Continue Verification
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Co-Applicant Demo Link */}
+              {!hasCoApplicant() && (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold mb-2">Want to see the co-applicant experience?</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Simulate how the application would work with a co-applicant who shares debt accounts.
+                      </p>
+                      <button
+                        onClick={() => {
+                          // Mock enabling co-applicant for demo
+                          const currentSteps = JSON.parse(localStorage.getItem('user_steps') || '{}');
+                          currentSteps.co_applicant_check = {
+                            completed: true,
+                            data: {
+                              hasCoApplicant: true,
+                              coApplicantInfo: {
+                                name: 'Jane Smith',
+                                phone: '(555) 123-4567',
+                                completed: true
+                              }
+                            }
+                          };
+                          localStorage.setItem('user_steps', JSON.stringify(currentSteps));
+                          window.location.reload();
+                        }}
+                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Enable Co-Applicant Demo
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Technical Documentation */}
               <Accordion type="single" collapsible className="mt-8">
@@ -289,6 +673,54 @@ export default function ResultsPage() {
                     <Card>
                       <CardContent className="p-6">
                         <div className="space-y-8 text-sm font-mono">
+
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">QUICK LINKS</h3>
+
+                            <h4 className="font-semibold mb-2">Data Sources:</h4>
+                            <div className="space-y-1">
+                              <div>
+                                <a href={`/results/bank?session=${Date.now()}`} className="text-blue-600 hover:underline">
+                                  /results/bank
+                                </a>
+                                <span className="text-gray-600 ml-2">- Plaid Bank Data (Income verification and transactions)</span>
+                              </div>
+                              <div>
+                                <a href={`/results/credit?session=${Date.now()}`} className="text-blue-600 hover:underline">
+                                  /results/credit
+                                </a>
+                                <span className="text-gray-600 ml-2">- Credit Report (Account balances and narrative codes)</span>
+                              </div>
+                              <div>
+                                <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">
+                                  /your-plan/deal-sheet
+                                </a>
+                                <span className="text-gray-600 ml-2">- Complete Deal Sheet (Full financial analysis)</span>
+                              </div>
+                            </div>
+
+                            <h4 className="font-semibold mt-4 mb-2">Configuration Pages:</h4>
+                            <div className="space-y-1">
+                              <div>
+                                <a href="/admin/plaid" className="text-blue-600 hover:underline">
+                                  /admin/plaid
+                                </a>
+                                <span className="text-gray-600 ml-2">- Plaid to Deal Sheet Mapping (Configure expense categories)</span>
+                              </div>
+                              <div>
+                                <a href="/admin/program-calculator" className="text-blue-600 hover:underline">
+                                  /admin/program-calculator
+                                </a>
+                                <span className="text-gray-600 ml-2">- Creditor Settlement Rates & Fee Tiers</span>
+                              </div>
+                              <div>
+                                <a href="/admin/equifax-codes" className="text-blue-600 hover:underline">
+                                  /admin/equifax-codes
+                                </a>
+                                <span className="text-gray-600 ml-2">- Narrative Code Configuration (Debt eligibility)</span>
+                              </div>
+                            </div>
+                          </div>
 
                           <div>
                             <h3 className="font-bold text-lg mb-4">STEP 1: PLAID INCOME VERIFICATION API</h3>
@@ -329,7 +761,12 @@ export default function ResultsPage() {
                                 &nbsp;&nbsp;• FOOD_AND_DRINK_GROCERIES → groceries<br/>
                                 &nbsp;&nbsp;• RENT_AND_UTILITIES_RENT → housingPayment<br/>
                                 &nbsp;&nbsp;• TRANSPORTATION_GAS → gasoline<br/>
-                                &nbsp;&nbsp;• Full mapping at <a href="/admin/plaid" className="text-blue-600 hover:underline">/admin/plaid</a>
+                                &nbsp;&nbsp;• Full mapping at <a href="/admin/plaid" className="text-blue-600 hover:underline">/admin/plaid</a><br/>
+                                3. <strong>Unmapped Transactions Handling:</strong><br/>
+                                &nbsp;&nbsp;• Any transaction that doesn't fall into a specific bucket<br/>
+                                &nbsp;&nbsp;• Automatically mapped to "Other Expenses - Misc"<br/>
+                                &nbsp;&nbsp;• Ensures all expense transactions are captured<br/>
+                                &nbsp;&nbsp;• Marked with note: "Auto-mapped to Miscellaneous (unmapped category)"
                               </code>
                             </div>
                           </div>
@@ -593,54 +1030,6 @@ export default function ResultsPage() {
                               <div>Minimum Threshold Met: {momentumResults?.totalDebt >= 15000 ? 'Yes' : 'No'}</div>
                             </div>
 
-                          </div>
-
-                          <div>
-                            <h3 className="font-bold text-lg mb-4">QUICK LINKS</h3>
-
-                            <h4 className="font-semibold mb-2">Data Sources:</h4>
-                            <div className="space-y-1">
-                              <div>
-                                <a href={`/results/bank?session=${Date.now()}`} className="text-blue-600 hover:underline">
-                                  /results/bank
-                                </a>
-                                <span className="text-gray-600 ml-2">- Plaid Bank Data (Income verification and transactions)</span>
-                              </div>
-                              <div>
-                                <a href={`/results/credit?session=${Date.now()}`} className="text-blue-600 hover:underline">
-                                  /results/credit
-                                </a>
-                                <span className="text-gray-600 ml-2">- Credit Report (Account balances and narrative codes)</span>
-                              </div>
-                              <div>
-                                <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">
-                                  /your-plan/deal-sheet
-                                </a>
-                                <span className="text-gray-600 ml-2">- Complete Deal Sheet (Full financial analysis)</span>
-                              </div>
-                            </div>
-
-                            <h4 className="font-semibold mt-4 mb-2">Configuration Pages:</h4>
-                            <div className="space-y-1">
-                              <div>
-                                <a href="/admin/plaid" className="text-blue-600 hover:underline">
-                                  /admin/plaid
-                                </a>
-                                <span className="text-gray-600 ml-2">- Plaid to Deal Sheet Mapping (Configure expense categories)</span>
-                              </div>
-                              <div>
-                                <a href="/admin/program-calculator" className="text-blue-600 hover:underline">
-                                  /admin/program-calculator
-                                </a>
-                                <span className="text-gray-600 ml-2">- Creditor Settlement Rates & Fee Tiers</span>
-                              </div>
-                              <div>
-                                <a href="/admin/equifax-codes" className="text-blue-600 hover:underline">
-                                  /admin/equifax-codes
-                                </a>
-                                <span className="text-gray-600 ml-2">- Narrative Code Configuration (Debt eligibility)</span>
-                              </div>
-                            </div>
                           </div>
 
                         </div>

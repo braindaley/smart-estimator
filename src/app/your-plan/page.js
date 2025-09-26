@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/header';
 import LoanQualificationEnhanced from '@/components/LoanQualificationEnhanced';
-import PersonaSelector from '@/components/PersonaSelector';
 
 export default function LoanQualificationPage() {
   const [userId, setUserId] = useState(null);
-  const [currentPersona, setCurrentPersona] = useState(null);
 
   useEffect(() => {
     // Generate or retrieve user ID
@@ -30,11 +28,6 @@ export default function LoanQualificationPage() {
     // - Showing additional options
   };
 
-  const handlePersonaChange = (persona) => {
-    setCurrentPersona(persona);
-    // Force a page refresh to reload data with new persona
-    window.location.reload();
-  };
 
   if (!userId) {
     return (
@@ -51,32 +44,9 @@ export default function LoanQualificationPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="flex-1">
-        {/* Hero Section */}
-        <div className="bg-background">
-          <div className="container mx-auto max-w-7xl px-4 py-6">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-4">
-                View Your Plan
-              </h1>
-              <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
-                We'll securely verify your financial information to create an accurate, personalized debt settlement plan. This takes 2-3 minutes and shows you real payment amounts based on your actual debts and income.
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Main Content */}
         <div className="container mx-auto max-w-7xl px-4 py-12">
-          {/* Persona Selector for Testing */}
-          {userId && (
-            <div className="mb-8">
-              <PersonaSelector
-                userId={userId}
-                onPersonaChange={handlePersonaChange}
-              />
-            </div>
-          )}
-
           <LoanQualificationEnhanced
             userId={userId}
             onComplete={handleQualificationComplete}
