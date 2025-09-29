@@ -150,6 +150,19 @@ export const EXPENSE_MAPPINGS = {
  */
 export function mapPlaidToDealsSheet(transactions, accounts) {
   console.log('[Mapping] Starting with transactions:', transactions?.length, 'accounts:', accounts?.length);
+
+  // Load custom mappings from localStorage if available
+  let customMappings = {};
+  try {
+    const storedMapping = localStorage.getItem('plaid-dealsheet-mapping');
+    if (storedMapping) {
+      const mappingConfig = JSON.parse(storedMapping);
+      customMappings = mappingConfig.mappings || {};
+      console.log('[Mapping] Loaded custom mappings:', Object.keys(customMappings).length, 'custom rules');
+    }
+  } catch (err) {
+    console.warn('[Mapping] Could not load custom mappings:', err);
+  }
   
   const mappedData = {
     income: {},
@@ -255,7 +268,15 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
     if (primaryCategory === 'INCOME') {
       // The detailedCategory already includes the primary, so just use it directly
       const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
-      const mappedField = INCOME_MAPPINGS[categoryKey];
+
+      // Check for custom mapping first
+      const customMapping = customMappings[categoryKey] || customMappings[`INCOME_${categoryKey}`];
+      if (customMapping === 'do_not_map') {
+        console.log(`[Mapping] Skipping income category ${categoryKey} - marked as 'do not map'`);
+        return; // Skip this transaction entirely
+      }
+
+      const mappedField = customMapping || INCOME_MAPPINGS[categoryKey];
       
       if (mappedField) {
         if (!mappedData.income[mappedField]) {
@@ -275,9 +296,9 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
       }
     }
     // Handle expenses (positive amounts in Plaid represent money going out)
-    else if (transaction.amount > 0 || 
-             primaryCategory === 'TRANSPORTATION' || 
-             primaryCategory === 'FOOD_AND_DRINK' || 
+    else if (transaction.amount > 0 ||
+             primaryCategory === 'TRANSPORTATION' ||
+             primaryCategory === 'FOOD_AND_DRINK' ||
              primaryCategory === 'GENERAL_MERCHANDISE' ||
              primaryCategory === 'GENERAL_SERVICES' ||
              primaryCategory === 'ENTERTAINMENT' ||
@@ -286,7 +307,15 @@ export function mapPlaidToDealsSheet(transactions, accounts) {
              primaryCategory === 'TRAVEL') {
       // The detailedCategory already includes the primary, so just use it directly
       const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
-      let mappedField = EXPENSE_MAPPINGS[categoryKey];
+
+      // Check for custom mapping first
+      const customMapping = customMappings[categoryKey] || customMappings[detailedCategory];
+      if (customMapping === 'do_not_map') {
+        console.log(`[Mapping] Skipping expense category ${categoryKey} - marked as 'do not map'`);
+        return; // Skip this transaction entirely
+      }
+
+      let mappedField = customMapping || EXPENSE_MAPPINGS[categoryKey];
       
       // Special handling for GENERAL_SERVICES_INSURANCE - need to detect type
       if (categoryKey === 'GENERAL_SERVICES_INSURANCE') {

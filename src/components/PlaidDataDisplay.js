@@ -324,13 +324,30 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
 
     const detailedCategory = category.detailed;
     const primaryCategory = category.primary;
+
+    // Check for custom mappings from localStorage
+    let customMappings = {};
+    try {
+      const storedMapping = localStorage.getItem('plaid-dealsheet-mapping');
+      if (storedMapping) {
+        const mappingConfig = JSON.parse(storedMapping);
+        customMappings = mappingConfig.mappings || {};
+      }
+    } catch (err) {
+      console.warn('[PlaidDataDisplay] Could not load custom mappings:', err);
+    }
     
     // Format the detailed category for mapping lookup
     const categoryKey = detailedCategory.toUpperCase().replace(/[^A-Z_]/g, '_');
-    
+
     // Check if this is income
     if (isIncomeTransaction(transaction)) {
-      const mappedField = INCOME_MAPPINGS[categoryKey] || 'netMonthlyEmploymentIncome'; // Default to employment income
+      // Check for custom mapping first
+      const customMapping = customMappings[categoryKey] || customMappings[`INCOME_${categoryKey}`];
+      if (customMapping === 'do_not_map') {
+        return 'DO_NOT_MAP'; // Special return value to indicate no mapping
+      }
+      const mappedField = customMapping || INCOME_MAPPINGS[categoryKey] || 'netMonthlyEmploymentIncome';
       return mappedField ? getFieldDisplayName(mappedField) : '';
     } 
     // Check if this is an expense (positive amounts or known expense categories)
@@ -345,8 +362,14 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
              primaryCategory === 'RENT_AND_UTILITIES' ||
              primaryCategory === 'MEDICAL' ||
              primaryCategory === 'TRAVEL') {
-      
-      let mappedField = EXPENSE_MAPPINGS[categoryKey];
+
+      // Check for custom mapping first
+      const customMapping = customMappings[categoryKey] || customMappings[detailedCategory];
+      if (customMapping === 'do_not_map') {
+        return 'DO_NOT_MAP'; // Special return value to indicate no mapping
+      }
+
+      let mappedField = customMapping || EXPENSE_MAPPINGS[categoryKey];
       
       // Special handling for GENERAL_SERVICES_INSURANCE - need to detect type
       if (categoryKey === 'GENERAL_SERVICES_INSURANCE') {
@@ -779,13 +802,23 @@ export default function PlaidDataDisplay({ userId, connectionMetadata, isResults
                                   <td className="px-4 py-2 text-sm text-gray-600">
                                     {(() => {
                                       const dealSheetField = getDealSheetField(transaction);
-                                      return dealSheetField ? (
-                                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                                          {dealSheetField}
-                                        </span>
-                                      ) : (
-                                        <span className="text-gray-400 italic">No mapping</span>
-                                      );
+                                      if (dealSheetField === 'DO_NOT_MAP') {
+                                        return (
+                                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
+                                            Do not map
+                                          </span>
+                                        );
+                                      } else if (dealSheetField) {
+                                        return (
+                                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                            {dealSheetField}
+                                          </span>
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="text-gray-400 italic">No mapping</span>
+                                        );
+                                      }
                                     })()}
                                   </td>
                                 </tr>

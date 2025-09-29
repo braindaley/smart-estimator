@@ -114,11 +114,13 @@ export default function PlaidAdminPage() {
       mappings: fieldMappings,
       incomeCategories: incomeCategories.map(cat => ({
         plaidCategory: cat.detailed,
-        dealSheetField: fieldMappings[cat.id] || cat.dealSheetField
+        dealSheetField: fieldMappings[cat.id] || cat.dealSheetField,
+        doNotMap: (fieldMappings[cat.id] || cat.dealSheetField) === 'do_not_map'
       })),
       expenseCategories: allCategories.map(cat => ({
         plaidCategory: cat.detailed,
-        dealSheetField: fieldMappings[cat.id || cat.detailed] || cat.dealSheetField
+        dealSheetField: fieldMappings[cat.id || cat.detailed] || cat.dealSheetField,
+        doNotMap: (fieldMappings[cat.id || cat.detailed] || cat.dealSheetField) === 'do_not_map'
       }))
     };
     
@@ -362,10 +364,12 @@ export default function PlaidAdminPage() {
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue>
-                              {dealSheetFields.find(field => field.value === (fieldMappings[item.id] || item.dealSheetField))?.label || item.dealSheetField}
+                              {(fieldMappings[item.id] || item.dealSheetField) === 'do_not_map' ? 'Do not map' :
+                               dealSheetFields.find(field => field.value === (fieldMappings[item.id] || item.dealSheetField))?.label || item.dealSheetField}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="do_not_map">Do not map</SelectItem>
                             {dealSheetFields
                               .filter(field => field.category === 'Income')
                               .map(field => (
@@ -427,14 +431,18 @@ export default function PlaidAdminPage() {
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue>
-                              {dealSheetFields.find(field => 
-                                field.value === (fieldMappings[item.id || item.detailed] || 
-                                dealSheetFields.find(f => f.label === item.dealSheetField)?.value || 
-                                item.dealSheetField))?.label || 
+                              {(fieldMappings[item.id || item.detailed] ||
+                                dealSheetFields.find(f => f.label === item.dealSheetField)?.value ||
+                                item.dealSheetField) === 'do_not_map' ? 'Do not map' :
+                               dealSheetFields.find(field =>
+                                field.value === (fieldMappings[item.id || item.detailed] ||
+                                dealSheetFields.find(f => f.label === item.dealSheetField)?.value ||
+                                item.dealSheetField))?.label ||
                                item.dealSheetField}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="max-h-[300px] overflow-y-auto">
+                            <SelectItem value="do_not_map">Do not map</SelectItem>
                             {dealSheetFields
                               .filter(field => field.category !== 'Income')
                               .map(field => (

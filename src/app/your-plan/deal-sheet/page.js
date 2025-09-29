@@ -1070,6 +1070,61 @@ export default function DealSheetPage() {
             )}
           </Card>
 
+          {/* Contract Details Section */}
+          <Card className="p-6 mb-8">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700">Contract Details</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Program Fees */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Program Fees ($ Amount)
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  ${(debtAccounts
+                    .reduce((sum, account) => sum + (account.balance || 0), 0) * 0.15)
+                    .toLocaleString()}
+                </div>
+                <p className="text-xs text-gray-500">15% of total debt enrolled</p>
+              </div>
+
+              {/* Program Months */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Program Months
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  24
+                </div>
+                <p className="text-xs text-gray-500">Duration in months</p>
+              </div>
+
+              {/* Fee Percentage */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Fee %
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  15%
+                </div>
+                <p className="text-xs text-gray-500">Of total enrolled debt</p>
+              </div>
+
+              {/* Creditors Enrolled */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Creditors Enrolled
+                </label>
+                <div className="text-lg font-semibold text-gray-900">
+                  {debtAccounts.length}
+                </div>
+                <p className="text-xs text-gray-500">Total creditor accounts</p>
+              </div>
+            </div>
+          </Card>
+
           {/* No Plaid Data Warning */}
           {!hasPlaidData && (
             <div className="mb-8">
@@ -1099,7 +1154,7 @@ export default function DealSheetPage() {
                 <h2 className="text-lg font-semibold text-gray-700">Monthly Expenditure Details</h2>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                 {(() => {
                   // Calculate dynamic values from Plaid data
                   // Calculate total income including wages + dividends

@@ -131,7 +131,7 @@ export function Header() {
         </Link>
       </nav>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" asChild className="hidden md:flex">
+        <Button variant="ghost" asChild className="hidden lg:flex">
           <Link href="/login">Sign in</Link>
         </Button>
         <MobileNav />
@@ -146,8 +146,8 @@ export function Header() {
         <div className="h-6 w-24 rounded-md bg-muted animate-pulse" />
       </nav>
       <div className="flex items-center gap-4">
-        <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse md:block" />
-        <div className="h-10 w-10 rounded-md bg-muted animate-pulse md:hidden" />
+        <div className="hidden h-10 w-20 rounded-md bg-muted animate-pulse lg:block" />
+        <div className="h-10 w-10 rounded-md bg-muted animate-pulse" />
       </div>
     </>
   );
