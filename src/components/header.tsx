@@ -94,6 +94,15 @@ export function Header() {
           <button
             onClick={() => {
               setIsSheetOpen(false);
+              setTimeout(() => router.push('/creditor-profile'), 150);
+            }}
+            className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
+          >
+            Creditor Profile
+          </button>
+          <button
+            onClick={() => {
+              setIsSheetOpen(false);
               setTimeout(() => router.push('/login'), 150);
             }}
             className="flex items-center gap-2 text-lg font-semibold text-muted-foreground hover:text-foreground text-left"
