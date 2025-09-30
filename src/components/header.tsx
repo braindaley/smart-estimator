@@ -14,7 +14,7 @@ import {
 import { Logo } from '@/components/logo';
 import { useSmartEstimatorLink } from '@/hooks/useSmartEstimatorLink';
 import { useReadinessToolLink } from '@/hooks/useReadinessToolLink';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export function Header() {
   const router = useRouter();
@@ -29,10 +29,20 @@ export function Header() {
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  const handleSheetOpenChange = useCallback((open: boolean) => {
+    setIsSheetOpen(open);
+  }, []);
+
   const MobileNav = () => (
-    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+    <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="icon">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <Menu className="h-6 w-6" />
           <span className="sr-only">Open menu</span>
         </Button>

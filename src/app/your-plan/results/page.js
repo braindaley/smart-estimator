@@ -291,12 +291,30 @@ export default function ResultsPage() {
                 belowMinimum: false
               };
 
-              setMomentumResults(results);
-
-              // Save to sessionStorage for use in other pages
+              // Check if there's an optimized plan from the deal sheet
               if (typeof window !== 'undefined') {
-                sessionStorage.setItem('momentumResults', JSON.stringify(results));
+                const existingResults = sessionStorage.getItem('momentumResults');
+                let existingParsed = null;
+                try {
+                  existingParsed = existingResults ? JSON.parse(existingResults) : null;
+                } catch {}
+
+                // If there's an optimized plan, use it and preserve the original plan data
+                if (existingParsed && existingParsed.isOptimized) {
+                  results.isOptimized = true;
+                  results.monthlyPayment = existingParsed.monthlyPayment;
+                  results.term = existingParsed.term;
+                  results.totalCost = existingParsed.totalCost;
+                  results.originalMonthlyPayment = existingParsed.originalMonthlyPayment || momentumMonthlyPayment;
+                  results.originalTerm = existingParsed.originalTerm || momentumTerm;
+                  results.excessLiquidity = existingParsed.excessLiquidity || 0;
+                } else {
+                  // Save the original plan to sessionStorage
+                  sessionStorage.setItem('momentumResults', JSON.stringify(results));
+                }
               }
+
+              setMomentumResults(results);
             }
 
             // Calculate Current Path (always calculated regardless of debt amount)
@@ -926,22 +944,44 @@ export default function ResultsPage() {
                             <h4 className="font-semibold mb-2">Term Length:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
+                                <strong>Standard Term (Debt-based):</strong><br/>
                                 • $15,000-$20,000: 25 months<br/>
                                 • $20,001-$24,000: 38 months<br/>
                                 • $24,001+: 42 months<br/>
-                                {momentumResults?.term && (
-                                  <span>Current Term: {momentumResults.term} months</span>
-                                )}
+                                {momentumResults?.isOptimized ? (
+                                  <>
+                                    <br/><strong>Term Optimization:</strong><br/>
+                                    Original Term: {momentumResults.originalTerm} months<br/>
+                                    Optimized Term: {momentumResults.term} months<br/>
+                                    <br/><strong>Optimization Logic:</strong><br/>
+                                    1. Excess Liquidity = Client Budget - Proposed Monthly Payment<br/>
+                                    2. If Excess Liquidity ≥ $50 → Term can be shortened<br/>
+                                    3. Optimized Monthly Payment = Client Budget - $50 (legal/payment processing fee)<br/>
+                                    4. Payment Toward Program Cost = Optimized Monthly Payment - $50<br/>
+                                    5. Optimized Term = Total Program Cost ÷ Payment Toward Program Cost<br/>
+                                    <br/>Result: Pay off {momentumResults.originalTerm - momentumResults.term} months faster!
+                                  </>
+                                ) : momentumResults?.term ? (
+                                  <span><br/>Current Term: {momentumResults.term} months</span>
+                                ) : null}
                               </code>
                             </div>
 
                             <h4 className="font-semibold mb-2">Monthly Payment:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Formula: (Total Settlement Amount + Program Fee) ÷ Term Length<br/>
-                                {momentumResults?.monthlyPayment && (
-                                  <span>Current: {formatCurrency(momentumResults.monthlyPayment)}/month</span>
-                                )}
+                                <strong>Standard Formula:</strong><br/>
+                                (Total Settlement Amount + Program Fee) ÷ Term Length<br/>
+                                {momentumResults?.isOptimized ? (
+                                  <>
+                                    <br/><strong>Optimized Payment:</strong><br/>
+                                    Original: {formatCurrency(momentumResults.originalMonthlyPayment)}/month<br/>
+                                    Optimized: {formatCurrency(momentumResults.monthlyPayment)}/month<br/>
+                                    <br/>Based on client budget with {formatCurrency(momentumResults.excessLiquidity)} excess liquidity
+                                  </>
+                                ) : momentumResults?.monthlyPayment ? (
+                                  <span><br/>Current: {formatCurrency(momentumResults.monthlyPayment)}/month</span>
+                                ) : null}
                               </code>
                             </div>
 
@@ -1447,19 +1487,28 @@ export default function ResultsPage() {
                                 &nbsp;&nbsp;eligible_account_count INTEGER,<br/>
                                 &nbsp;&nbsp;monthly_income DECIMAL(12,2),<br/>
                                 &nbsp;&nbsp;monthly_expenses DECIMAL(12,2),<br/>
-                                &nbsp;&nbsp;available_funds DECIMAL(12,2),<br/>
+                                &nbsp;&nbsp;client_budget DECIMAL(12,2), -- Income - Expenses (before program)<br/>
+                                &nbsp;&nbsp;available_funds DECIMAL(12,2), -- Client Budget - Program Cost<br/>
                                 &nbsp;&nbsp;-- CALCULATION PARAMETERS --<br/>
                                 &nbsp;&nbsp;debt_tier_used VARCHAR(100),<br/>
                                 &nbsp;&nbsp;fee_percentage DECIMAL(5,2),<br/>
                                 &nbsp;&nbsp;settlement_percentage DECIMAL(5,2),<br/>
-                                &nbsp;&nbsp;term_length_months INTEGER,<br/>
+                                &nbsp;&nbsp;term_length_months INTEGER, -- Standard term based on debt tier<br/>
+                                &nbsp;&nbsp;-- TERM OPTIMIZATION FIELDS --<br/>
+                                &nbsp;&nbsp;is_optimized BOOLEAN DEFAULT FALSE,<br/>
+                                &nbsp;&nbsp;excess_liquidity DECIMAL(12,2), -- Client Budget - Original Monthly Payment<br/>
+                                &nbsp;&nbsp;original_monthly_payment DECIMAL(12,2), -- Pre-optimization payment<br/>
+                                &nbsp;&nbsp;original_term_months INTEGER, -- Pre-optimization term<br/>
+                                &nbsp;&nbsp;optimized_monthly_payment DECIMAL(12,2), -- Client Budget - $50<br/>
+                                &nbsp;&nbsp;optimized_term_months INTEGER, -- Shortened term<br/>
+                                &nbsp;&nbsp;payment_toward_program_cost DECIMAL(12,2), -- Optimized Payment - $50<br/>
                                 &nbsp;&nbsp;-- RESULTS --<br/>
                                 &nbsp;&nbsp;settlement_amount DECIMAL(12,2),<br/>
                                 &nbsp;&nbsp;program_fee DECIMAL(12,2),<br/>
                                 &nbsp;&nbsp;total_program_cost DECIMAL(12,2),<br/>
-                                &nbsp;&nbsp;monthly_payment DECIMAL(12,2),<br/>
+                                &nbsp;&nbsp;monthly_payment DECIMAL(12,2), -- Final payment (optimized or standard)<br/>
                                 &nbsp;&nbsp;total_savings DECIMAL(12,2), -- vs current path<br/>
-                                &nbsp;&nbsp;time_savings_months INTEGER, -- vs current path<br/>
+                                &nbsp;&nbsp;time_savings_months INTEGER, -- vs current path or vs original term<br/>
                                 &nbsp;&nbsp;qualifies_for_program BOOLEAN,<br/>
                                 &nbsp;&nbsp;disqualification_reasons JSONB, -- If doesn't qualify<br/>
                                 &nbsp;&nbsp;confidence_score DECIMAL(3,2), -- Based on data quality<br/>

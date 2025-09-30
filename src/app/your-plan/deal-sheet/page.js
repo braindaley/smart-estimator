@@ -14,7 +14,7 @@ import TransactionDetailsModal from '@/components/TransactionDetailsModal';
 import ClickableLabel from '@/components/ClickableLabel';
 import { mapPlaidToDealsSheet, getFieldDisplayName, formatCurrency } from '@/lib/plaid-mapping';
 import { getMockCraIncomeForPeriod, calculateAverageMonthlyIncome, getIncomeConfidencePercentage } from '@/lib/mock-cra-income';
-import { calculateMonthlyMomentumPayment } from '@/lib/calculations';
+import { calculateMonthlyMomentumPayment, getMomentumTermLength } from '@/lib/calculations';
 
 // Dynamically import session-store to avoid SSR issues
 const getPlaidData = typeof window !== 'undefined' 
@@ -155,6 +155,7 @@ const getDisplayCategoryFromNarrativeCodes = (account) => {
 
 
 export default function DealSheetPage() {
+  const [isMounted, setIsMounted] = useState(false);
   const [plaidData, setPlaidData] = useState(null);
   const [mappedData, setMappedData] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -470,6 +471,11 @@ export default function DealSheetPage() {
     }
   };
 
+  // Set mounted state to prevent hydration errors
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Load data on component mount
   useEffect(() => {
     loadPlaidData();
@@ -512,6 +518,166 @@ export default function DealSheetPage() {
     console.log('[DealSheet] Is using fallback calculation?', programCost > 0 && !momentumResults);
     setCalculatedProgramCost(programCost);
   }, [liabilitiesData]);
+
+  // Budget Verification: Calculate optimization based on excess liquidity
+  const calculateBudgetVerification = () => {
+    // Don't calculate during SSR to prevent hydration errors
+    if (!isMounted) {
+      return null;
+    }
+
+    // Calculate dynamic values from form data
+    const wagesIncome = formData.netMonthlyEmploymentIncome ?
+      parseFloat(formData.netMonthlyEmploymentIncome) :
+      calculateAverageMonthlyIncome();
+    const dividendsIncome = formData.dividends ? parseFloat(formData.dividends) : 0;
+    const totalMonthlyIncome = wagesIncome + dividendsIncome;
+
+    // Calculate total expenses
+    const expenseFields = [
+      'housingPayment', 'homeOwnersInsurance', 'secondaryHousingPayment', 'healthLifeInsurance',
+      'medicalCare', 'prescriptionsMedicalExp', 'autoPayments', 'gasoline', 'repairsMaintenance',
+      'parking', 'commuting', 'groceries', 'eatingOut', 'entertainment', 'hobbies',
+      'miscellaneousPersonal', 'petCare', 'clothingHousehold', 'taxPreparation',
+      'tuition', 'childcare', 'alimonyChildSupport', 'gym', 'personalCare', 'charityDonations',
+      'daycareChildExpenses', 'nursingCare', 'misc'
+    ];
+
+    const baseExpenses = expenseFields.reduce((total, field) => {
+      const value = formData[field] ? parseFloat(formData[field]) : 0;
+      return total + (isNaN(value) ? 0 : value);
+    }, 0);
+
+    const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
+    const totalExpenses = baseExpenses + debtOther;
+
+    // Client Budget = Available funds for the program (before program cost)
+    const clientBudget = totalMonthlyIncome - totalExpenses;
+
+    // Program cost and total expenses with program
+    const programCost = calculatedProgramCost;
+    const totalExpensesWithProgram = totalExpenses + programCost;
+    const availableFunds = clientBudget; // Use clientBudget for optimization calculations
+
+    // Get current term from momentum results
+    const getMomentumResults = () => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const stored = sessionStorage.getItem('momentumResults');
+        return stored ? JSON.parse(stored) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const momentumResults = getMomentumResults();
+    const currentTerm = momentumResults?.term || getMomentumTermLength(momentumResults?.totalDebt || 0);
+    const totalDebt = momentumResults?.totalDebt || 0;
+
+    // Calculate the actual 15% program fee (not the total cost)
+    const programFeeAmount = totalDebt * 0.15;
+
+    // Total program cost = settlement amount (60% of debt) + program fee (15% of debt)
+    const totalProgramCost = (totalDebt * 0.60) + programFeeAmount;
+
+    // Budget verification logic
+    if (programCost > availableFunds) {
+      // Client does NOT qualify
+      return {
+        qualifies: false,
+        programCost,
+        availableFunds,
+        excessLiquidity: 0,
+        message: 'Based on your verified budget, this plan may not be feasible. Please schedule a consultation with a Momentum staff member to explore your options.'
+      };
+    }
+
+    // Calculate excess liquidity
+    const excessLiquidity = availableFunds - programCost;
+
+    if (excessLiquidity < 50) {
+      // Client qualifies but no optimization
+      return {
+        qualifies: true,
+        programCost,
+        availableFunds,
+        excessLiquidity,
+        optimized: false,
+        currentTerm,
+        totalProgramCost,
+        programFeeAmount,
+        totalDebt,
+        message: 'Your budget supports the proposed monthly payment.'
+      };
+    }
+
+    // Client qualifies with optimization potential
+    // Optimization logic: Can shorten term or extend up to 1x max term
+    const maxOptimizedTerm = currentTerm; // Can be extended up to 1x the current max term
+
+    // Calculate optimized monthly payment (client budget minus $50 legal/payment processing fee)
+    const optimizedMonthlyPayment = availableFunds - 50;
+
+    // Payment toward program cost (excluding legal/processing fee)
+    const paymentTowardProgramCost = optimizedMonthlyPayment - 50;
+
+    // Calculate optimized term: Total Program Cost / Payment Toward Program Cost
+    const optimizedTerm = Math.round(totalProgramCost / paymentTowardProgramCost);
+
+    // Round optimized term to nearest whole month
+    const roundedOptimizedTerm = Math.round(optimizedTerm);
+
+    return {
+      qualifies: true,
+      programCost,
+      availableFunds,
+      excessLiquidity,
+      optimized: true,
+      currentTerm,
+      optimizedMonthlyPayment,
+      optimizedTerm: roundedOptimizedTerm,
+      paymentTowardProgramCost,
+      totalProgramCost,
+      programFeeAmount,
+      totalDebt,
+      message: 'Your budget allows for an optimized payment plan.'
+    };
+  };
+
+  // Automatically save optimized results to sessionStorage when calculated
+  useEffect(() => {
+    if (!isMounted || calculatedProgramCost === 0) return;
+
+    const budgetVerification = calculateBudgetVerification();
+    if (budgetVerification && budgetVerification.optimized) {
+      const getMomentumResults = () => {
+        if (typeof window === 'undefined') return null;
+        try {
+          const stored = sessionStorage.getItem('momentumResults');
+          return stored ? JSON.parse(stored) : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const currentResults = getMomentumResults();
+      if (currentResults) {
+        const optimizedResults = {
+          ...currentResults,
+          monthlyPayment: budgetVerification.optimizedMonthlyPayment,
+          term: budgetVerification.optimizedTerm,
+          totalCost: budgetVerification.optimizedMonthlyPayment * budgetVerification.optimizedTerm,
+          isOptimized: true,
+          originalMonthlyPayment: budgetVerification.programCost,
+          originalTerm: budgetVerification.currentTerm,
+          excessLiquidity: budgetVerification.excessLiquidity,
+        };
+
+        sessionStorage.setItem('momentumResults', JSON.stringify(optimizedResults));
+        console.log('[DealSheet] Auto-saved optimized momentum results:', optimizedResults);
+      }
+    }
+  }, [isMounted, calculatedProgramCost, formData]);
 
   // Listen for storage events to refresh when Plaid data is updated
   useEffect(() => {
@@ -560,11 +726,19 @@ export default function DealSheetPage() {
   };
 
   const handleSave = () => {
+    // Check budget verification before saving
+    const budgetVerification = calculateBudgetVerification();
+
+    if (!budgetVerification.qualifies) {
+      alert('Cannot save: Client does not qualify based on budget verification.\n\nThe proposed monthly payment exceeds the available budget. Please consult with a Momentum staff member.');
+      return;
+    }
+
     // Create comprehensive deal sheet data including Plaid mappings
     const dealSheetData = {
       // Basic form data
       ...formData,
-      
+
       // Plaid integration metadata
       plaidData: {
         connected: hasPlaidData,
@@ -572,7 +746,7 @@ export default function DealSheetPage() {
         mappingSource: '/admin/plaid', // Reference to mapping definitions
         lastUpdated: new Date().toISOString(),
       },
-      
+
       // Mapped amounts from Plaid (read-only, for reference)
       plaidMappings: mappedData ? {
         income: {
@@ -588,32 +762,69 @@ export default function DealSheetPage() {
             .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
         },
         transactionSummary: {
-          totalTransactions: (mappedData.unmapped?.length || 0) + 
+          totalTransactions: (mappedData.unmapped?.length || 0) +
             Object.values(mappedData.transactionDetails || {}).reduce((sum, arr) => sum + (arr?.length || 0), 0),
           mappedTransactions: Object.values(mappedData.transactionDetails || {}).reduce((sum, arr) => sum + (arr?.length || 0), 0),
           unmappedTransactions: mappedData.unmapped?.length || 0,
         }
       } : null,
-      
+
       // Deal sheet calculations
       calculations: {
         totalMonthlyIncome: mappedData ? Object.values(mappedData.income).reduce((a, b) => a + b, 0) : 0,
         totalMonthlyExpenses: mappedData ? Object.values(mappedData.expenses).reduce((a, b) => a + b, 0) : 0,
-        netCashFlow: mappedData ? 
-          Object.values(mappedData.income).reduce((a, b) => a + b, 0) - 
+        netCashFlow: mappedData ?
+          Object.values(mappedData.income).reduce((a, b) => a + b, 0) -
           Object.values(mappedData.expenses).reduce((a, b) => a + b, 0) : 0,
       },
-      
+
+      // Budget verification results
+      budgetVerification: budgetVerification,
+
       // Timestamp
       savedAt: new Date().toISOString(),
     };
-    
+
     console.log('Saving comprehensive deal sheet data:', dealSheetData);
-    
+
+    // Store optimized plan results if applicable
+    if (budgetVerification.optimized) {
+      const getMomentumResults = () => {
+        if (typeof window === 'undefined') return null;
+        try {
+          const stored = sessionStorage.getItem('momentumResults');
+          return stored ? JSON.parse(stored) : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const currentResults = getMomentumResults();
+      if (currentResults) {
+        const optimizedResults = {
+          ...currentResults,
+          monthlyPayment: budgetVerification.optimizedMonthlyPayment,
+          term: budgetVerification.optimizedTerm,
+          totalCost: budgetVerification.optimizedMonthlyPayment * budgetVerification.optimizedTerm,
+          isOptimized: true,
+          originalMonthlyPayment: budgetVerification.programCost,
+          originalTerm: budgetVerification.currentTerm,
+          excessLiquidity: budgetVerification.excessLiquidity,
+        };
+
+        sessionStorage.setItem('momentumResults', JSON.stringify(optimizedResults));
+        console.log('[DealSheet] Saved optimized momentum results:', optimizedResults);
+      }
+    }
+
     // Here you would typically send this to your backend API
     // Example: await fetch('/api/deal-sheet', { method: 'POST', body: JSON.stringify(dealSheetData) })
-    
-    alert(`Deal Sheet Saved!\n\nPlaid Data: ${hasPlaidData ? 'Connected' : 'Not Connected'}\nTotal Income: ${formatCurrency(dealSheetData.calculations.totalMonthlyIncome)}\nTotal Expenses: ${formatCurrency(dealSheetData.calculations.totalMonthlyExpenses)}\nNet Cash Flow: ${formatCurrency(dealSheetData.calculations.netCashFlow)}`);
+
+    const saveMessage = budgetVerification.optimized
+      ? `Deal Sheet Saved!\n\nBudget Verified: ✓\nOptimized Plan: ✓\nPlaid Data: ${hasPlaidData ? 'Connected' : 'Not Connected'}\nTotal Income: ${formatCurrency(dealSheetData.calculations.totalMonthlyIncome)}\nTotal Expenses: ${formatCurrency(dealSheetData.calculations.totalMonthlyExpenses)}\nNet Cash Flow: ${formatCurrency(dealSheetData.calculations.netCashFlow)}\n\nOptimized Payment: ${formatCurrency(budgetVerification.optimizedMonthlyPayment)}/mo\nOptimized Term: ${budgetVerification.optimizedTerm} months`
+      : `Deal Sheet Saved!\n\nBudget Verified: ✓\nPlaid Data: ${hasPlaidData ? 'Connected' : 'Not Connected'}\nTotal Income: ${formatCurrency(dealSheetData.calculations.totalMonthlyIncome)}\nTotal Expenses: ${formatCurrency(dealSheetData.calculations.totalMonthlyExpenses)}\nNet Cash Flow: ${formatCurrency(dealSheetData.calculations.netCashFlow)}`;
+
+    alert(saveMessage);
   };
 
   const handleCancel = () => {
@@ -1070,60 +1281,6 @@ export default function DealSheetPage() {
             )}
           </Card>
 
-          {/* Contract Details Section */}
-          <Card className="p-6 mb-8">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-700">Contract Details</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Program Fees */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Program Fees ($ Amount)
-                </label>
-                <div className="text-lg font-semibold text-gray-900">
-                  ${(debtAccounts
-                    .reduce((sum, account) => sum + (account.balance || 0), 0) * 0.15)
-                    .toLocaleString()}
-                </div>
-                <p className="text-xs text-gray-500">15% of total debt enrolled</p>
-              </div>
-
-              {/* Program Months */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Program Months
-                </label>
-                <div className="text-lg font-semibold text-gray-900">
-                  24
-                </div>
-                <p className="text-xs text-gray-500">Duration in months</p>
-              </div>
-
-              {/* Fee Percentage */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Fee %
-                </label>
-                <div className="text-lg font-semibold text-gray-900">
-                  15%
-                </div>
-                <p className="text-xs text-gray-500">Of total enrolled debt</p>
-              </div>
-
-              {/* Creditors Enrolled */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Creditors Enrolled
-                </label>
-                <div className="text-lg font-semibold text-gray-900">
-                  {debtAccounts.length}
-                </div>
-                <p className="text-xs text-gray-500">Total creditor accounts</p>
-              </div>
-            </div>
-          </Card>
 
           {/* No Plaid Data Warning */}
           {!hasPlaidData && (
@@ -1148,93 +1305,289 @@ export default function DealSheetPage() {
           )}
 
           <div className="space-y-8">
-            {/* Monthly Expenditure Details */}
-            <Card className="p-6">
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-700">Monthly Expenditure Details</h2>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                {(() => {
-                  // Calculate dynamic values from Plaid data
-                  // Calculate total income including wages + dividends
-                  const wagesIncome = formData.netMonthlyEmploymentIncome ?
-                    parseFloat(formData.netMonthlyEmploymentIncome) :
-                    calculateAverageMonthlyIncome();
-                  const dividendsIncome = formData.dividends ? parseFloat(formData.dividends) : 0;
-                  const totalMonthlyIncome = wagesIncome + dividendsIncome;
-                  // Calculate total minimum payments from debt accounts
-                  const totalDebtMinimumPayments = debtAccounts
-                    .reduce((sum, account) => sum + (account.minimumPayment || account.scheduledPaymentAmount || 0), 0);
+            {/* Budget Verification Section */}
+            {(() => {
+              const budgetVerification = calculateBudgetVerification();
 
-                  // Calculate total expenses using the 3-period averages from form data
-                  // Exclude debt payments since they're being replaced by program cost
-                  const expenseFields = [
-                    'housingPayment', 'homeOwnersInsurance', 'secondaryHousingPayment', 'healthLifeInsurance',
-                    'medicalCare', 'prescriptionsMedicalExp', 'autoPayments', 'gasoline', 'repairsMaintenance',
-                    'parking', 'commuting', 'groceries', 'eatingOut', 'entertainment', 'hobbies',
-                    'miscellaneousPersonal', 'petCare', 'clothingHousehold', 'taxPreparation',
-                    'tuition', 'childcare', 'alimonyChildSupport', 'gym', 'personalCare', 'charityDonations',
-                    'daycareChildExpenses', 'nursingCare', 'misc'
-                  ];
+              if (!budgetVerification || calculatedProgramCost === 0) {
+                return null;
+              }
 
-                  const baseExpenses = expenseFields.reduce((total, field) => {
-                    const value = formData[field] ? parseFloat(formData[field]) : 0;
-                    return total + (isNaN(value) ? 0 : value);
-                  }, 0);
+              return (
+                <Card className="p-6">
+                  <div className="mb-6">
+                    <h2 className="text-lg font-semibold text-gray-700">Plan Details</h2>
+                  </div>
 
-                  // Total expenses from Plaid transactions only (no deductions for settled accounts)
-                  const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
-                  const totalExpenses = baseExpenses + debtOther;
-
-                  // Use the calculated program cost from state
-                  const programCost = calculatedProgramCost;
-                  const totalExpensesWithProgram = totalExpenses + programCost;
-                  const availableFunds = totalMonthlyIncome - totalExpensesWithProgram;
-                  
-                  return (
-                    <>
-                      <div className="text-center">
-                        <div className={`text-lg font-semibold ${totalMonthlyIncome > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {formatCurrency(totalMonthlyIncome)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Total Monthly Income</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Wages: ${formatCurrency(wagesIncome)} {dividendsIncome > 0 ? `+ Dividends: ${formatCurrency(dividendsIncome)}` : ''}
+                  {!budgetVerification.qualifies ? (
+                    // Client does NOT qualify
+                    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+                      <div className="flex items-start mb-4">
+                        <svg className="h-6 w-6 text-red-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                          <h3 className="text-lg font-semibold text-red-900 mb-2">Budget Verification Failed</h3>
+                          <p className="text-sm text-red-800">{budgetVerification.message}</p>
                         </div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-gray-900">
-                          {formatCurrency(programCost)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Program Cost</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-lg font-semibold ${totalExpenses > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {formatCurrency(totalExpenses)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Total Expenses</div>
-                        <div className="text-xs text-gray-500 mt-1">From Plaid transaction data</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-gray-900">
-                          {formatCurrency(totalExpensesWithProgram)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Total Monthly Expense (With Program Cost)</div>
-                        <div className="text-xs text-gray-500 mt-1">Total Expenses + Program Cost (${formatCurrency(programCost)})</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-lg font-semibold ${availableFunds >= 0 ? 'text-gray-900' : 'text-gray-700'}`}>
-                          {formatCurrency(availableFunds)}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">Available Funds</div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </Card>
 
+                      <div className="mt-4 bg-white rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Budget Comparison:</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-sm text-gray-600">Proposed Monthly Payment</div>
+                            <div className="text-lg font-bold text-red-600">{formatCurrency(budgetVerification.programCost)}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">Client Budget (Available Funds)</div>
+                            <div className="text-lg font-bold text-gray-900">{formatCurrency(budgetVerification.availableFunds)}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-sm text-gray-600">Budget Shortfall</div>
+                          <div className="text-lg font-bold text-red-600">
+                            {formatCurrency(budgetVerification.programCost - budgetVerification.availableFunds)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : !budgetVerification.optimized ? (
+                    // Client qualifies but no optimization
+                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
+                      <div className="flex items-start mb-4">
+                        <svg className="h-6 w-6 text-green-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h3 className="text-lg font-semibold text-green-900 mb-2">Budget Verified</h3>
+                          <p className="text-sm text-green-800">{budgetVerification.message}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 bg-white rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Budget Comparison:</h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <div className="text-sm text-gray-600">Monthly Payment</div>
+                            <div className="text-lg font-bold text-gray-900">{formatCurrency(budgetVerification.programCost)}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">Client Budget</div>
+                            <div className="text-lg font-bold text-gray-900">{formatCurrency(budgetVerification.availableFunds)}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">Excess Liquidity</div>
+                            <div className="text-lg font-bold text-green-600">{formatCurrency(budgetVerification.excessLiquidity)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Client qualifies with optimization
+                    <div className="space-y-4">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-3">Plan Comparison:</h4>
+
+                          {/* Original Plan Contract Details */}
+                          <div className="mb-4">
+                            <h5 className="text-sm font-semibold text-gray-900 mb-2">Original Plan</h5>
+                            <div className="bg-white border border-gray-300 rounded-lg p-4">
+                              {(() => {
+                                // Calculate values for Original Plan
+                                const wagesIncome = formData.netMonthlyEmploymentIncome ?
+                                  parseFloat(formData.netMonthlyEmploymentIncome) :
+                                  calculateAverageMonthlyIncome();
+                                const dividendsIncome = formData.dividends ? parseFloat(formData.dividends) : 0;
+                                const totalMonthlyIncome = wagesIncome + dividendsIncome;
+
+                                const expenseFields = [
+                                  'housingPayment', 'homeOwnersInsurance', 'secondaryHousingPayment', 'healthLifeInsurance',
+                                  'medicalCare', 'prescriptionsMedicalExp', 'autoPayments', 'gasoline', 'repairsMaintenance',
+                                  'parking', 'commuting', 'groceries', 'eatingOut', 'entertainment', 'hobbies',
+                                  'miscellaneousPersonal', 'petCare', 'clothingHousehold', 'taxPreparation',
+                                  'tuition', 'childcare', 'alimonyChildSupport', 'gym', 'personalCare', 'charityDonations',
+                                  'daycareChildExpenses', 'nursingCare', 'misc'
+                                ];
+
+                                const baseExpenses = expenseFields.reduce((total, field) => {
+                                  const value = formData[field] ? parseFloat(formData[field]) : 0;
+                                  return total + (isNaN(value) ? 0 : value);
+                                }, 0);
+
+                                const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
+                                const totalExpenses = baseExpenses + debtOther;
+                                const totalExpensesWithProgram = totalExpenses + budgetVerification.programCost;
+
+                                return (
+                                  <>
+                                    {/* Income and Expenses Summary */}
+                                    <div className="grid grid-cols-4 gap-4 mb-3 pb-3 border-b border-gray-300">
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Monthly Income</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalMonthlyIncome)}</div>
+                                        <div className="text-xs text-gray-500">Total income</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Total Expenses</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalExpenses)}</div>
+                                        <div className="text-xs text-gray-500">From Plaid</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Program Cost</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.programCost)}</div>
+                                        <div className="text-xs text-gray-500">Per month</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Total Monthly Expense</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalExpensesWithProgram)}</div>
+                                        <div className="text-xs text-gray-500">With program cost</div>
+                                      </div>
+                                    </div>
+
+                                    {/* Program Details */}
+                                    <div className="grid grid-cols-4 gap-4 mb-4">
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Program Fees ($ Amount)</div>
+                                  <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.programFeeAmount || 0)}</div>
+                                  <div className="text-xs text-gray-500">15% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Program Months</div>
+                                  <div className="text-base font-semibold text-gray-900">{budgetVerification.currentTerm}</div>
+                                  <div className="text-xs text-gray-500">Duration in months</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Fee %</div>
+                                  <div className="text-base font-semibold text-gray-900">15%</div>
+                                  <div className="text-xs text-gray-500">Of total enrolled debt</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Excess Liquidity</div>
+                                  <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.excessLiquidity)}</div>
+                                  <div className="text-xs text-gray-500">Available funds</div>
+                                </div>
+                              </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Optimized Plan Contract Details */}
+                          <div className="mb-4">
+                            <h5 className="text-sm font-semibold text-gray-900 mb-2">Optimized Plan</h5>
+                            <div className="bg-gray-100 rounded-lg p-4 border-2 border-gray-400">
+                              {(() => {
+                                // Calculate values for Optimized Plan
+                                const wagesIncome = formData.netMonthlyEmploymentIncome ?
+                                  parseFloat(formData.netMonthlyEmploymentIncome) :
+                                  calculateAverageMonthlyIncome();
+                                const dividendsIncome = formData.dividends ? parseFloat(formData.dividends) : 0;
+                                const totalMonthlyIncome = wagesIncome + dividendsIncome;
+
+                                const expenseFields = [
+                                  'housingPayment', 'homeOwnersInsurance', 'secondaryHousingPayment', 'healthLifeInsurance',
+                                  'medicalCare', 'prescriptionsMedicalExp', 'autoPayments', 'gasoline', 'repairsMaintenance',
+                                  'parking', 'commuting', 'groceries', 'eatingOut', 'entertainment', 'hobbies',
+                                  'miscellaneousPersonal', 'petCare', 'clothingHousehold', 'taxPreparation',
+                                  'tuition', 'childcare', 'alimonyChildSupport', 'gym', 'personalCare', 'charityDonations',
+                                  'daycareChildExpenses', 'nursingCare', 'misc'
+                                ];
+
+                                const baseExpenses = expenseFields.reduce((total, field) => {
+                                  const value = formData[field] ? parseFloat(formData[field]) : 0;
+                                  return total + (isNaN(value) ? 0 : value);
+                                }, 0);
+
+                                const debtOther = formData.debtOther ? parseFloat(formData.debtOther) : 0;
+                                const totalExpenses = baseExpenses + debtOther;
+                                const totalExpensesWithProgram = totalExpenses + budgetVerification.optimizedMonthlyPayment;
+
+                                return (
+                                  <>
+                                    {/* Income and Expenses Summary */}
+                                    <div className="grid grid-cols-4 gap-4 mb-3 pb-3 border-b border-gray-400">
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Monthly Income</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalMonthlyIncome)}</div>
+                                        <div className="text-xs text-gray-500">Total income</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Total Expenses</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalExpenses)}</div>
+                                        <div className="text-xs text-gray-500">From Plaid</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Program Cost</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.optimizedMonthlyPayment)}</div>
+                                        <div className="text-xs text-gray-500">Per month</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-600 mb-1">Total Monthly Expense</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatCurrency(totalExpensesWithProgram)}</div>
+                                        <div className="text-xs text-gray-500">With program cost</div>
+                                      </div>
+                                    </div>
+
+                                    {/* Program Details */}
+                                    <div className="grid grid-cols-4 gap-4 mb-4">
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Program Fees ($ Amount)</div>
+                                  <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.programFeeAmount || 0)}</div>
+                                  <div className="text-xs text-gray-500">15% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Program Months</div>
+                                  <div className="text-base font-semibold text-gray-900">{budgetVerification.optimizedTerm}</div>
+                                  <div className="text-xs text-gray-500">Duration in months</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Fee %</div>
+                                  <div className="text-base font-semibold text-gray-900">15%</div>
+                                  <div className="text-xs text-gray-500">Of total enrolled debt</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Excess Liquidity</div>
+                                  <div className="text-base font-semibold text-gray-900">{formatCurrency(50)}</div>
+                                  <div className="text-xs text-gray-500">Reserved buffer</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-700 bg-white border border-gray-300 rounded p-2">
+                                <strong>Savings:</strong> Pay off {budgetVerification.currentTerm - budgetVerification.optimizedTerm} months faster by increasing monthly payment to {formatCurrency(budgetVerification.optimizedMonthlyPayment)}
+                              </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Calculation Breakdown */}
+                          <div className="bg-white border border-gray-300 rounded-lg p-4">
+                            <div className="text-sm text-gray-700 space-y-2">
+                              <div className="font-semibold text-gray-900">Optimization Calculation:</div>
+                              <div className="pl-4">
+                                • <strong>Excess Liquidity:</strong> {formatCurrency(budgetVerification.excessLiquidity)} (Client Budget - Proposed Payment)
+                              </div>
+                              <div className="pl-4">
+                                • <strong>Optimized Monthly Payment:</strong> {formatCurrency(budgetVerification.optimizedMonthlyPayment)} (Client Budget - $50 legal/payment processing fee)
+                              </div>
+                              <div className="pl-4">
+                                • <strong>Payment Toward Program Cost:</strong> {formatCurrency(budgetVerification.paymentTowardProgramCost)}
+                                (Optimized Payment - $50)
+                              </div>
+                              <div className="pl-4">
+                                • <strong>Optimized Term:</strong> {budgetVerification.optimizedTerm} months
+                                (Total Program Cost ÷ Payment Toward Program Cost, rounded)
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
 
             {/* Applicant and Co-Applicant Details */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -2210,16 +2563,6 @@ export default function DealSheetPage() {
                 </div>
               </Card>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-4">
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} className="bg-gray-600 hover:bg-gray-700">
-                Save
-              </Button>
-            </div>
           </div>
             </TabsContent>
 

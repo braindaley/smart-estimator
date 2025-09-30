@@ -181,10 +181,63 @@ export const mockCraIncomeByPeriod = {
 
 /**
  * Get mock CRA income data for a specific period
+ * If persona data is available, use persona's income instead of hardcoded mock data
  * @param {number} period - 1, 2, or 3 representing different time periods
  * @returns {Object} Mock CRA income data for the specified period
  */
 export function getMockCraIncomeForPeriod(period = 1) {
+  // Check if persona data exists and use its income
+  if (typeof window !== 'undefined') {
+    try {
+      const userId = localStorage.getItem('loan_user_id');
+      if (userId) {
+        const selectedPersonaKey = `selected_persona_${userId}`;
+        const selectedPersonaId = localStorage.getItem(selectedPersonaKey);
+
+        if (selectedPersonaId) {
+          // Get plaid data which should contain persona income
+          const plaidDataKey = `plaid_data_${userId}`;
+          const storedPlaidData = localStorage.getItem(plaidDataKey);
+
+          if (storedPlaidData) {
+            const plaidData = JSON.parse(storedPlaidData);
+            if (plaidData.income && plaidData.income.income_summary) {
+              const personaIncome = plaidData.income.income_summary.total_monthly_income || 0;
+
+              // Return the persona's income for all periods (persona data is static)
+              return {
+                ...mockCraIncomeData,
+                income: {
+                  ...mockCraIncomeData.income,
+                  income_insights: [
+                    {
+                      ...mockCraIncomeData.income.income_insights[0],
+                      income_streams: [
+                        {
+                          ...mockCraIncomeData.income.income_insights[0].income_streams[0],
+                          monthly_income: personaIncome,
+                          average_monthly_income: personaIncome,
+                          confidence: "HIGH"
+                        }
+                      ]
+                    }
+                  ],
+                  summary: {
+                    ...mockCraIncomeData.income.summary,
+                    total_monthly_income: personaIncome
+                  }
+                }
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[getMockCraIncomeForPeriod] Error reading persona income:', e);
+    }
+  }
+
+  // Fallback to hardcoded mock data
   switch (period) {
     case 1:
       return mockCraIncomeByPeriod.period1;
@@ -200,9 +253,37 @@ export function getMockCraIncomeForPeriod(period = 1) {
 /**
  * Calculate average monthly income across all periods
  * This should return $17,333.33 = ($24,000 + $12,000 + $16,000) / 3
+ * If persona data is available, use that instead
  * @returns {number} Average monthly income
  */
 export function calculateAverageMonthlyIncome() {
+  // Check if persona data exists and use its income
+  if (typeof window !== 'undefined') {
+    try {
+      const userId = localStorage.getItem('loan_user_id');
+      if (userId) {
+        const selectedPersonaKey = `selected_persona_${userId}`;
+        const selectedPersonaId = localStorage.getItem(selectedPersonaKey);
+
+        if (selectedPersonaId) {
+          // Get plaid data which should contain persona income
+          const plaidDataKey = `plaid_data_${userId}`;
+          const storedPlaidData = localStorage.getItem(plaidDataKey);
+
+          if (storedPlaidData) {
+            const plaidData = JSON.parse(storedPlaidData);
+            if (plaidData.income && plaidData.income.income_summary) {
+              return plaidData.income.income_summary.total_monthly_income || 0;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[calculateAverageMonthlyIncome] Error reading persona income:', e);
+    }
+  }
+
+  // Fallback to mock data
   const period1Income = mockCraIncomeByPeriod.period1.income.summary.total_monthly_income;
   const period2Income = mockCraIncomeByPeriod.period2.income.summary.total_monthly_income;
   const period3Income = mockCraIncomeByPeriod.period3.income.summary.total_monthly_income;

@@ -2226,7 +2226,7 @@ export const applyPersona = (personaId, userId) => {
   // Store credit data
   localStorage.setItem(`credit_data_${userId}`, JSON.stringify(persona.creditData));
 
-  // Store plaid data in session storage (as the app expects)
+  // Store plaid data in multiple formats to ensure compatibility
   const plaidDataWithMetadata = {
     data: persona.plaidData,
     timestamp: new Date().toISOString(),
@@ -2236,6 +2236,7 @@ export const applyPersona = (personaId, userId) => {
 
   console.log('[Persona] Storing plaid data:', plaidDataWithMetadata);
 
+  // Store in sessionStorage (for getPlaidData compatibility)
   try {
     sessionStorage.setItem('plaid_session_data', JSON.stringify(plaidDataWithMetadata));
     console.log('[Persona] Successfully stored in sessionStorage');
@@ -2244,6 +2245,18 @@ export const applyPersona = (personaId, userId) => {
     localStorage.setItem('plaid_session_data', JSON.stringify(plaidDataWithMetadata));
     console.log('[Persona] Fallback to localStorage due to error:', e);
   }
+
+  // Also store in localStorage with userId key (for direct access)
+  localStorage.setItem(`plaid_data_${userId}`, JSON.stringify(persona.plaidData));
+
+  // Store in the standard plaid_data key as well
+  localStorage.setItem('plaid_data', JSON.stringify({
+    userId: userId,
+    data: persona.plaidData,
+    storedAt: new Date().toISOString()
+  }));
+
+  console.log('[Persona] Stored plaid data in all storage locations');
 
   // Update step completion status for persona testing
   const stepStatus = JSON.parse(localStorage.getItem('user_steps') || '{}');
@@ -2283,8 +2296,9 @@ export const clearPersonaData = (userId) => {
     localStorage.removeItem('plaid_session_data');
   }
 
-  // Clear any existing real API data that might conflict
+  // Clear all plaid data storage locations
   localStorage.removeItem('plaid_data');
+  localStorage.removeItem(`plaid_data_${userId}`);
   localStorage.removeItem('credit_data');
 
   // Reset step completion status

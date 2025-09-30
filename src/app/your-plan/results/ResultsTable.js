@@ -66,6 +66,18 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
                   <div>Total cost: {formatCurrency(momentumResults.totalCost)}</div>
                 </div>
 
+                {momentumResults.isOptimized && (
+                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-left">
+                    <div className="font-semibold text-green-800 mb-1">✓ Budget Optimized</div>
+                    <div className="text-green-700">
+                      Original: {formatCurrency(momentumResults.originalMonthlyPayment)}/mo for {momentumResults.originalTerm} months
+                    </div>
+                    <div className="text-green-700 mt-1">
+                      This plan has been optimized based on your available budget with {formatCurrency(momentumResults.excessLiquidity)} excess liquidity.
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 text-xs text-left">
                   <div className="text-sm font-bold mb-2">Legal Assistance Program</div>
                   <div className="text-xs">
