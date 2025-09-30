@@ -710,72 +710,120 @@ export default function ResultsPage() {
                             <h4 className="font-semibold mb-2">Data Source:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Plaid's /credit/payroll_income/get API (CRA Income Verification)<br/>
-                                Returns: Employment data with income streams and confidence levels
+                                Plaid /credit/payroll_income/get API (CRA Income Verification)
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Income Data Structure:</h4>
-                            <div className="space-y-1">
-                              <div>• Income Streams: Individual deposits identified as income (payroll, benefits, etc.)</div>
-                              <div>• Confidence Levels: HIGH (95%+), MEDIUM (70-94%), LOW (&lt;70%)</div>
-                              <div>• Time Periods: Data for last 90 days divided into 3 periods</div>
-                              <div>• Monthly Income: Calculated for each 30-day period</div>
+                            <h4 className="font-semibold mb-2">Formula:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Average Monthly Income = (Period 1 + Period 2 + Period 3) ÷ 3</strong><br/><br/>
+                                Where:<br/>
+                                • Period 1 = Last 30 days verified income<br/>
+                                • Period 2 = 31-60 days ago verified income<br/>
+                                • Period 3 = 61-90 days ago verified income
+                              </code>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong> $4,500/month
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Implementation:</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                const incomeData = await plaid.creditPayrollIncomeGet(access_token);<br/>
+                                const periods = incomeData.income_insights[0].income_streams[0].periods;<br/>
+                                const avgMonthlyIncome = (periods[0].monthly_income + periods[1].monthly_income + periods[2].monthly_income) / 3;
+                              </code>
                             </div>
                           </div>
 
                           <div>
                             <h3 className="font-bold text-lg mb-4">STEP 2: PLAID TRANSACTION DATA & EXPENSE MAPPING</h3>
 
-                            <h4 className="font-semibold mb-2">Data Source & Configuration:</h4>
+                            <h4 className="font-semibold mb-2">Data Source:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Plaid's /transactions/get API<br/>
-                                Mapping Configuration: <a href="/admin/plaid" className="text-blue-600 hover:underline">/admin/plaid</a> - Maps Plaid taxonomy to deal sheet fields
+                                Plaid /transactions/get API<br/>
+                                Configuration: <a href="/admin/plaid" className="text-blue-600 hover:underline">/admin/plaid</a>
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Expense Transaction Categorization:</h4>
+                            <h4 className="font-semibold mb-2">Process:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                1. Plaid returns transactions with categories<br/>
-                                2. Each category maps to deal sheet expense fields:<br/>
-                                &nbsp;&nbsp;• FOOD_AND_DRINK_GROCERIES → groceries<br/>
-                                &nbsp;&nbsp;• RENT_AND_UTILITIES_RENT → housingPayment<br/>
-                                &nbsp;&nbsp;• TRANSPORTATION_GAS → gasoline<br/>
-                                &nbsp;&nbsp;• Full mapping at <a href="/admin/plaid" className="text-blue-600 hover:underline">/admin/plaid</a><br/>
-                                3. <strong>Unmapped Transactions Handling:</strong><br/>
-                                &nbsp;&nbsp;• Any transaction that doesn't fall into a specific bucket<br/>
-                                &nbsp;&nbsp;• Automatically mapped to "Other Expenses - Misc"<br/>
-                                &nbsp;&nbsp;• Ensures all expense transactions are captured<br/>
-                                &nbsp;&nbsp;• Marked with note: "Auto-mapped to Miscellaneous (unmapped category)"
+                                1. Fetch 90 days of transactions<br/>
+                                2. Map transactions to deal sheet fields (e.g., FOOD_AND_DRINK_GROCERIES → groceries)<br/>
+                                3. Unmapped categories → "Other Expenses - Misc"<br/>
+                                4. Split into 3 periods (30 days each)<br/>
+                                5. Calculate average per field
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Formula (per expense category):</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Average Monthly Expense = (Period 1 + Period 2 + Period 3) ÷ 3</strong>
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Implementation:</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                const period1Txns = transactions.filter(tx =&gt; isInPeriod(tx.date, 1));<br/>
+                                const period2Txns = transactions.filter(tx =&gt; isInPeriod(tx.date, 2));<br/>
+                                const period3Txns = transactions.filter(tx =&gt; isInPeriod(tx.date, 3));<br/>
+                                <br/>
+                                const calculatePeriodTotals = (txns) =&gt; {'{'}<br/>
+                                &nbsp;&nbsp;const totals = {'{}'};<br/>
+                                &nbsp;&nbsp;txns.forEach(tx =&gt; {'{'}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;const field = mapPlaidCategoryToDealSheetField(tx.category);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;totals[field] = (totals[field] || 0) + tx.amount;<br/>
+                                &nbsp;&nbsp;{'}'});<br/>
+                                &nbsp;&nbsp;return totals;<br/>
+                                {'}'};<br/>
+                                <br/>
+                                allFields.forEach(field =&gt; {'{'}<br/>
+                                &nbsp;&nbsp;averages[field] = (p1Totals[field] + p2Totals[field] + p3Totals[field]) / 3;<br/>
+                                {'}'});
                               </code>
                             </div>
                           </div>
 
                           <div>
-                            <h3 className="font-bold text-lg mb-4">STEP 3: PERIOD CALCULATIONS (90-DAY ANALYSIS)</h3>
+                            <h3 className="font-bold text-lg mb-4">STEP 3: CALCULATIONS TAB (90-DAY BREAKDOWN)</h3>
 
                             <h4 className="font-semibold mb-2">Location:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">/your-plan/deal-sheet</a> - Calculations Tab
+                                <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">/your-plan/deal-sheet</a> → Calculations Tab
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Income Period Data (from Plaid Income API):</h4>
-                            <div className="space-y-1 mb-4">
-                              <div>• Period 1 (Days 1-30): Most recent month's verified income</div>
-                              <div>• Period 2 (Days 31-60): Previous month's verified income</div>
-                              <div>• Period 3 (Days 61-90): Oldest month's verified income</div>
-                              <div>• <strong>Average Monthly Income</strong> = (Period 1 + Period 2 + Period 3) ÷ 3</div>
+                            <h4 className="font-semibold mb-2">Purpose:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                Shows detailed period-by-period breakdown of how transactions convert to monthly averages
+                              </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Expense Period Data (from Transactions):</h4>
-                            <div className="space-y-1">
-                              <div>For each expense field:</div>
-                              <div>• Period Amount = Sum of mapped transactions in that period</div>
-                              <div>• <strong>Average Monthly Expense</strong> = (Period 1 + Period 2 + Period 3) ÷ 3</div>
+                            <h4 className="font-semibold mb-2">Table Structure:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>| Field Name | Period 1 | Period 2 | Period 3 | Average |</strong><br/>
+                                | Groceries  | $369.58  | $326.85  | $294.45  | $330.29 |<br/>
+                                | → Walmart  | $85.43   |          |          |    --   |<br/>
+                                | → Safeway  | $124.20  | $98.45   |          |    --   |<br/>
+                                <br/>
+                                • Category rows show period totals<br/>
+                                • Indented rows (→) show individual transactions<br/>
+                                • Average column = value used in Deal Sheet
+                              </code>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 p-3">
+                              <strong>Current User Values:</strong> View at <a href="/your-plan/deal-sheet" className="text-blue-600 hover:underline">/your-plan/deal-sheet</a> → Calculations Tab
                             </div>
                           </div>
 
@@ -805,204 +853,253 @@ export default function ResultsPage() {
                           <div>
                             <h3 className="font-bold text-lg mb-4">STEP 5: CREDIT REPORT ACCOUNT FILTERING</h3>
 
-                            <h4 className="font-semibold mb-2">Data Source & Configuration:</h4>
+                            <h4 className="font-semibold mb-2">Data Source:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Data Source: Equifax Credit Report API<br/>
-                                Filter Configuration: <a href="/admin/equifax-codes" className="text-blue-600 hover:underline">/admin/equifax-codes</a> - Narrative codes table
+                                Equifax Credit Report API<br/>
+                                Configuration: <a href="/admin/equifax-codes" className="text-blue-600 hover:underline">/admin/equifax-codes</a>
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Account Eligibility Process:</h4>
+                            <h4 className="font-semibold mb-2">Eligibility Rules:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                1. Load all credit accounts with balance &gt; $0<br/>
-                                2. Check each account's narrative codes<br/>
-                                3. Match codes against admin configuration<br/>
-                                4. Include if ANY code has includeInSettlement = true<br/>
-                                5. <strong>Total Eligible Debt</strong> = Sum of eligible balances
+                                1. Account balance &gt; $500 (minimum threshold)<br/>
+                                2. Account has narrative code with includeInSettlement = true
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Formula:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Total Eligible Debt = Σ(Balance of all eligible accounts)</strong>
                               </code>
                             </div>
 
                             <h4 className="font-semibold mb-2">Common Narrative Codes:</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <div className="font-semibold">Settlement-Eligible:</div>
-                                <div className="space-y-1 text-xs">
-                                  <div>• FE - Credit Card</div>
-                                  <div>• AU - Personal Loan</div>
-                                  <div>• CZ - Collection Account</div>
-                                  <div>• GS - Medical</div>
-                                </div>
-                              </div>
-                              <div>
-                                <div className="font-semibold">Excluded:</div>
-                                <div className="space-y-1 text-xs">
-                                  <div>• BU - Student Loan</div>
-                                  <div>• AR - Mortgage</div>
-                                  <div>• AO - Auto Loan</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h3 className="font-bold text-lg mb-4">STEP 6: MOMENTUM PLAN SETTLEMENT CALCULATIONS</h3>
-
-                            <h4 className="font-semibold mb-2">Settlement Amount Per Account:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                1. Look up creditor in data table (<a href="/admin/program-calculator" className="text-blue-600 hover:underline">/admin/program-calculator</a>)<br/>
-                                2. Find creditor-specific settlement percentage<br/>
-                                3. If not found, use fallback rate (default 60%)<br/>
-                                4. <strong>Account Settlement</strong> = Balance × (Settlement % ÷ 100)
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Example Creditor Rates:</h4>
                             <div className="grid grid-cols-2 gap-4 mb-4">
                               <div className="bg-gray-100 p-3">
                                 <code>
-                                  • AMERICAN EXPRESS: 56%<br/>
-                                  • BANK OF AMERICA: 65%<br/>
-                                  • CAPITAL ONE: 65%
+                                  <strong>Eligible:</strong><br/>
+                                  FE - Credit Card<br/>
+                                  AU - Personal Loan<br/>
+                                  CZ - Collection<br/>
+                                  GS - Medical
                                 </code>
                               </div>
                               <div className="bg-gray-100 p-3">
                                 <code>
-                                  • CHASE: 58%<br/>
-                                  • DISCOVER: 65%<br/>
-                                  • Unknown creditors: 60% (fallback)
+                                  <strong>Excluded:</strong><br/>
+                                  BU - Student Loan<br/>
+                                  AR - Mortgage<br/>
+                                  AO - Auto Loan
                                 </code>
                               </div>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Total Settlement Amount:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                Formula: Sum of all individual account settlements<br/>
-                                {momentumResults?.totalDebt ? (
-                                  <span>
-                                    Current: {formatCurrency(momentumResults.totalDebt * 0.60)} (using 60% average)
-                                  </span>
-                                ) : (
-                                  <span>Example: $10,000 debt × 60% = $6,000 settlement</span>
-                                )}
-                              </code>
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong><br/>
+                              CHASE ($8,500 - FE) ✓<br/>
+                              DISCOVER ($6,200 - FE) ✓<br/>
+                              CAPITAL ONE ($4,800 - FE) ✓<br/>
+                              BANK OF AMERICA ($12,000 - BU) ✗ Excluded<br/>
+                              <strong>Total Eligible Debt: $19,500</strong>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Program Fee (Based on Total Eligible Debt):</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                • $15,000-$20,000: 25% of total debt<br/>
-                                • $20,001-$24,000: 19% of total debt<br/>
-                                • $24,001+: 19% of total debt<br/>
-                                {momentumResults?.totalDebt && (
-                                  <span>
-                                    <br/>Current: {formatCurrency(momentumResults.totalDebt)} × {(getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers) * 100).toFixed(0)}% = {formatCurrency(momentumResults.totalDebt * getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers))}
-                                  </span>
-                                )}
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Term Length:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                <strong>Standard Term (Debt-based):</strong><br/>
-                                • $15,000-$20,000: 25 months<br/>
-                                • $20,001-$24,000: 38 months<br/>
-                                • $24,001+: 42 months<br/>
-                                {momentumResults?.isOptimized ? (
-                                  <>
-                                    <br/><strong>Term Optimization:</strong><br/>
-                                    Original Term: {momentumResults.originalTerm} months<br/>
-                                    Optimized Term: {momentumResults.term} months<br/>
-                                    <br/><strong>Optimization Logic:</strong><br/>
-                                    1. Excess Liquidity = Client Budget - Proposed Monthly Payment<br/>
-                                    2. If Excess Liquidity ≥ $50 → Term can be shortened<br/>
-                                    3. Optimized Monthly Payment = Client Budget - $50 (legal/payment processing fee)<br/>
-                                    4. Payment Toward Program Cost = Optimized Monthly Payment - $50<br/>
-                                    5. Optimized Term = Total Program Cost ÷ Payment Toward Program Cost<br/>
-                                    <br/>Result: Pay off {momentumResults.originalTerm - momentumResults.term} months faster!
-                                  </>
-                                ) : momentumResults?.term ? (
-                                  <span><br/>Current Term: {momentumResults.term} months</span>
-                                ) : null}
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Monthly Payment:</h4>
-                            <div className="bg-gray-100 p-4 mb-4">
-                              <code>
-                                <strong>Standard Formula:</strong><br/>
-                                (Total Settlement Amount + Program Fee) ÷ Term Length<br/>
-                                {momentumResults?.isOptimized ? (
-                                  <>
-                                    <br/><strong>Optimized Payment:</strong><br/>
-                                    Original: {formatCurrency(momentumResults.originalMonthlyPayment)}/month<br/>
-                                    Optimized: {formatCurrency(momentumResults.monthlyPayment)}/month<br/>
-                                    <br/>Based on client budget with {formatCurrency(momentumResults.excessLiquidity)} excess liquidity
-                                  </>
-                                ) : momentumResults?.monthlyPayment ? (
-                                  <span><br/>Current: {formatCurrency(momentumResults.monthlyPayment)}/month</span>
-                                ) : null}
-                              </code>
-                            </div>
-
-                            <h4 className="font-semibold mb-2">Additional Fees:</h4>
+                            <h4 className="font-semibold mb-2">Implementation:</h4>
                             <div className="bg-gray-100 p-4">
                               <code>
-                                • Legal Processing Fee: $50/month (if required)<br/>
-                                • Total Program Cost = Settlement + Program Fee + (Legal Fee × Term)
+                                const MINIMUM_BALANCE = 500;<br/>
+                                const eligibleAccounts = creditReport.trades.filter(account =&gt; {'{'}<br/>
+                                &nbsp;&nbsp;if (account.balance &lt;= MINIMUM_BALANCE) return false;<br/>
+                                &nbsp;&nbsp;return account.narrativeCodes.some(nc =&gt; {'{'}<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;const rule = narrativeCodeRules.find(r =&gt; r.code === nc.codeabv);<br/>
+                                &nbsp;&nbsp;&nbsp;&nbsp;return rule && rule.includeInSettlement === true;<br/>
+                                &nbsp;&nbsp;{'}'});<br/>
+                                {'}'});<br/>
+                                const totalEligibleDebt = eligibleAccounts.reduce((sum, acc) =&gt; sum + acc.balance, 0);
                               </code>
                             </div>
                           </div>
 
                           <div>
-                            <h3 className="font-bold text-lg mb-4">STEP 7: CURRENT PATH CALCULATIONS</h3>
+                            <h3 className="font-bold text-lg mb-4">STEP 6: MOMENTUM PLAN CALCULATIONS</h3>
 
-                            <h4 className="font-semibold mb-2">Minimum Payment:</h4>
+                            <h4 className="font-semibold mb-2">A. Settlement Amount Per Account</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Formula: Total Debt × 0.025 (2.5% of balance)<br/>
-                                {currentPathResults?.monthlyPayment && (
-                                  <span>Current: {formatCurrency(currentPathResults.monthlyPayment)}/month</span>
-                                )}
+                                <strong>Formula: Account Settlement = Balance × Settlement Rate</strong><br/><br/>
+                                Settlement Rates (<a href="/admin/program-calculator" className="text-blue-600 hover:underline">/admin/program-calculator</a>):<br/>
+                                AMERICAN EXPRESS: 56% | CHASE: 58% | BANK OF AMERICA: 65%<br/>
+                                CAPITAL ONE: 65% | DISCOVER: 65% | Unknown: 60% (fallback)
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Long-term Cost Projection:</h4>
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong><br/>
+                              CHASE: $8,500 × 0.58 = $4,930<br/>
+                              DISCOVER: $6,200 × 0.65 = $4,030<br/>
+                              CAPITAL ONE: $4,800 × 0.65 = $3,120<br/>
+                              <strong>Total Settlement: $12,080</strong>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">B. Program Fee (Debt Tier-Based)</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Base Model: $2,000 at 22% APR = $4,300 over 11 years<br/>
-                                Scaling: (Your Debt ÷ 2000) × 4300 × (24% ÷ 22%)<br/>
-                                {currentPathResults?.totalCost && momentumResults?.totalDebt && (
-                                  <span>
-                                    <br/>Current: ({formatCurrency(momentumResults.totalDebt)} ÷ 2000) × 4300 × 1.091<br/>
-                                    = {formatCurrency(currentPathResults.totalCost)}
-                                  </span>
-                                )}
+                                <strong>Momentum Program Tiers:</strong><br/>
+                                | Debt Range | Fee % | Max Term |<br/>
+                                | $15,000-$20,000 | 20% | 30 months |<br/>
+                                | $20,001-$24,000 | 15% | 36 months |<br/>
+                                | $24,001+ | 15% | 42 months |<br/>
+                                <br/>
+                                <strong>Formula: Program Fee = Total Eligible Debt × Fee %</strong>
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Term Length:</h4>
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong><br/>
+                              Debt: $19,500 → Tier 1 (20% fee, 30 months)<br/>
+                              <strong>Program Fee: $19,500 × 0.20 = $3,900</strong>
+                              {momentumResults?.totalDebt && (
+                                <span>
+                                  <br/>Your Actual: {formatCurrency(momentumResults.totalDebt)} × {(getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers) * 100).toFixed(0)}% = {formatCurrency(momentumResults.totalDebt * getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers))}
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 className="font-semibold mb-2">C. Monthly Payment</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Formula: 11 years × (24% ÷ 22%) × 12 months<br/>
-                                {currentPathResults?.term && (
-                                  <span>Current: {currentPathResults.term} months ({(currentPathResults.term / 12).toFixed(1)} years)</span>
-                                )}
+                                <strong>Formula: Monthly Payment = (Settlement + Program Fee) ÷ Term</strong>
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Total Interest Paid:</h4>
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong><br/>
+                              Total Program Cost: $12,080 + $3,900 = $15,980<br/>
+                              Term: 30 months<br/>
+                              <strong>Monthly Payment: $15,980 ÷ 30 = $533/month</strong>
+                              {momentumResults?.monthlyPayment && (
+                                <span><br/>Your Actual: {formatCurrency(momentumResults.monthlyPayment)}/month</span>
+                              )}
+                            </div>
+
+                            <h4 className="font-semibold mb-2">D. Term Optimization (Optional)</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Logic:</strong><br/>
+                                IF Excess Liquidity ≥ $50 THEN:<br/>
+                                &nbsp;&nbsp;Optimized Payment = Client Budget - $50<br/>
+                                &nbsp;&nbsp;Payment Toward Cost = Optimized Payment - $50<br/>
+                                &nbsp;&nbsp;Optimized Term = Total Program Cost ÷ Payment Toward Cost
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Implementation:</h4>
                             <div className="bg-gray-100 p-4">
                               <code>
-                                Formula: Total Cost - Original Debt<br/>
-                                {currentPathResults?.totalCost && momentumResults?.totalDebt && (
-                                  <span>Current: {formatCurrency(currentPathResults.totalCost)} - {formatCurrency(momentumResults.totalDebt)} = {formatCurrency(currentPathResults.totalCost - momentumResults.totalDebt)}</span>
-                                )}
+                                const tier = debtTiers.find(t =&gt; totalEligibleDebt &gt;= t.minAmount && totalEligibleDebt &lt;= t.maxAmount);<br/>
+                                const programFee = totalEligibleDebt * (tier.feePercentage / 100);<br/>
+                                const totalProgramCost = totalSettlement + programFee;<br/>
+                                const monthlyPayment = totalProgramCost / tier.maxTermMonths;<br/>
+                                <br/>
+                                // Term optimization<br/>
+                                const excessLiquidity = (monthlyIncome - monthlyExpenses) - monthlyPayment;<br/>
+                                if (excessLiquidity &gt;= 50) {'{'}<br/>
+                                &nbsp;&nbsp;const optimizedTerm = Math.ceil(totalProgramCost / ((monthlyIncome - monthlyExpenses - 50) - 50));<br/>
+                                {'}'}
                               </code>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h3 className="font-bold text-lg mb-4">STEP 7: CURRENT PATH (MINIMUM PAYMENTS)</h3>
+
+                            <h4 className="font-semibold mb-2">Purpose:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>Calculate outcome if user only makes minimum payments</code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Formulas:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Minimum Payment = Total Debt × 0.025</strong><br/>
+                                <strong>Term = 11 years × (APR ÷ 22%) × 12 months</strong><br/>
+                                <strong>Total Cost = (Debt ÷ 2000) × 4300 × (APR ÷ 22%)</strong><br/>
+                                <strong>Interest Paid = Total Cost - Original Debt</strong><br/>
+                                <br/>
+                                <em>Based on industry data: $2,000 at 22% APR = $4,300 over 11 years</em>
+                              </code>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
+                              <strong>Current User Values:</strong><br/>
+                              Minimum Payment: $19,500 × 0.025 = $488/month<br/>
+                              Term: 11 × (24 ÷ 22) × 12 = 144 months (12 years)<br/>
+                              Total Cost: 9.75 × $4,300 × 1.091 = $45,729<br/>
+                              <strong>Interest Paid: $45,729 - $19,500 = $26,229</strong>
+                              {currentPathResults?.monthlyPayment && (
+                                <span><br/>Your Actual: {formatCurrency(currentPathResults.monthlyPayment)}/month over {currentPathResults.term} months</span>
+                              )}
+                            </div>
+
+                            <h4 className="font-semibold mb-2">Implementation:</h4>
+                            <div className="bg-gray-100 p-4">
+                              <code>
+                                function calculateCurrentPath(totalDebt) {'{'}<br/>
+                                &nbsp;&nbsp;const minimumPayment = Math.round(totalDebt * 0.025);<br/>
+                                &nbsp;&nbsp;const termMonths = Math.round(11 * (24 / 22) * 12);<br/>
+                                &nbsp;&nbsp;const totalCost = Math.round((totalDebt / 2000) * 4300 * (24 / 22));<br/>
+                                &nbsp;&nbsp;return {'{'}minimumPayment, termMonths, totalCost{'}'};<br/>
+                                {'}'}
+                              </code>
+                            </div>
+                          </div>
+
+                          <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg">
+                            <h3 className="font-bold text-xl mb-4 text-center">FINAL COMPARISON</h3>
+
+                            <div className="bg-white rounded-lg p-4 mb-4">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b-2 border-gray-300">
+                                    <th className="text-left p-2">Metric</th>
+                                    <th className="text-right p-2">Current Path</th>
+                                    <th className="text-right p-2">Momentum Plan</th>
+                                    <th className="text-right p-2 text-green-600">Savings</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-b border-gray-200">
+                                    <td className="p-2">Monthly Payment</td>
+                                    <td className="text-right p-2">$488</td>
+                                    <td className="text-right p-2">$533</td>
+                                    <td className="text-right p-2 text-red-600">$45 more</td>
+                                  </tr>
+                                  <tr className="border-b border-gray-200">
+                                    <td className="p-2">Term</td>
+                                    <td className="text-right p-2">144 months (12 yrs)</td>
+                                    <td className="text-right p-2">30 months (2.5 yrs)</td>
+                                    <td className="text-right p-2 text-green-600">114 months faster</td>
+                                  </tr>
+                                  <tr className="border-b border-gray-200">
+                                    <td className="p-2">Total Cost</td>
+                                    <td className="text-right p-2">$45,729</td>
+                                    <td className="text-right p-2">$15,980</td>
+                                    <td className="text-right p-2 text-green-600 font-bold">$29,749 saved</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="p-2">Interest/Fees</td>
+                                    <td className="text-right p-2">$26,229</td>
+                                    <td className="text-right p-2">$0</td>
+                                    <td className="text-right p-2 text-green-600">Settlement-based</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div className="text-center text-lg font-semibold text-gray-700">
+                              <strong className="text-green-600">Result:</strong> Pay only $45/month more, become debt-free <strong className="text-green-600">9.5 years sooner</strong>, and save <strong className="text-green-600 text-2xl">$29,749</strong>
                             </div>
                           </div>
 
