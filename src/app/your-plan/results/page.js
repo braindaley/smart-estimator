@@ -645,42 +645,6 @@ export default function ResultsPage() {
                 </Card>
               )}
 
-              {/* Co-Applicant Demo Link */}
-              {!hasCoApplicant() && (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold mb-2">Want to see the co-applicant experience?</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Simulate how the application would work with a co-applicant who shares debt accounts.
-                      </p>
-                      <button
-                        onClick={() => {
-                          // Mock enabling co-applicant for demo
-                          const currentSteps = JSON.parse(localStorage.getItem('user_steps') || '{}');
-                          currentSteps.co_applicant_check = {
-                            completed: true,
-                            data: {
-                              hasCoApplicant: true,
-                              coApplicantInfo: {
-                                name: 'Jane Smith',
-                                phone: '(555) 123-4567',
-                                completed: true
-                              }
-                            }
-                          };
-                          localStorage.setItem('user_steps', JSON.stringify(currentSteps));
-                          window.location.reload();
-                        }}
-                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Enable Co-Applicant Demo
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Technical Documentation */}
               <Accordion type="single" collapsible className="mt-8">
                 <AccordionItem value="calculations" className="border-0">
