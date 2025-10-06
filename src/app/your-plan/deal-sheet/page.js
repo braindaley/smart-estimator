@@ -14,7 +14,7 @@ import TransactionDetailsModal from '@/components/TransactionDetailsModal';
 import ClickableLabel from '@/components/ClickableLabel';
 import { mapPlaidToDealsSheet, getFieldDisplayName, formatCurrency } from '@/lib/plaid-mapping';
 import { getMockCraIncomeForPeriod, calculateAverageMonthlyIncome, getIncomeConfidencePercentage } from '@/lib/mock-cra-income';
-import { calculateMonthlyMomentumPayment, getMomentumTermLength } from '@/lib/calculations';
+import { calculateMonthlyMomentumPayment, getMomentumTermLength, getMomentumFeePercentage } from '@/lib/calculations';
 
 // Dynamically import session-store to avoid SSR issues
 const getPlaidData = typeof window !== 'undefined' 
@@ -168,6 +168,7 @@ export default function DealSheetPage() {
   const [availableAccounts, setAvailableAccounts] = useState([]);
   const [liabilitiesData, setLiabilitiesData] = useState(null);
   const [calculatedProgramCost, setCalculatedProgramCost] = useState(0);
+  const [calculatorSettings, setCalculatorSettings] = useState(null);
   const [formData, setFormData] = useState({
     // Monthly Expenditure Details
     totalMonthlyIncome: '',
@@ -476,6 +477,23 @@ export default function DealSheetPage() {
     setIsMounted(true);
   }, []);
 
+  // Load calculator settings on mount
+  useEffect(() => {
+    const loadCalculatorSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/calculator-settings');
+        if (response.ok) {
+          const settings = await response.json();
+          setCalculatorSettings(settings);
+        }
+      } catch (error) {
+        console.error('Error loading calculator settings:', error);
+      }
+    };
+
+    loadCalculatorSettings();
+  }, []);
+
   // Load data on component mount
   useEffect(() => {
     loadPlaidData();
@@ -508,7 +526,7 @@ export default function DealSheetPage() {
         liabilitiesData.debt_summary.total_student_loan_debt;
 
       if (totalDebtAmount >= 15000) { // Minimum for Momentum plan
-        programCost = calculateMonthlyMomentumPayment(totalDebtAmount);
+        programCost = calculateMonthlyMomentumPayment(totalDebtAmount, calculatorSettings?.debtTiers);
         console.log('[DealSheet] Calculated fallback program cost:', programCost, 'for debt amount:', totalDebtAmount);
       }
     }
@@ -517,12 +535,17 @@ export default function DealSheetPage() {
     console.log('[DealSheet] Is using stored results?', !!momentumResults);
     console.log('[DealSheet] Is using fallback calculation?', programCost > 0 && !momentumResults);
     setCalculatedProgramCost(programCost);
-  }, [liabilitiesData]);
+  }, [liabilitiesData, calculatorSettings]);
 
   // Budget Verification: Calculate optimization based on excess liquidity
   const calculateBudgetVerification = () => {
     // Don't calculate during SSR to prevent hydration errors
     if (!isMounted) {
+      return null;
+    }
+
+    // Wait for calculator settings to load before calculating
+    if (!calculatorSettings) {
       return null;
     }
 
@@ -571,13 +594,38 @@ export default function DealSheetPage() {
     };
 
     const momentumResults = getMomentumResults();
-    const currentTerm = momentumResults?.term || getMomentumTermLength(momentumResults?.totalDebt || 0);
-    const totalDebt = momentumResults?.totalDebt || 0;
 
-    // Calculate the actual 15% program fee (not the total cost)
-    const programFeeAmount = totalDebt * 0.15;
+    // Get total debt from momentumResults or calculate from liabilities data
+    let totalDebt = momentumResults?.totalDebt || 0;
+    if (totalDebt === 0 && liabilitiesData?.debt_summary) {
+      totalDebt = liabilitiesData.debt_summary.total_credit_card_debt +
+                  liabilitiesData.debt_summary.total_student_loan_debt;
+    }
 
-    // Total program cost = settlement amount (60% of debt) + program fee (15% of debt)
+    // Always recalculate term based on current calculator settings (don't use stored term)
+    console.log('[DealSheet Budget Verification] Total Debt:', totalDebt);
+    console.log('[DealSheet Budget Verification] Calculator Settings:', calculatorSettings);
+    console.log('[DealSheet Budget Verification] Debt Tiers:', calculatorSettings?.debtTiers);
+
+    const currentTerm = getMomentumTermLength(totalDebt, calculatorSettings?.debtTiers);
+    console.log('[DealSheet Budget Verification] Calculated Term:', currentTerm);
+
+    // If we got a valid recalculated term and it differs from stored term, update sessionStorage
+    if (currentTerm > 0 && momentumResults && momentumResults.term !== currentTerm) {
+      console.log(`[DealSheet] Term mismatch detected. Stored: ${momentumResults.term}, Calculated: ${currentTerm}. Updating sessionStorage.`);
+      const updatedResults = {
+        ...momentumResults,
+        term: currentTerm,
+        totalCost: momentumResults.monthlyPayment * currentTerm
+      };
+      sessionStorage.setItem('momentumResults', JSON.stringify(updatedResults));
+    }
+
+    // Calculate the actual program fee based on debt tier (dynamic)
+    const feePercentage = getMomentumFeePercentage(totalDebt, calculatorSettings?.debtTiers);
+    const programFeeAmount = totalDebt * feePercentage;
+
+    // Total program cost = settlement amount (60% of debt) + program fee (dynamic % of debt)
     const totalProgramCost = (totalDebt * 0.60) + programFeeAmount;
 
     // Budget verification logic
@@ -606,6 +654,7 @@ export default function DealSheetPage() {
         currentTerm,
         totalProgramCost,
         programFeeAmount,
+        feePercentage,
         totalDebt,
         message: 'Your budget supports the proposed monthly payment.'
       };
@@ -615,14 +664,14 @@ export default function DealSheetPage() {
     // Optimization logic: Can shorten term or extend up to 1x max term
     const maxOptimizedTerm = currentTerm; // Can be extended up to 1x the current max term
 
-    // Calculate optimized monthly payment (client budget minus $50 legal/payment processing fee)
+    // Calculate optimized monthly payment (client budget minus $50 reserve buffer)
     const optimizedMonthlyPayment = availableFunds - 50;
 
-    // Payment toward program cost (excluding legal/processing fee)
-    const paymentTowardProgramCost = optimizedMonthlyPayment - 50;
+    // Payment toward program cost (excluding $50 reserve buffer and $50 legal/processing fee)
+    const paymentTowardProgramCost = availableFunds - 100;
 
     // Calculate optimized term: Total Program Cost / Payment Toward Program Cost
-    const optimizedTerm = Math.round(totalProgramCost / paymentTowardProgramCost);
+    const optimizedTerm = Math.ceil(totalProgramCost / paymentTowardProgramCost);
 
     // Round optimized term to nearest whole month
     const roundedOptimizedTerm = Math.round(optimizedTerm);
@@ -639,6 +688,7 @@ export default function DealSheetPage() {
       paymentTowardProgramCost,
       totalProgramCost,
       programFeeAmount,
+      feePercentage,
       totalDebt,
       message: 'Your budget allows for an optimized payment plan.'
     };
@@ -677,7 +727,7 @@ export default function DealSheetPage() {
         console.log('[DealSheet] Auto-saved optimized momentum results:', optimizedResults);
       }
     }
-  }, [isMounted, calculatedProgramCost, formData]);
+  }, [isMounted, calculatedProgramCost, formData, calculatorSettings]);
 
   // Listen for storage events to refresh when Plaid data is updated
   useEffect(() => {
@@ -1096,6 +1146,23 @@ export default function DealSheetPage() {
     return periodData;
   };
 
+  // Show loading state if calculator settings haven't loaded yet
+  if (!isMounted || !calculatorSettings) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="flex-1">
+          <div className="container mx-auto max-w-7xl px-4 py-6">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-4">Deal Sheet</h1>
+              <p>Loading calculator settings...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -1450,7 +1517,7 @@ export default function DealSheetPage() {
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Program Fees ($ Amount)</div>
                                   <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.programFeeAmount || 0)}</div>
-                                  <div className="text-xs text-gray-500">15% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
+                                  <div className="text-xs text-gray-500">{Math.round((budgetVerification.feePercentage || 0.15) * 100)}% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Program Months</div>
@@ -1459,7 +1526,7 @@ export default function DealSheetPage() {
                                 </div>
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Fee %</div>
-                                  <div className="text-base font-semibold text-gray-900">15%</div>
+                                  <div className="text-base font-semibold text-gray-900">{Math.round((budgetVerification.feePercentage || 0.15) * 100)}%</div>
                                   <div className="text-xs text-gray-500">Of total enrolled debt</div>
                                 </div>
                                 <div>
@@ -1535,7 +1602,7 @@ export default function DealSheetPage() {
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Program Fees ($ Amount)</div>
                                   <div className="text-base font-semibold text-gray-900">{formatCurrency(budgetVerification.programFeeAmount || 0)}</div>
-                                  <div className="text-xs text-gray-500">15% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
+                                  <div className="text-xs text-gray-500">{Math.round((budgetVerification.feePercentage || 0.15) * 100)}% of {formatCurrency(budgetVerification.totalDebt || 0)}</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Program Months</div>
@@ -1544,7 +1611,7 @@ export default function DealSheetPage() {
                                 </div>
                                 <div>
                                   <div className="text-xs text-gray-600 mb-1">Fee %</div>
-                                  <div className="text-base font-semibold text-gray-900">15%</div>
+                                  <div className="text-base font-semibold text-gray-900">{Math.round((budgetVerification.feePercentage || 0.15) * 100)}%</div>
                                   <div className="text-xs text-gray-500">Of total enrolled debt</div>
                                 </div>
                                 <div>

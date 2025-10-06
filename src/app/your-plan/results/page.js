@@ -291,27 +291,10 @@ export default function ResultsPage() {
                 belowMinimum: false
               };
 
-              // Check if there's an optimized plan from the deal sheet
+              // Always recalculate and save fresh results based on current calculator settings
+              // This ensures the term and payments reflect any changes made in the admin panel
               if (typeof window !== 'undefined') {
-                const existingResults = sessionStorage.getItem('momentumResults');
-                let existingParsed = null;
-                try {
-                  existingParsed = existingResults ? JSON.parse(existingResults) : null;
-                } catch {}
-
-                // If there's an optimized plan, use it and preserve the original plan data
-                if (existingParsed && existingParsed.isOptimized) {
-                  results.isOptimized = true;
-                  results.monthlyPayment = existingParsed.monthlyPayment;
-                  results.term = existingParsed.term;
-                  results.totalCost = existingParsed.totalCost;
-                  results.originalMonthlyPayment = existingParsed.originalMonthlyPayment || momentumMonthlyPayment;
-                  results.originalTerm = existingParsed.originalTerm || momentumTerm;
-                  results.excessLiquidity = existingParsed.excessLiquidity || 0;
-                } else {
-                  // Save the original plan to sessionStorage
-                  sessionStorage.setItem('momentumResults', JSON.stringify(results));
-                }
+                sessionStorage.setItem('momentumResults', JSON.stringify(results));
               }
 
               setMomentumResults(results);
