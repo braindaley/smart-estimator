@@ -12,34 +12,60 @@ export default function DocuSignPage() {
   const [step, setStep] = useState('review'); // 'review', 'signing', 'complete', 'waiting_coapplicant'
 
   useEffect(() => {
-    // Load user data from session storage
+    // Load user data from storage
     const loadUserData = () => {
       try {
-        // Get phone data
+        // Get user ID
+        const userId = sessionStorage.getItem('user_id') || 'user_123';
+
+        // Get phone data from sessionStorage
         const phoneData = JSON.parse(sessionStorage.getItem('phone_data') || '{}');
 
-        // Get co-applicant data
-        const stepStatus = JSON.parse(sessionStorage.getItem('loan_step_status') || '{}');
+        // Get co-applicant data from localStorage
+        const stepStatus = JSON.parse(localStorage.getItem('loan_step_status') || '{}');
         const coApplicantData = stepStatus.co_applicant_check?.data;
 
-        // Get credit data for user info
-        const userId = sessionStorage.getItem('user_id') || 'user_123';
-        const creditData = JSON.parse(sessionStorage.getItem(`credit_data_${userId}`) || '{}');
+        // Get credit data from localStorage (contains ALL personal details from credit check form)
+        const creditData = JSON.parse(localStorage.getItem(`credit_data_${userId}`) || '{}');
 
-        // Get momentum results
+        console.log('[DocuSign] Raw credit data:', creditData);
+
+        // Extract name from personalInfo or direct fields
+        const firstName = creditData.personalInfo?.name?.split(' ')[0] || '';
+        const lastName = creditData.personalInfo?.name?.split(' ').slice(1).join(' ') || '';
+
+        // Get address info from personalInfo
+        const address = creditData.personalInfo?.address || {
+          street: '',
+          city: '',
+          state: '',
+          zip: ''
+        };
+
+        // Get DOB and SSN from API response or requestData
+        const dob = creditData.requestData?.dob || '';
+        const ssn = creditData.requestData?.ssn || '';
+
+        // Get momentum results from sessionStorage
         const momentumResults = JSON.parse(sessionStorage.getItem('momentumResults') || '{}');
 
         const data = {
           userId,
           phone: phoneData.phoneNumber || '',
-          firstName: creditData.personalInfo?.name?.split(' ')[0] || '',
-          lastName: creditData.personalInfo?.name?.split(' ').slice(1).join(' ') || '',
-          email: `${userId}@example.com`, // In production, collect this
+          firstName,
+          lastName,
+          fullName: `${firstName} ${lastName}`.trim(),
+          address,
+          dob,
+          ssn: ssn ? `***-**-${ssn.slice(-4)}` : '', // Only show last 4 digits
+          email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
           hasCoApplicant: coApplicantData?.hasCoApplicant || false,
           coApplicantInfo: coApplicantData?.coApplicantInfo || null,
-          momentumResults
+          momentumResults,
+          rawCreditData: creditData // Keep for debugging
         };
 
+        console.log('[DocuSign] Loaded user data:', data);
         setUserData(data);
       } catch (err) {
         console.error('[DocuSign] Error loading user data:', err);
@@ -60,44 +86,22 @@ export default function DocuSignPage() {
     setError('');
 
     try {
-      // Create DocuSign envelope
-      const response = await fetch('/api/docusign/create-envelope', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: userData.userId,
-          signerName: `${userData.firstName} ${userData.lastName}`,
-          signerEmail: userData.email,
-          signerPhone: userData.phone,
-          hasCoApplicant: userData.hasCoApplicant,
-          coApplicantName: userData.coApplicantInfo?.name,
-          coApplicantEmail: userData.coApplicantInfo?.email || `${userData.coApplicantInfo?.name?.replace(/\s/g, '')}@example.com`,
-          coApplicantPhone: userData.coApplicantInfo?.phone,
-          momentumResults: userData.momentumResults
-        })
-      });
+      // Simulate envelope creation (prototype mode)
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const data = await response.json();
+      const mockEnvelopeId = `env-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const mockEnvelopeData = {
+        envelopeId: mockEnvelopeId,
+        signingUrl: '#', // Placeholder for prototype
+        coApplicantSigningUrl: userData.hasCoApplicant ? '#' : null
+      };
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create envelope');
-      }
+      setEnvelopeData(mockEnvelopeData);
 
-      setEnvelopeData(data);
-
-      // If there's a co-applicant, send SMS notification
-      if (userData.hasCoApplicant && data.coApplicantSigningUrl) {
-        await fetch('/api/docusign/notify-coapplicant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            envelopeId: data.envelopeId,
-            coApplicantName: userData.coApplicantInfo?.name,
-            coApplicantPhone: userData.coApplicantInfo?.phone,
-            coApplicantEmail: userData.coApplicantInfo?.email || `${userData.coApplicantInfo?.name?.replace(/\s/g, '')}@example.com`,
-            signingUrl: data.coApplicantSigningUrl
-          })
-        });
+      // If there's a co-applicant, simulate SMS notification
+      if (userData.hasCoApplicant) {
+        console.log(`[Prototype] SMS would be sent to ${userData.coApplicantInfo?.phone}`);
+        console.log(`[Prototype] Message: "Hi ${userData.coApplicantInfo?.name}, please sign the debt settlement agreement."`);
       }
 
       // Move to signing step
@@ -184,19 +188,40 @@ export default function DocuSignPage() {
 
                 {/* Signer Info */}
                 <div className="border-b pb-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Primary Signer</h3>
-                  <div className="text-sm space-y-1">
-                    <div>
-                      <span className="text-gray-600">Name:</span>
-                      <span className="ml-2">{userData.firstName} {userData.lastName}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Email:</span>
-                      <span className="ml-2">{userData.email}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Phone:</span>
-                      <span className="ml-2">{userData.phone}</span>
+                  <h3 className="font-medium text-gray-900 mb-3">Primary Signer Information</h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600 block mb-1">Full Name</span>
+                        <span className="font-medium">{userData.fullName || 'Not provided'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block mb-1">Date of Birth</span>
+                        <span className="font-medium">{userData.dob || 'Not provided'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block mb-1">Phone Number</span>
+                        <span className="font-medium">{userData.phone || 'Not provided'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block mb-1">SSN</span>
+                        <span className="font-medium">{userData.ssn || 'Not provided'}</span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-gray-600 block mb-1">Address</span>
+                        <span className="font-medium">
+                          {userData.address?.street ? (
+                            <>
+                              {userData.address.street}<br />
+                              {userData.address.city}, {userData.address.state} {userData.address.zip}
+                            </>
+                          ) : 'Not provided'}
+                        </span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-gray-600 block mb-1">Email</span>
+                        <span className="font-medium">{userData.email || 'Not provided'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -297,26 +322,32 @@ export default function DocuSignPage() {
             </div>
 
             <div className="space-y-4">
-              <a
-                href={envelopeData.signingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg text-center"
-              >
-                Open DocuSign to Sign
-              </a>
+              <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <p className="text-gray-600 mb-4">
+                  [Prototype Mode: DocuSign signing interface would appear here]
+                </p>
+                <div className="text-sm text-gray-500 space-y-2">
+                  <p>In production, this would:</p>
+                  <ul className="list-disc list-inside text-left max-w-md mx-auto">
+                    <li>Display the debt settlement agreement</li>
+                    <li>Show signature fields</li>
+                    <li>Allow electronic signing</li>
+                    <li>Validate all required fields</li>
+                  </ul>
+                </div>
+              </div>
 
               <button
                 onClick={handleSigningComplete}
-                className="w-full py-3 px-6 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
               >
-                I've Completed Signing
+                Simulate Signature Complete
               </button>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-              <strong>Note:</strong> After clicking "Open DocuSign to Sign", a new window will open.
-              Complete the signing process there, then return here and click "I've Completed Signing".
+              <strong>Prototype Note:</strong> This is a mockup of the DocuSign flow.
+              In production, users would interact with the actual DocuSign signing interface.
             </div>
           </div>
         )}
