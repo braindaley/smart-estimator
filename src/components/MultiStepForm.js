@@ -22,7 +22,7 @@ const STEPS = [
   { id: 1, name: 'Phone Verification', key: 'phone_verification' },
   { id: 2, name: 'Co-Applicant', key: 'co_applicant_check' },
   { id: 3, name: 'Bank Connection', key: 'bank_connection' },
-  { id: 4, name: 'Credit Check', key: 'credit_check' },
+  { id: 4, name: 'Debt Finder', key: 'credit_check' },
   { id: 5, name: 'Results', key: 'plan_generation' }
 ];
 
@@ -388,7 +388,7 @@ export default function MultiStepForm({ userId, onComplete }) {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Credit Check
+              Debt Finder
             </h2>
             <p className="text-gray-600 mb-6">
               Review your current debts to determine which accounts qualify for settlement
@@ -404,7 +404,7 @@ export default function MultiStepForm({ userId, onComplete }) {
                 <CreditCheckForm
                   userId={userId}
                   onSuccess={handleCreditCheck}
-                  buttonText="Start Credit Check"
+                  buttonText="Start Debt Finder"
                   className="w-full h-12"
                 />
               )}

@@ -467,16 +467,7 @@ export default function ResultsPage() {
                         </div>
                       </div>
                     </>
-                  ) : (
-                    <div className="p-4 bg-gray-50 rounded-lg text-center">
-                      <div className="text-sm text-gray-600 mb-2">
-                        <strong>Waiting for verification completion</strong>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Results will be available once both applicants complete their verification
-                      </div>
-                    </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
@@ -518,8 +509,28 @@ export default function ResultsPage() {
                 </div>
               </CardContent>
             </Card>
-          ) : momentumResults && currentPathResults && (!hasCoApplicant() || (verificationStatus.primaryCompleted && verificationStatus.coApplicantCompleted)) ? (
+          ) : momentumResults && currentPathResults && verificationStatus.primaryCompleted ? (
             <div className="space-y-8">
+              {/* Warning banner when co-applicant hasn't completed */}
+              {hasCoApplicant() && !verificationStatus.coApplicantCompleted && (
+                <Card className="border-yellow-300 bg-yellow-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-yellow-800 mb-1">
+                          Co-Applicant Verification Pending
+                        </div>
+                        <div className="text-xs text-yellow-700">
+                          The results below show only your individual debt settlement plan. Once {coApplicantData?.name} completes their bank and credit verification, the data may change to reflect your combined financial situation.
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {/* Results Table */}
               <Card>
                 <CardContent className="p-6">
@@ -557,7 +568,7 @@ export default function ResultsPage() {
                         This shows {coApplicantData?.name}'s individual debt settlement plan
                       </p>
                     </div>
-                  ) : viewMode === 'combined' && combinedResults ? (
+                  ) : viewMode === 'combined' && combinedResults && verificationStatus.coApplicantCompleted ? (
                     <div>
                       <div className="mb-4 p-4 bg-green-50 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
@@ -587,46 +598,6 @@ export default function ResultsPage() {
                 </CardContent>
               </Card>
 
-              {/* Verification Incomplete Message */}
-              {hasCoApplicant() && !(verificationStatus.primaryCompleted && verificationStatus.coApplicantCompleted) && (
-                <Card>
-                  <CardContent className="p-8">
-                    <div className="text-center">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100 mb-4">
-                        <svg className="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <h3 className="text-xl font-semibold mb-2">Verification In Progress</h3>
-                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Your debt settlement plan will be available once both you and {coApplicantData?.name} complete verification.
-                        This ensures we have accurate information for joint accounts and combined income.
-                      </p>
-
-                      <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                        <div className="text-sm text-blue-800">
-                          <strong>Next Steps:</strong>
-                          <ul className="mt-2 text-left space-y-1">
-                            {!verificationStatus.primaryCompleted && (
-                              <li>• Complete your verification (phone, bank, credit)</li>
-                            )}
-                            {!verificationStatus.coApplicantCompleted && (
-                              <li>• {coApplicantData?.name} needs to complete verification via the link sent to {coApplicantData?.phone}</li>
-                            )}
-                          </ul>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => window.location.href = '/your-plan'}
-                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Continue Verification
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Technical Documentation */}
               <Accordion type="single" collapsible className="mt-8">
@@ -693,31 +664,45 @@ export default function ResultsPage() {
                             <h4 className="font-semibold mb-2">Data Source:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                Plaid /credit/payroll_income/get API (CRA Income Verification)
+                                Plaid /credit/payroll_income/get API (CRA Income Verification)<br/>
+                                Backend Route: /api/plaid/cra/get-income
                               </code>
                             </div>
 
-                            <h4 className="font-semibold mb-2">Formula:</h4>
+                            <h4 className="font-semibold mb-2">What We Use:</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                <strong>Average Monthly Income = (Period 1 + Period 2 + Period 3) ÷ 3</strong><br/><br/>
-                                Where:<br/>
-                                • Period 1 = Last 30 days verified income<br/>
-                                • Period 2 = 31-60 days ago verified income<br/>
-                                • Period 3 = 61-90 days ago verified income
+                                <strong>income.summary.total_monthly_income</strong> - Plaid's calculated monthly income<br/><br/>
+                                <strong>Note:</strong> Plaid automatically calculates monthly income from all income streams,<br/>
+                                accounting for pay frequency, employment data, and bank deposits.<br/>
+                                <strong>No additional calculation needed.</strong>
                               </code>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
-                              <strong>Current User Values:</strong> $4,500/month
+                              <strong>Current User Values:</strong> $4,500/month (from Plaid's calculated value)
+                            </div>
+
+                            <h4 className="font-semibold mb-2">What Plaid Provides:</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                • total_monthly_income - Pre-calculated average monthly income<br/>
+                                • total_annual_income - Summed from projected_yearly_income<br/>
+                                • income_streams[] - Individual income sources with confidence scores<br/>
+                                • employment[] - Employer data with pay_frequency and annual_income<br/>
+                                • income_stability_score - Reliability metric
+                              </code>
                             </div>
 
                             <h4 className="font-semibold mb-2">Implementation:</h4>
                             <div className="bg-gray-100 p-4">
                               <code>
-                                const incomeData = await plaid.creditPayrollIncomeGet(access_token);<br/>
-                                const periods = incomeData.income_insights[0].income_streams[0].periods;<br/>
-                                const avgMonthlyIncome = (periods[0].monthly_income + periods[1].monthly_income + periods[2].monthly_income) / 3;
+                                // Call our backend API that wraps Plaid's CRA endpoint<br/>
+                                const response = await fetch('/api/plaid/cra/get-income');<br/>
+                                const data = await response.json();<br/>
+                                <br/>
+                                // Use the pre-calculated monthly income directly<br/>
+                                const monthlyIncome = data.income.summary.total_monthly_income;
                               </code>
                             </div>
                           </div>

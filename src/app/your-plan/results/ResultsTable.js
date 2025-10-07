@@ -1,5 +1,8 @@
 // Separate component to avoid re-rendering issues
+'use client';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useRouter } from 'next/navigation';
 
 const formatCurrency = (amount) => {
   if (amount === null || amount === undefined) return '$0';
@@ -12,9 +15,15 @@ const formatCurrency = (amount) => {
 };
 
 export default function ResultsTable({ momentumResults, currentPathResults }) {
+  const router = useRouter();
+
   if (!momentumResults || !currentPathResults) {
     return null;
   }
+
+  const handleStartPlan = () => {
+    router.push('/your-plan/docusign');
+  };
 
   return (
     <Table>
@@ -85,6 +94,15 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
                     The cost will not exceed $50/mo and will cover all of your potential legal fees.
                   </div>
                 </div>
+
+                <div className="mt-6">
+                  <button
+                    onClick={handleStartPlan}
+                    className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+                  >
+                    Start My Plan
+                  </button>
+                </div>
               </>
             )}
           </TableCell>
@@ -115,7 +133,7 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
           <TableCell className="text-left align-top px-4">
             <div className="text-sm font-bold mb-2">Summary</div>
             <ul className="text-xs space-y-1 list-disc list-inside">
-              <li><span className="font-semibold">Pros:</span> No monthly payment</li>
+              <li><span className="font-semibold">Pros:</span> No upfront costs</li>
               <li><span className="font-semibold">Cons:</span> Growing debt, no solution</li>
             </ul>
           </TableCell>

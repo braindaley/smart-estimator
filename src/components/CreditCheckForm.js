@@ -165,7 +165,7 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
       }
       
       // Navigate to results page
-      router.push(`/results/credit?session=${Date.now()}`);
+      router.push('/your-plan/results');
       
     } catch (error) {
       console.error('Error checking credit:', error);
@@ -194,7 +194,7 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
           <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Credit Check Information</h2>
+                <h2 className="text-xl font-bold">Debt Finder Information</h2>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-gray-500 hover:text-gray-700"
@@ -206,7 +206,7 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
               </div>
 
               <p className="text-sm text-gray-600 mb-4">
-                We'll perform a soft credit check to review your current debts. This won't affect your credit score.
+                We'll perform a soft credit check to review your current debts.
               </p>
 
               {errors.general && (
@@ -410,7 +410,7 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
                         Checking...
                       </span>
                     ) : (
-                      'Run Credit Check'
+                      'Run Debt Finder'
                     )}
                   </button>
                 </div>
