@@ -1,5 +1,5 @@
 
-import { DebtTier } from '@/lib/types/calculator-settings';
+import { DebtTier, CreditorData } from '@/lib/types/calculator-settings';
 
 // Basic Calculations
 export const calculateDtiEstimate = (monthlyPaymentEstimate: number, monthlyIncomeEstimate: number): number => {
@@ -23,9 +23,11 @@ function findDebtTier(debtAmount: number, tiers: DebtTier[], programType: 'momen
 export const getMomentumFeePercentage = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
   if (!debtTiers) {
     // Fallback to hardcoded values if no tiers provided
-    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 20000) return 0.20;
-    if (debtAmountEstimate >= 20001 && debtAmountEstimate <= 24000) return 0.15;
-    if (debtAmountEstimate >= 24001) return 0.15;
+    if (debtAmountEstimate >= 10000 && debtAmountEstimate <= 12499) return 0.15;
+    if (debtAmountEstimate >= 12500 && debtAmountEstimate <= 14999) return 0.15;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 0.20;
+    if (debtAmountEstimate >= 20000 && debtAmountEstimate <= 23999) return 0.15;
+    if (debtAmountEstimate >= 24000 && debtAmountEstimate <= 49999) return 0.15;
     return 0;
   }
 
@@ -49,9 +51,11 @@ export const getStandardFeePercentage = (debtAmountEstimate: number, debtTiers?:
 export const getMomentumTermLength = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
   if (!debtTiers) {
     // Fallback to hardcoded values if no tiers provided
-    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 20000) return 30;
-    if (debtAmountEstimate >= 20001 && debtAmountEstimate <= 24000) return 36;
-    if (debtAmountEstimate >= 24001) return 42;
+    if (debtAmountEstimate >= 10000 && debtAmountEstimate <= 12499) return 28;
+    if (debtAmountEstimate >= 12500 && debtAmountEstimate <= 14999) return 30;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 34;
+    if (debtAmountEstimate >= 20000 && debtAmountEstimate <= 23999) return 39;
+    if (debtAmountEstimate >= 24000 && debtAmountEstimate <= 49999) return 42;
     return 0;
   }
 
@@ -73,21 +77,224 @@ export const getStandardTermLength = (debtAmountEstimate: number, debtTiers?: De
   return tier ? tier.maxTerm : 0;
 };
 
+// Settlement Rate Calculations with dynamic tiers
+export const getMomentumSettlementRate = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded values if no tiers provided
+    if (debtAmountEstimate >= 10000 && debtAmountEstimate <= 12499) return 0.52;
+    if (debtAmountEstimate >= 12500 && debtAmountEstimate <= 14999) return 0.52;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 0.52;
+    if (debtAmountEstimate >= 20000 && debtAmountEstimate <= 23999) return 0.54;
+    if (debtAmountEstimate >= 24000 && debtAmountEstimate <= 49999) return 0.55;
+    return 0.60; // Default fallback
+  }
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'momentum');
+  return tier ? tier.settlementRate / 100 : 0.60;
+};
+
+export const getStandardSettlementRate = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
+  if (!debtTiers) {
+    // Fallback to hardcoded value
+    return 0.60;
+  }
+
+  const tier = findDebtTier(debtAmountEstimate, debtTiers, 'standard');
+  return tier ? tier.settlementRate / 100 : 0.60;
+};
+
+/**
+ * Get creditor-specific settlement rate based on program term
+ * @param creditorName - Name of creditor (e.g., "CHASE", "DISCOVER")
+ * @param programTermMonths - Program length in months (e.g., 28, 30, 34)
+ * @param creditorData - Creditor settlement data with term-based rates
+ * @param tierSettlementRate - Fallback tier rate as decimal (e.g., 0.52)
+ * @returns Settlement rate as decimal (e.g., 0.50 for 50%)
+ */
+export const getCreditorSettlementRate = (
+  creditorName: string,
+  programTermMonths: number,
+  creditorData?: CreditorData,
+  tierSettlementRate?: number
+): number => {
+  // If no creditor data available, use tier rate
+  if (!creditorData) {
+    return tierSettlementRate || 0.60;
+  }
+
+  // Normalize creditor name (uppercase, trim)
+  const normalizedName = creditorName.toUpperCase().trim();
+
+  // Look up creditor in database
+  const creditorRates = creditorData.creditorSettlementRates[normalizedName];
+
+  // If creditor not found, use tier-specific settlement rate
+  if (!creditorRates) {
+    return tierSettlementRate || (creditorData.fallbackRate / 100);
+  }
+
+  // Look up rate for specific term length
+  const rate = creditorRates[programTermMonths];
+
+  // If term not found, use tier rate as fallback
+  if (rate === undefined || rate === null) {
+    return tierSettlementRate || (creditorData.fallbackRate / 100);
+  }
+
+  return rate / 100; // Convert percentage to decimal
+};
+
 // Monthly Payment Calculations
 export const calculateMonthlyMomentumPayment = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
   const feePercentage = getMomentumFeePercentage(debtAmountEstimate, debtTiers);
   const termLength = getMomentumTermLength(debtAmountEstimate, debtTiers);
+  const settlementRate = getMomentumSettlementRate(debtAmountEstimate, debtTiers);
   if (termLength === 0) return 0;
-  return (debtAmountEstimate * feePercentage + debtAmountEstimate * 0.60) / termLength;
+  return (debtAmountEstimate * feePercentage + debtAmountEstimate * settlementRate) / termLength;
 };
 
 export const calculateMonthlyStandardPayment = (debtAmountEstimate: number, debtTiers?: DebtTier[]): number => {
   const feePercentage = getStandardFeePercentage(debtAmountEstimate, debtTiers);
   const termLength = getStandardTermLength(debtAmountEstimate, debtTiers);
+  const settlementRate = getStandardSettlementRate(debtAmountEstimate, debtTiers);
   if (termLength === 0) return 0;
-  return (debtAmountEstimate * feePercentage + debtAmountEstimate * 0.60) / termLength;
+  return (debtAmountEstimate * feePercentage + debtAmountEstimate * settlementRate) / termLength;
 };
 
+/**
+ * Account settlement details
+ */
+export interface AccountSettlement {
+  creditor: string;
+  balance: number;
+  settlementRate: number;
+  settlementAmount: number;
+}
+
+/**
+ * Detailed Momentum Plan calculation result
+ */
+export interface MomentumPlanDetailed {
+  totalDebt: number;
+  tier: string;
+  maxTermLength: number;
+  feePercentage: number;
+  tierSettlementRate: number;
+  accountSettlements: AccountSettlement[];
+  totalSettlement: number;
+  programFee: number;
+  totalCost: number;
+  minMonthlyPayment: number;
+  qualifies: boolean;
+  availableFunds: number;
+  excessLiquidity: number;
+  isOptimized: boolean;
+  term: number;
+  monthlyPayment: number;
+  accountCount: number;
+  originalMonthlyPayment?: number;
+  originalTerm?: number;
+}
+
+/**
+ * Calculate detailed Momentum Plan with creditor-specific settlement rates
+ * @param eligibleAccounts - Array of accounts with creditor name and balance
+ * @param debtTiers - Debt tier configuration
+ * @param creditorData - Creditor settlement data with term-based rates
+ * @param monthlyIncome - Optional: User's monthly income for qualification check
+ * @param monthlyExpenses - Optional: User's monthly expenses for qualification check
+ * @returns Detailed calculation results or null if no tier found
+ */
+export const calculateMomentumPlanDetailed = (
+  eligibleAccounts: Array<{creditor: string, balance: number}>,
+  debtTiers: DebtTier[],
+  creditorData?: CreditorData,
+  monthlyIncome?: number,
+  monthlyExpenses?: number
+): MomentumPlanDetailed | null => {
+  // 1. Calculate total debt
+  const totalDebt = eligibleAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+  // 2. Get tier info
+  const tier = findDebtTier(totalDebt, debtTiers, 'momentum');
+  if (!tier) return null;
+
+  const maxTermLength = tier.maxTerm;
+  const feePercentage = tier.feePercentage / 100;
+  const tierSettlementRate = tier.settlementRate / 100;
+
+  // 3. Calculate settlement per account using creditor-specific rates
+  const accountSettlements: AccountSettlement[] = eligibleAccounts.map(account => {
+    const creditorRate = getCreditorSettlementRate(
+      account.creditor,
+      maxTermLength,
+      creditorData,
+      tierSettlementRate
+    );
+
+    return {
+      creditor: account.creditor,
+      balance: account.balance,
+      settlementRate: creditorRate,
+      settlementAmount: account.balance * creditorRate
+    };
+  });
+
+  // 4. Calculate totals
+  const totalSettlement = accountSettlements.reduce((sum, acc) => sum + acc.settlementAmount, 0);
+  const programFee = totalDebt * feePercentage;
+  const totalCost = totalSettlement + programFee;
+  const minMonthlyPayment = totalCost / maxTermLength;
+
+  // 5. Income comparison and qualification (if income/expenses provided)
+  let qualifies = true;
+  let availableFunds = 0;
+  let excessLiquidity = 0;
+  let optimized = false;
+  let optimizedTerm = maxTermLength;
+  let optimizedMonthlyPayment = minMonthlyPayment;
+
+  if (monthlyIncome !== undefined && monthlyExpenses !== undefined) {
+    availableFunds = monthlyIncome - monthlyExpenses;
+    qualifies = minMonthlyPayment <= availableFunds;
+
+    // 6. Term optimization (if qualifies and has excess)
+    if (qualifies) {
+      excessLiquidity = availableFunds - minMonthlyPayment;
+
+      if (excessLiquidity >= 50) {
+        optimized = true;
+        optimizedMonthlyPayment = availableFunds - 50; // Leave $50 affordability buffer
+        optimizedTerm = Math.round(totalCost / optimizedMonthlyPayment);
+
+        // Ensure optimized term is at least 1 month
+        if (optimizedTerm < 1) optimizedTerm = 1;
+      }
+    }
+  }
+
+  return {
+    totalDebt,
+    tier: tier.id,
+    maxTermLength,
+    feePercentage: tier.feePercentage,
+    tierSettlementRate: tier.settlementRate,
+    accountSettlements,
+    totalSettlement,
+    programFee,
+    totalCost,
+    minMonthlyPayment,
+    qualifies,
+    availableFunds,
+    excessLiquidity,
+    isOptimized: optimized,
+    term: optimized ? optimizedTerm : maxTermLength,
+    monthlyPayment: optimized ? optimizedMonthlyPayment : minMonthlyPayment,
+    accountCount: eligibleAccounts.length,
+    originalMonthlyPayment: optimized ? minMonthlyPayment : undefined,
+    originalTerm: optimized ? maxTermLength : undefined
+  };
+};
 
 // Personal Loan Calculations
 export const getPersonalLoanApr = (ficoScore: number): number => {

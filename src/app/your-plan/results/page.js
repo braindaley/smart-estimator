@@ -7,7 +7,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import {
   calculateMonthlyMomentumPayment,
   getMomentumTermLength,
-  getMomentumFeePercentage
+  getMomentumFeePercentage,
+  getMomentumSettlementRate,
+  calculateMomentumPlanDetailed
 } from '@/lib/calculations';
 import ResultsTable from './ResultsTable';
 
@@ -257,8 +259,8 @@ export default function ResultsPage() {
 
           if (totalDebt > 0) {
             // Check if debt meets minimum for Momentum plan
-            if (totalDebt < 15000) {
-              // For debts below $15,000, use standard calculation
+            if (totalDebt < 10000) {
+              // For debts below $10,000, use standard calculation
               // or show a message that minimum is not met
               const results = {
                 monthlyPayment: 0,
@@ -267,7 +269,7 @@ export default function ResultsPage() {
                 totalDebt: totalDebt,
                 accountCount: eligible.length,
                 belowMinimum: true,
-                minimumRequired: 15000
+                minimumRequired: 10000
               };
 
               setMomentumResults(results);
@@ -277,17 +279,28 @@ export default function ResultsPage() {
                 sessionStorage.setItem('momentumResults', JSON.stringify(results));
               }
             } else {
-              // Calculate Momentum Plan
-              const momentumMonthlyPayment = calculateMonthlyMomentumPayment(totalDebt, calculatorSettings.debtTiers);
-              const momentumTerm = getMomentumTermLength(totalDebt, calculatorSettings.debtTiers);
-              const momentumTotalCost = momentumMonthlyPayment * momentumTerm;
+              // Calculate Momentum Plan with creditor-specific settlement rates
+              const accountsForCalculation = eligible.map(acc => ({
+                creditor: acc.creditor || 'UNKNOWN',
+                balance: typeof acc.balance === 'number' ? acc.balance : parseFloat(acc.balance) || 0
+              }));
+
+              // Try to get income/expenses for qualification check
+              // For now, we'll calculate without income data (will be added later when available)
+              const detailedResults = calculateMomentumPlanDetailed(
+                accountsForCalculation,
+                calculatorSettings.debtTiers,
+                calculatorSettings.creditorData
+                // monthlyIncome and monthlyExpenses can be added when available
+              );
+
+              if (!detailedResults) {
+                console.error('Failed to calculate Momentum plan - no tier found');
+                return;
+              }
 
               const results = {
-                monthlyPayment: momentumMonthlyPayment,
-                term: momentumTerm,
-                totalCost: momentumTotalCost,
-                totalDebt: totalDebt,
-                accountCount: eligible.length,
+                ...detailedResults,
                 belowMinimum: false
               };
 
@@ -893,41 +906,69 @@ export default function ResultsPage() {
                           <div>
                             <h3 className="font-bold text-lg mb-4">STEP 6: MOMENTUM PLAN CALCULATIONS</h3>
 
-                            <h4 className="font-semibold mb-2">A. Settlement Amount Per Account</h4>
+                            <h4 className="font-semibold mb-2">Calculation Flow Overview</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>1.</strong> Total Debt = Sum of all eligible account balances<br/>
+                                <strong>2.</strong> Determine Tier (based on Total Debt) → Max Term Length & Fee Rate<br/>
+                                <strong>3.</strong> Lookup Settlement Rate per Account (Creditor-specific, Term-based)<br/>
+                                <strong>4.</strong> Sum Settlement Amounts + Fee = Total Program Cost<br/>
+                                <strong>5.</strong> Calculate Monthly Payment (Total Cost ÷ Max Term Length)<br/>
+                                <strong>6.</strong> Optimize Term if excess budget ≥ $50 (Optional)
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">A. Determine Debt Tier & Program Term</h4>
+                            <div className="bg-gray-100 p-4 mb-4">
+                              <code>
+                                <strong>Momentum Program Tiers:</strong><br/>
+                                | Debt Range | Fee % | Max Term | Tier Settlement % |<br/>
+                                | $10,000-$12,499 | 15% | 28 months | 52% (fallback) |<br/>
+                                | $12,500-$14,999 | 15% | 30 months | 52% (fallback) |<br/>
+                                | $15,000-$19,000 | 20% | 34 months | 52% (fallback) |<br/>
+                                | $20,000-$23,999 | 15% | 39 months | 54% (fallback) |<br/>
+                                | $24,000-$49,999 | 15% | 42 months | 55% (fallback) |<br/>
+                                <br/>
+                                <strong>Note:</strong> Tier settlement % is used as fallback when creditor not found
+                              </code>
+                            </div>
+
+                            <h4 className="font-semibold mb-2">B. Settlement Amount Per Account (Term-Based Rates)</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
                                 <strong>Formula: Account Settlement = Balance × Settlement Rate</strong><br/><br/>
-                                Settlement Rates (<a href="/admin/program-calculator" className="text-blue-600 hover:underline">/admin/program-calculator</a>):<br/>
+                                <strong>Settlement rates vary by creditor AND program term length.</strong><br/>
+                                Configuration: <a href="/admin/program-calculator" className="text-blue-600 hover:underline">/admin/program-calculator</a> (Creditor Data section)<br/><br/>
+                                <strong>Example rates for 30-month term:</strong><br/>
                                 AMERICAN EXPRESS: 56% | CHASE: 58% | BANK OF AMERICA: 65%<br/>
-                                CAPITAL ONE: 65% | DISCOVER: 65% | Unknown: 60% (fallback)
+                                CAPITAL ONE: 65% | DISCOVER: 65%<br/><br/>
+                                <strong>Fallback hierarchy:</strong><br/>
+                                1. Creditor-specific rate for program term<br/>
+                                2. Tier settlement rate (if creditor not found)<br/>
+                                3. Global fallback: 60%
                               </code>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
-                              <strong>Current User Values:</strong><br/>
+                              <strong>Example Calculation (30-month program):</strong><br/>
                               CHASE: $8,500 × 0.58 = $4,930<br/>
                               DISCOVER: $6,200 × 0.65 = $4,030<br/>
                               CAPITAL ONE: $4,800 × 0.65 = $3,120<br/>
                               <strong>Total Settlement: $12,080</strong>
                             </div>
 
-                            <h4 className="font-semibold mb-2">B. Program Fee (Debt Tier-Based)</h4>
+                            <h4 className="font-semibold mb-2">C. Program Fee (Debt Tier-Based)</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                <strong>Momentum Program Tiers:</strong><br/>
-                                | Debt Range | Fee % | Max Term |<br/>
-                                | $15,000-$20,000 | 20% | 30 months |<br/>
-                                | $20,001-$24,000 | 15% | 36 months |<br/>
-                                | $24,001+ | 15% | 42 months |<br/>
-                                <br/>
-                                <strong>Formula: Program Fee = Total Eligible Debt × Fee %</strong>
+                                <strong>Formula: Program Fee = Total Eligible Debt × Fee %</strong><br/><br/>
+                                Fee percentage determined by debt tier (see section A above)
                               </code>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
-                              <strong>Current User Values:</strong><br/>
-                              Debt: $19,500 → Tier 1 (20% fee, 30 months)<br/>
-                              <strong>Program Fee: $19,500 × 0.20 = $3,900</strong>
+                              <strong>Example:</strong><br/>
+                              Debt: $17,000 → Tier 3 (20% fee, 34 months, 52% fallback settlement)<br/>
+                              <strong>Program Fee: $17,000 × 0.20 = $3,400</strong>
                               {momentumResults?.totalDebt && (
                                 <span>
                                   <br/>Your Actual: {formatCurrency(momentumResults.totalDebt)} × {(getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers) * 100).toFixed(0)}% = {formatCurrency(momentumResults.totalDebt * getMomentumFeePercentage(momentumResults.totalDebt, calculatorSettings.debtTiers))}
@@ -935,40 +976,52 @@ export default function ResultsPage() {
                               )}
                             </div>
 
-                            <h4 className="font-semibold mb-2">C. Monthly Payment</h4>
+                            <h4 className="font-semibold mb-2">D. Total Program Cost & Monthly Payment</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                <strong>Formula: Monthly Payment = (Settlement + Program Fee) ÷ Term</strong>
+                                <strong>Total Cost = Total Settlement + Program Fee</strong><br/>
+                                <strong>Monthly Payment = Total Cost ÷ Max Term Length</strong>
                               </code>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 p-3 mb-4">
-                              <strong>Current User Values:</strong><br/>
+                              <strong>Example:</strong><br/>
+                              Total Settlement: $12,080<br/>
+                              Program Fee: $3,900<br/>
                               Total Program Cost: $12,080 + $3,900 = $15,980<br/>
                               Term: 30 months<br/>
                               <strong>Monthly Payment: $15,980 ÷ 30 = $533/month</strong>
                               {momentumResults?.monthlyPayment && (
-                                <span><br/>Your Actual: {formatCurrency(momentumResults.monthlyPayment)}/month</span>
+                                <span><br/>Your Actual: {formatCurrency(momentumResults.monthlyPayment)}/month over {momentumResults.term} months</span>
                               )}
                             </div>
 
-                            <h4 className="font-semibold mb-2">D. Term Optimization (Optional)</h4>
+                            <h4 className="font-semibold mb-2">E. Term Optimization (Optional)</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
                                 <strong>Logic:</strong><br/>
-                                IF Excess Liquidity ≥ $50 THEN:<br/>
-                                &nbsp;&nbsp;Optimized Payment = Client Budget - $50<br/>
-                                &nbsp;&nbsp;Payment Toward Cost = Optimized Payment - $50<br/>
-                                &nbsp;&nbsp;Optimized Term = Total Program Cost ÷ Payment Toward Cost
+                                IF (Monthly Income - Monthly Expenses) - Min Monthly Payment ≥ $50 THEN:<br/>
+                                &nbsp;&nbsp;Optimized Payment = (Income - Expenses) - $50<br/>
+                                &nbsp;&nbsp;Optimized Term = Total Cost ÷ Optimized Payment<br/>
+                                <br/>
+                                <strong>$50 buffer</strong> ensures client has breathing room in their budget
                               </code>
                             </div>
 
                             <h4 className="font-semibold mb-2">Implementation:</h4>
                             <div className="bg-gray-100 p-4">
                               <code>
-                                const tier = debtTiers.find(t =&gt; totalEligibleDebt &gt;= t.minAmount && totalEligibleDebt &lt;= t.maxAmount);<br/>
-                                const programFee = totalEligibleDebt * (tier.feePercentage / 100);<br/>
-                                const totalProgramCost = totalSettlement + programFee;<br/>
+                                // See calculateMomentumPlanDetailed() in /lib/calculations.ts<br/>
+                                const tier = findDebtTier(totalDebt, debtTiers, 'momentum');<br/>
+                                const accountSettlements = eligibleAccounts.map(account =&gt; (&#123;<br/>
+                                &nbsp;&nbsp;creditor: account.creditor,<br/>
+                                &nbsp;&nbsp;balance: account.balance,<br/>
+                                &nbsp;&nbsp;settlementRate: getCreditorSettlementRate(account.creditor, tier.maxTerm, creditorData, tier.settlementRate / 100),<br/>
+                                &nbsp;&nbsp;settlementAmount: account.balance * settlementRate<br/>
+                                &#125;));<br/>
+                                const totalSettlement = accountSettlements.reduce((sum, acc) =&gt; sum + acc.settlementAmount, 0);<br/>
+                                const programFee = totalDebt * (tier.feePercentage / 100);<br/>
+                                const totalCost = totalSettlement + programFee;<br/>
                                 const monthlyPayment = totalProgramCost / tier.maxTermMonths;<br/>
                                 <br/>
                                 // Term optimization<br/>

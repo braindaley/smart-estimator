@@ -14,6 +14,7 @@ import {
   calculatePersonalLoanPayment,
   getMomentumTermLength,
   getMomentumFeePercentage,
+  getMomentumSettlementRate,
   getPersonalLoanApr,
   getMaximumPersonalLoanAmount,
   isEligibleForPersonalLoan,
@@ -749,9 +750,10 @@ export default function Results() {
                           <div className="ml-2 space-y-1">
                             <div>• Your Debt: {formatCurrency(allFormData.debtAmountEstimate)}</div>
                             <div>• Your Fee Percentage: {getMomentumFeePercentage(allFormData.debtAmountEstimate, calculatorSettings.debtTiers) * 100}%</div>
+                            <div>• Your Settlement Rate: {getMomentumSettlementRate(allFormData.debtAmountEstimate, calculatorSettings.debtTiers) * 100}%</div>
                             <div>• Your Term Length: {getMomentumTermLength(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)} months</div>
-                            <div>• Formula: ((debt × fee%) + (debt × 0.60)) ÷ term</div>
-                            <div>• Calculation: (({formatCurrency(allFormData.debtAmountEstimate)} × {getMomentumFeePercentage(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)}) + ({formatCurrency(allFormData.debtAmountEstimate)} × 0.60)) ÷ {getMomentumTermLength(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)} = {formatCurrency(results.momentum.monthlyPayment)}/mo</div>
+                            <div>• Formula: ((debt × fee%) + (debt × settlement%)) ÷ term</div>
+                            <div>• Calculation: (({formatCurrency(allFormData.debtAmountEstimate)} × {getMomentumFeePercentage(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)}) + ({formatCurrency(allFormData.debtAmountEstimate)} × {getMomentumSettlementRate(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)})) ÷ {getMomentumTermLength(allFormData.debtAmountEstimate, calculatorSettings.debtTiers)} = {formatCurrency(results.momentum.monthlyPayment)}/mo</div>
                             <div>• Total Cost: {formatCurrency(results.momentum.monthlyPayment)} × {results.momentum.term} = {formatCurrency(results.momentum.totalCost)}</div>
                           </div>
 
@@ -761,7 +763,7 @@ export default function Results() {
                               .filter(tier => tier.programType === 'momentum')
                               .map((tier, index) => (
                                 <div key={index}>
-                                  • {formatCurrency(tier.minAmount)}-{formatCurrency(tier.maxAmount)}: {tier.feePercentage}% fee, {tier.maxTerm} months
+                                  • {formatCurrency(tier.minAmount)}-{formatCurrency(tier.maxAmount)}: {tier.feePercentage}% fee, {tier.maxTerm} months, {tier.settlementRate}% settlement
                                 </div>
                               ))}
                           </div>

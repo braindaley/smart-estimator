@@ -87,6 +87,49 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
                   </div>
                 )}
 
+                {momentumResults.accountSettlements && momentumResults.accountSettlements.length > 0 && (
+                  <div className="mt-4 text-xs text-left">
+                    <div className="text-sm font-bold mb-2">Settlement Breakdown</div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead className="sticky top-0 bg-blue-50">
+                          <tr className="border-b">
+                            <th className="text-left py-1 px-2">Creditor</th>
+                            <th className="text-right py-1 px-2">Balance</th>
+                            <th className="text-right py-1 px-2">Rate</th>
+                            <th className="text-right py-1 px-2">Settlement</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {momentumResults.accountSettlements.map((acc, idx) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-1 px-2 font-medium">{acc.creditor}</td>
+                              <td className="text-right py-1 px-2">{formatCurrency(acc.balance)}</td>
+                              <td className="text-right py-1 px-2">{(acc.settlementRate * 100).toFixed(1)}%</td>
+                              <td className="text-right py-1 px-2">{formatCurrency(acc.settlementAmount)}</td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold border-t-2">
+                            <td className="py-1 px-2" colSpan="3">Total Settlement</td>
+                            <td className="text-right py-1 px-2">{formatCurrency(momentumResults.totalSettlement)}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 px-2" colSpan="3">Program Fee ({momentumResults.feePercentage}%)</td>
+                            <td className="text-right py-1 px-2">{formatCurrency(momentumResults.programFee)}</td>
+                          </tr>
+                          <tr className="font-bold border-t">
+                            <td className="py-1 px-2" colSpan="3">Total Cost</td>
+                            <td className="text-right py-1 px-2">{formatCurrency(momentumResults.totalCost)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      Settlement rates are creditor-specific and based on your {momentumResults.term}-month program term.
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 text-xs text-left">
                   <div className="text-sm font-bold mb-2">Legal Assistance Program</div>
                   <div className="text-xs">

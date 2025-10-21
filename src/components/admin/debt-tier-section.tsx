@@ -25,7 +25,8 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
     maxAmount: 0,
     feePercentage: 0,
     maxTerm: 0,
-    legalProcessingFee: 0
+    legalProcessingFee: 0,
+    settlementRate: 60
   });
 
   const handleEdit = (tier: DebtTier) => {
@@ -92,7 +93,8 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
       feePercentage: newTier.feePercentage!,
       maxTerm: newTier.maxTerm!,
       legalProcessingFee: newTier.legalProcessingFee || 0,
-      programType: 'momentum'
+      programType: 'momentum',
+      settlementRate: newTier.settlementRate || 60
     };
 
     onChange([...debtTiers, tier]);
@@ -103,7 +105,8 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
       maxAmount: 0,
       feePercentage: 0,
       maxTerm: 0,
-      legalProcessingFee: 0
+      legalProcessingFee: 0,
+      settlementRate: 60
     });
   };
 
@@ -188,6 +191,16 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                   onChange={(e) => setNewTier({ ...newTier, legalProcessingFee: parseFloat(e.target.value) })}
                 />
               </div>
+              <div>
+                <Label>Settlement Rate (%)</Label>
+                <Input
+                  type="number"
+                  value={newTier.settlementRate}
+                  onChange={(e) => setNewTier({ ...newTier, settlementRate: parseFloat(e.target.value) })}
+                  min="0"
+                  max="100"
+                />
+              </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button onClick={handleAddNew} size="sm">
@@ -212,6 +225,7 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                   <TableHead>Fee %</TableHead>
                   <TableHead>Max Term</TableHead>
                   <TableHead>Legal Fee</TableHead>
+                  <TableHead>Settlement %</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -263,6 +277,16 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                           />
                         </TableCell>
                         <TableCell>
+                          <Input
+                            type="number"
+                            value={editingTier?.settlementRate}
+                            onChange={(e) => setEditingTier({ ...editingTier!, settlementRate: parseFloat(e.target.value) })}
+                            className="w-20"
+                            min="0"
+                            max="100"
+                          />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex gap-1">
                             <Button onClick={handleSaveEdit} size="sm" variant="ghost">
                               <Save className="h-4 w-4" />
@@ -280,6 +304,7 @@ export function DebtTierSection({ debtTiers, onChange }: DebtTierSectionProps) {
                         <TableCell>{tier.feePercentage}%</TableCell>
                         <TableCell>{tier.maxTerm} mo</TableCell>
                         <TableCell>${tier.legalProcessingFee}</TableCell>
+                        <TableCell>{tier.settlementRate || 60}%</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
                             <Button onClick={() => handleEdit(tier)} size="sm" variant="ghost">

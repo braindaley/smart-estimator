@@ -6,12 +6,17 @@ export interface DebtTier {
   maxTerm: number;
   legalProcessingFee: number;
   programType: 'momentum' | 'standard';
+  settlementRate: number; // Settlement rate percentage for this tier
 }
 
 export interface SettlementConfig {
   fallbackSettlementRate: number;
   minimumExcessLiquidity: number;
   enableSettlementRateValidation: boolean;
+  programFallbackRates?: {
+    momentum: number;
+    standard: number;
+  };
 }
 
 export interface FeeStructure {
@@ -55,7 +60,7 @@ export interface BusinessRules {
 }
 
 export interface CreditorData {
-  creditorSettlementRates: Record<string, number>;
+  creditorSettlementRates: Record<string, Record<number, number>>;
   fallbackRate: number;
   lastUpdated: string;
 }
