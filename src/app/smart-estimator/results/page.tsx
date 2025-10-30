@@ -865,12 +865,11 @@ export default function Results() {
 
                           <div className="font-medium mt-3">Debt Amount Points Logic:</div>
                           <div className="ml-2 space-y-1">
-                            <div>• $15,000-$24,999: 3 points</div>
-                            <div>• $25,000-$34,999: 11 points</div>
-                            <div>• $35,000-$49,999: 8 points</div>
-                            <div>• $50,000-$74,999: 6 points</div>
-                            <div>• $75,000+: 2 points</div>
-                            <div>• Below $15,000: 0 points</div>
+                            <div>• $11,250: 0 pts</div>
+                            <div>• $13,750: 2 pts</div>
+                            <div>• $17,000: 4 pts</div>
+                            <div>• $22,000: 11 pts</div>
+                            <div>• $37,000: 10 pts</div>
                           </div>
 
                           <div className="font-medium mt-3">Creditor Count Points Logic:</div>

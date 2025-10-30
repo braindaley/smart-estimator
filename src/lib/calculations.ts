@@ -371,12 +371,13 @@ interface MomentumScoreInput {
 }
 
 function mapDebtAmountToPoints(debtAmount: number): number {
-    if (debtAmount >= 15000 && debtAmount < 25000) return 3;   // was 5, now ~3.5 -> 3
-    if (debtAmount >= 25000 && debtAmount < 35000) return 11;  // was 15, now ~10.5 -> 11
-    if (debtAmount >= 35000 && debtAmount < 50000) return 8;   // was 12, now ~8.4 -> 8
-    if (debtAmount >= 50000 && debtAmount < 75000) return 6;   // was 8, now ~5.6 -> 6
-    if (debtAmount >= 75000) return 2;                          // was 3, now ~2.1 -> 2
-    return 0; // Below minimum
+    if (debtAmount < 11250) return 0;                           // Below $11,250: 0 pts
+    if (debtAmount >= 11250 && debtAmount < 13750) return 0;    // $11,250: 0 pts
+    if (debtAmount >= 13750 && debtAmount < 17000) return 2;    // $13,750: 2 pts
+    if (debtAmount >= 17000 && debtAmount < 22000) return 4;    // $17,000: 4 pts
+    if (debtAmount >= 22000 && debtAmount < 37000) return 11;   // $22,000: 11 pts
+    if (debtAmount >= 37000) return 10;                         // $37,000: 10 pts
+    return 0;
 }
 
 function mapCreditorsToPoints(creditorCount: number): number {
