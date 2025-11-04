@@ -73,10 +73,8 @@ function getQualificationStatus(formData: any): Qualification {
     return { hideColumns, hideComparison: true };
   }
 
-  // Hide Personal Loan column when credit score < 580 or debt exceeds FICO-based limits
-  if (userFicoScoreEstimate < 580 || !isEligibleForPersonalLoan(debtAmountEstimate, userFicoScoreEstimate)) {
-    hideColumns.push('personalLoan');
-  }
+  // Always hide Personal Loan column
+  hideColumns.push('personalLoan');
 
   // For all other cases, show comparison table
   return { hideColumns, hideComparison: false };
@@ -772,51 +770,6 @@ export default function Results() {
                       </div>
 
                       <div>
-                        <h5 className="font-medium text-gray-600">Personal Loan Calculations:</h5>
-                        <div className="ml-4 space-y-2 text-xs">
-                          <div className="font-medium">Current User Values:</div>
-                          <div className="ml-2 space-y-1">
-                            <div>• Your FICO Score: {allFormData.userFicoScoreEstimate}</div>
-                            <div>• Your APR: {(getPersonalLoanApr(allFormData.userFicoScoreEstimate) * 100).toFixed(2)}%</div>
-                            <div>• Term: 36 months (fixed)</div>
-                            <div>• Your Max Loan Amount: {formatCurrency(getMaximumPersonalLoanAmount(allFormData.userFicoScoreEstimate))}</div>
-                            <div>• Actual Loan Amount: {formatCurrency(results.personalLoan.actualLoanAmount)}</div>
-                            <div>• Monthly Rate: {((getPersonalLoanApr(allFormData.userFicoScoreEstimate) / 12) * 100).toFixed(4)}%</div>
-                            <div>• Formula: PMT(rate, nper, pv) where rate = monthly APR, nper = 36, pv = loan amount</div>
-                            <div>• Calculation: PMT({((getPersonalLoanApr(allFormData.userFicoScoreEstimate) / 12) * 100).toFixed(4)}%, 36, {formatCurrency(results.personalLoan.actualLoanAmount)}) = {formatCurrency(results.personalLoan.monthlyPayment)}/mo</div>
-                            <div>• Total Cost: {formatCurrency(results.personalLoan.monthlyPayment)} × 36 = {formatCurrency(results.personalLoan.totalCost)}</div>
-                            <div>• Eligible: {isEligibleForPersonalLoan(allFormData.debtAmountEstimate, allFormData.userFicoScoreEstimate) ? 'Yes' : 'No'}</div>
-                          </div>
-
-                          <div className="font-medium mt-3">APR by Credit Score Ranges:</div>
-                          <div className="ml-2 space-y-1">
-                            <div>• 720+: 10.25% APR</div>
-                            <div>• 690-719: 13.25% APR</div>
-                            <div>• 660-689: 18.00% APR</div>
-                            <div>• 620-659: 25.00% APR</div>
-                            <div>• &lt;620: 150.00% APR (very high risk)</div>
-                          </div>
-
-                          <div className="font-medium mt-3">Max Loan Amount by Credit Score:</div>
-                          <div className="ml-2 space-y-1">
-                            <div>• 720+: {formatCurrency(50000)} max</div>
-                            <div>• 690-719: {formatCurrency(40000)} max</div>
-                            <div>• 660-689: {formatCurrency(30000)} max</div>
-                            <div>• 620-659: {formatCurrency(20000)} max</div>
-                            <div>• &lt;620: {formatCurrency(5000)} max</div>
-                          </div>
-
-                          <div className="font-medium mt-3">Eligibility Logic:</div>
-                          <div className="ml-2 space-y-1">
-                            <div>• Must have steady income</div>
-                            <div>• FICO score ≥ 580</div>
-                            <div>• Debt amount ≤ max loan amount for score</div>
-                            <div>• Fixed 36-month term</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
                         <h5 className="font-medium text-red-600">Current Path Calculations:</h5>
                         <div className="ml-4 space-y-2 text-xs">
                           <div className="font-medium">Current User Values:</div>
@@ -923,12 +876,9 @@ export default function Results() {
                             <div>• Result: Shows "Unfortunately without steady income, we do not have a solutions for you."</div>
                           </div>
 
-                          <div className="font-medium mt-3">Hide Personal Loan Column When:</div>
+                          <div className="font-medium mt-3">Hide Personal Loan Column:</div>
                           <div className="ml-2 space-y-1">
-                            <div>• FICO score &lt; 580 OR</div>
-                            <div>• Debt amount exceeds max loan amount for credit score OR</div>
-                            <div>• No steady income</div>
-                            <div>• Max loan amounts: 720+ = $50K, 690-719 = $40K, 660-689 = $30K, 620-659 = $20K, &lt;620 = $5K</div>
+                            <div>• Personal Loan column is always hidden</div>
                           </div>
 
                           <div className="font-medium mt-3">Always Show:</div>
