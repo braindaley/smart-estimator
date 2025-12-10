@@ -12,6 +12,8 @@ import {
   calculateMomentumPlanDetailed
 } from '@/lib/calculations';
 import ResultsTable from './ResultsTable';
+import { getPlaidData } from '@/lib/session-store';
+import { calculateAverageMonthlyIncome } from '@/lib/mock-cra-income';
 
 // Function to get credit data
 const getCreditData = () => {
@@ -151,6 +153,57 @@ export default function ResultsPage() {
     primaryCompleted: false,
     coApplicantCompleted: false
   });
+  const [budgetData, setBudgetData] = useState({
+    totalMonthlyIncome: 0,
+    totalMonthlyExpenses: 0
+  });
+
+  // Load budget data from Plaid
+  useEffect(() => {
+    const loadBudgetData = () => {
+      try {
+        const plaidData = getPlaidData();
+
+        // Get income from Plaid data or use calculated average
+        let totalIncome = 0;
+        if (plaidData?.income?.income_summary?.total_monthly_income) {
+          totalIncome = plaidData.income.income_summary.total_monthly_income;
+        } else {
+          totalIncome = calculateAverageMonthlyIncome();
+        }
+
+        // Get expenses from Plaid transactions if available
+        let totalExpenses = 0;
+        if (plaidData?.transactions) {
+          // Calculate expenses from transaction categories (excluding income categories)
+          const expenseCategories = plaidData.transactions.filter(tx => {
+            const category = tx.personal_finance_category?.primary || tx.category?.[0] || '';
+            return !category.includes('INCOME') && tx.amount > 0;
+          });
+
+          // Group by month and calculate average
+          const last90Days = new Date();
+          last90Days.setDate(last90Days.getDate() - 90);
+
+          const recentExpenses = expenseCategories.filter(tx =>
+            new Date(tx.date) >= last90Days
+          );
+
+          const totalExpenseAmount = recentExpenses.reduce((sum, tx) => sum + tx.amount, 0);
+          totalExpenses = totalExpenseAmount / 3; // Average over 3 months
+        }
+
+        setBudgetData({
+          totalMonthlyIncome: totalIncome,
+          totalMonthlyExpenses: totalExpenses
+        });
+      } catch (error) {
+        console.error('Error loading budget data:', error);
+      }
+    };
+
+    loadBudgetData();
+  }, []);
 
   // Load calculator settings
   useEffect(() => {
@@ -611,6 +664,91 @@ export default function ResultsPage() {
                 </CardContent>
               </Card>
 
+              {/* Budget Summary Section */}
+              <Card className="mt-6">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Budget Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <div className="text-sm text-gray-600 mb-1">Total Monthly Income</div>
+                      <div className="text-2xl font-bold text-green-700">
+                        {formatCurrency(budgetData.totalMonthlyIncome)}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">From verified bank data</div>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-4">
+                      <div className="text-sm text-gray-600 mb-1">Total Monthly Expenses</div>
+                      <div className="text-2xl font-bold text-red-700">
+                        {formatCurrency(budgetData.totalMonthlyExpenses)}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">90-day average from transactions</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-blue-800">Net Monthly Cash Flow</span>
+                      <span className={`text-lg font-bold ${budgetData.totalMonthlyIncome - budgetData.totalMonthlyExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(budgetData.totalMonthlyIncome - budgetData.totalMonthlyExpenses)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Debt Summary Section */}
+              {momentumResults && eligibleAccounts.length > 0 && (
+                <Card className="mt-6">
+                  <CardContent className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Debt Portfolio Summary</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Creditor</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-700">Balance</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-700">Est. Settlement</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(momentumResults.accountSettlements || eligibleAccounts.map(acc => {
+                            const balance = typeof acc.balance === 'number' ? acc.balance : parseFloat(acc.balance) || 0;
+                            const settlementRate = (momentumResults.tierSettlementRate || 60) / 100;
+                            return {
+                              creditor: acc.creditor || 'Unknown',
+                              balance: balance,
+                              settlementAmount: balance * settlementRate
+                            };
+                          })).map((account, index) => (
+                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="py-3 px-4 font-medium">{account.creditor}</td>
+                              <td className="py-3 px-4 text-right text-gray-600">{formatCurrency(account.balance)}</td>
+                              <td className="py-3 px-4 text-right text-green-600 font-medium">{formatCurrency(account.settlementAmount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-300 bg-gray-50">
+                            <td className="py-3 px-4 font-bold">Total</td>
+                            <td className="py-3 px-4 text-right font-bold">{formatCurrency(momentumResults.totalDebt)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-green-600">{formatCurrency(momentumResults.totalSettlement || momentumResults.totalDebt * 0.6)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-green-800">Estimated Savings</span>
+                        <span className="text-lg font-bold text-green-600">
+                          {formatCurrency(momentumResults.totalDebt - (momentumResults.totalSettlement || momentumResults.totalDebt * 0.6))}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Settlement rates based on creditor-specific negotiation history
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Technical Documentation */}
               <Accordion type="single" collapsible className="mt-8">
