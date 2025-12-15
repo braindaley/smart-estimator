@@ -38,8 +38,8 @@ function calculateCurrentPath(debtAmount: number) {
   const baseYears = 11 * aprAdjustment; // ~12 years at 24% APR
   const baseTotalCost = 4300 * scalingFactor * aprAdjustment; // ~2.3x debt amount
   
-  // Monthly payment starts around 2.5% of balance, decreasing over time
-  const initialMonthlyPayment = Math.round(debtAmount * 0.025);
+  // Monthly payment starts around 3.5% of balance, decreasing over time
+  const initialMonthlyPayment = Math.round(debtAmount * 0.035);
   
   return {
     monthlyPayment: initialMonthlyPayment,

@@ -9,7 +9,8 @@ const SESSION_KEYS = {
   CREDIT_DATA: 'credit_data',
   PHONE_VERIFIED: 'phone_verified',
   PHONE_DATA: 'phone_data',
-  USER_STEPS: 'user_steps'
+  USER_STEPS: 'user_steps',
+  DEBT_GOAL_PREFERENCE: 'debt_goal_preference'
 };
 
 // Store step completion status
@@ -198,6 +199,41 @@ export const clearPhoneData = () => {
     const steps = getStepStatus();
     if (steps.phone_verification) {
       delete steps.phone_verification;
+      localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
+    }
+  }
+};
+
+// Store debt goal preference
+export const storeDebtGoalPreference = (userId, preference) => {
+  if (typeof window !== 'undefined') {
+    const data = {
+      userId,
+      preference,
+      storedAt: new Date().toISOString()
+    };
+    localStorage.setItem(SESSION_KEYS.DEBT_GOAL_PREFERENCE, JSON.stringify(data));
+    setStepCompleted('debt_goal_preference', true, { preference });
+  }
+};
+
+// Get debt goal preference
+export const getDebtGoalPreference = () => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(SESSION_KEYS.DEBT_GOAL_PREFERENCE);
+    return stored ? JSON.parse(stored) : null;
+  }
+  return null;
+};
+
+// Clear debt goal preference
+export const clearDebtGoalPreference = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(SESSION_KEYS.DEBT_GOAL_PREFERENCE);
+    // Update user steps to remove debt goal preference step
+    const steps = getStepStatus();
+    if (steps.debt_goal_preference) {
+      delete steps.debt_goal_preference;
       localStorage.setItem(SESSION_KEYS.USER_STEPS, JSON.stringify(steps));
     }
   }

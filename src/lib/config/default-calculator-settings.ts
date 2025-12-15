@@ -27,8 +27,8 @@ export const defaultCalculatorSettings: CalculatorSettings = {
       id: 'momentum-tier-3',
       minAmount: 15000,
       maxAmount: 19000,
-      feePercentage: 20,
-      maxTerm: 34,
+      feePercentage: 15,
+      maxTerm: 36,
       legalProcessingFee: 50,
       programType: 'momentum',
       settlementRate: 52

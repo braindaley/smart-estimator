@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PhoneVerificationStep from './steps/PhoneVerificationStep';
 import CoApplicantDetectionStep from './steps/CoApplicantDetectionStep';
+import DebtGoalPreferenceStep from './steps/DebtGoalPreferenceStep';
 import PlaidLink from './PlaidLink';
 import CreditCheckForm from './CreditCheckForm';
 import PersonaSelector from './PersonaSelector';
@@ -14,7 +15,8 @@ import {
   storePlaidData,
   generateResultsUrl,
   storeCreditData,
-  storePhoneData
+  storePhoneData,
+  storeDebtGoalPreference
 } from '@/lib/session-store';
 import { getTokenClient } from '@/lib/client-token-store';
 
@@ -23,7 +25,8 @@ const STEPS = [
   { id: 2, name: 'Co-Applicant', key: 'co_applicant_check' },
   { id: 3, name: 'Bank Connection', key: 'bank_connection' },
   { id: 4, name: 'Debt Finder', key: 'credit_check' },
-  { id: 5, name: 'Results', key: 'plan_generation' }
+  { id: 5, name: 'Your Goals', key: 'debt_goal_preference' },
+  { id: 6, name: 'Results', key: 'plan_generation' }
 ];
 
 export default function MultiStepForm({ userId, onComplete }) {
@@ -34,7 +37,8 @@ export default function MultiStepForm({ userId, onComplete }) {
     hasCoApplicant: null,
     coApplicantInfo: null,
     bankConnected: false,
-    creditChecked: false
+    creditChecked: false,
+    debtGoalPreference: null
   });
   const [stepStatus, setStepStatus] = useState({});
   const [isProcessing, setIsProcessing] = useState({});
@@ -46,6 +50,12 @@ export default function MultiStepForm({ userId, onComplete }) {
 
     // Determine current step based on completion
     if (currentStepStatus.phone_verification?.completed &&
+        currentStepStatus.co_applicant_check?.completed &&
+        currentStepStatus.bank_connection?.completed &&
+        currentStepStatus.credit_check?.completed &&
+        currentStepStatus.debt_goal_preference?.completed) {
+      setCurrentStep(6);
+    } else if (currentStepStatus.phone_verification?.completed &&
         currentStepStatus.co_applicant_check?.completed &&
         currentStepStatus.bank_connection?.completed &&
         currentStepStatus.credit_check?.completed) {
@@ -251,12 +261,30 @@ export default function MultiStepForm({ userId, onComplete }) {
     setStepStatus(newStepStatus);
     setStepData(prev => ({ ...prev, creditChecked: true }));
 
-    // Move to results
+    // Move to debt goal preference step
     setCurrentStep(5);
 
     if (onComplete) {
       onComplete(creditData);
     }
+  };
+
+  const handleDebtGoalPreference = (preferenceData) => {
+    console.log('[MultiStepForm] Debt goal preference selected:', preferenceData);
+
+    // Store preference data
+    storeDebtGoalPreference(userId, preferenceData.preference);
+
+    // Update local state
+    const newStepStatus = getStepStatus();
+    setStepStatus(newStepStatus);
+    setStepData(prev => ({
+      ...prev,
+      debtGoalPreference: preferenceData.preference
+    }));
+
+    // Move to results step
+    setCurrentStep(6);
   };
 
   const goToResults = () => {
@@ -413,6 +441,14 @@ export default function MultiStepForm({ userId, onComplete }) {
         );
 
       case 5:
+        return (
+          <DebtGoalPreferenceStep
+            onComplete={handleDebtGoalPreference}
+            onBack={() => setCurrentStep(4)}
+          />
+        );
+
+      case 6:
         return (
           <div className="max-w-md mx-auto text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-4">

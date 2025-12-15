@@ -3,6 +3,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter } from 'next/navigation';
+import { getDebtGoalPreference } from '@/lib/session-store';
 
 const formatCurrency = (amount) => {
   if (amount === null || amount === undefined) return '$0';
@@ -20,6 +21,10 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
   if (!momentumResults || !currentPathResults) {
     return null;
   }
+
+  // Check user's debt goal preference to determine if we should show term optimization
+  const debtGoalPreference = getDebtGoalPreference();
+  const showTermOptimization = debtGoalPreference?.preference !== 'lower_payments';
 
   const handleStartPlan = () => {
     router.push('/your-plan/docusign');
@@ -75,7 +80,7 @@ export default function ResultsTable({ momentumResults, currentPathResults }) {
                   <div>Total cost: {formatCurrency(momentumResults.totalCost)}</div>
                 </div>
 
-                {momentumResults.isOptimized && (
+                {momentumResults.isOptimized && showTermOptimization && (
                   <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-left">
                     <div className="font-semibold text-green-800 mb-1">✓ Budget Optimized</div>
                     <div className="text-green-700">

@@ -25,7 +25,7 @@ export const getMomentumFeePercentage = (debtAmountEstimate: number, debtTiers?:
     // Fallback to hardcoded values if no tiers provided
     if (debtAmountEstimate >= 10000 && debtAmountEstimate <= 12499) return 0.15;
     if (debtAmountEstimate >= 12500 && debtAmountEstimate <= 14999) return 0.15;
-    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 0.20;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 0.15;
     if (debtAmountEstimate >= 20000 && debtAmountEstimate <= 23999) return 0.15;
     if (debtAmountEstimate >= 24000 && debtAmountEstimate <= 49999) return 0.15;
     return 0;
@@ -53,7 +53,7 @@ export const getMomentumTermLength = (debtAmountEstimate: number, debtTiers?: De
     // Fallback to hardcoded values if no tiers provided
     if (debtAmountEstimate >= 10000 && debtAmountEstimate <= 12499) return 28;
     if (debtAmountEstimate >= 12500 && debtAmountEstimate <= 14999) return 30;
-    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 34;
+    if (debtAmountEstimate >= 15000 && debtAmountEstimate <= 19000) return 36;
     if (debtAmountEstimate >= 20000 && debtAmountEstimate <= 23999) return 39;
     if (debtAmountEstimate >= 24000 && debtAmountEstimate <= 49999) return 42;
     return 0;

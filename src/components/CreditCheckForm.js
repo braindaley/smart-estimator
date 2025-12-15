@@ -158,14 +158,11 @@ export default function CreditCheckForm({ userId, onSuccess, buttonText = 'Check
       
       // Close modal
       setIsOpen(false);
-      
-      // Call success callback
+
+      // Call success callback - let the parent component handle navigation
       if (onSuccess) {
         onSuccess(data);
       }
-      
-      // Navigate to results page
-      router.push('/your-plan/results');
       
     } catch (error) {
       console.error('Error checking credit:', error);

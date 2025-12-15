@@ -75,7 +75,7 @@ function calculateCurrentPath(debtAmount) {
   const aprAdjustment = 24 / 22;
   const baseYears = 11 * aprAdjustment;
   const baseTotalCost = 4300 * scalingFactor * aprAdjustment;
-  const initialMonthlyPayment = Math.round(debtAmount * 0.025);
+  const initialMonthlyPayment = Math.round(debtAmount * 0.035);
 
   return {
     monthlyPayment: initialMonthlyPayment,
@@ -1137,7 +1137,12 @@ export default function ResultsPage() {
                             <h4 className="font-semibold mb-2">E. Term Optimization (Optional)</h4>
                             <div className="bg-gray-100 p-4 mb-4">
                               <code>
-                                <strong>Logic:</strong><br/>
+                                <strong>User Preference Check:</strong><br/>
+                                During the Your Plan flow, user is asked: "Which option is more important to you?"<br/>
+                                &nbsp;&nbsp;• "Getting Debt-Free Faster" → Show Term Optimization if logic allows<br/>
+                                &nbsp;&nbsp;• "Lowering Your Monthly Payments" → Hide Term Optimization even if logic allows<br/>
+                                <br/>
+                                <strong>Calculation Logic (when preference allows):</strong><br/>
                                 IF (Monthly Income - Monthly Expenses) - Min Monthly Payment ≥ $50 THEN:<br/>
                                 &nbsp;&nbsp;Optimized Payment = (Income - Expenses) - $50<br/>
                                 &nbsp;&nbsp;Optimized Term = Total Cost ÷ Optimized Payment<br/>
