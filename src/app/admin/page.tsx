@@ -104,6 +104,32 @@ export default function AdminPage() {
               </div>
             </Card>
 
+            {/* Deal Sheet Card */}
+            <Card className="p-6 hover:shadow-lg transition-shadow">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-orange-100 rounded-lg">
+                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold">Deal Sheet</h2>
+                </div>
+
+                <p className="text-sm text-gray-600">
+                  View and manage deal sheet information for client plans.
+                </p>
+
+                <div className="pt-2">
+                  <Link href="/your-plan/deal-sheet">
+                    <Button className="w-full bg-orange-600 hover:bg-orange-700">
+                      View Deal Sheet
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </Card>
+
           </div>
 
           {/* Back Button */}
